@@ -26,109 +26,173 @@ export default function HomeScreen({ navigation }) {
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const blurIntensityAnim = useRef(new Animated.Value(0)).current;
 
-  // Wave and background animations
   useEffect(() => {
-    // Wave animation
-    Animated.loop(
-     // This is correct - width animation needs native driver false
-Animated.timing(progressAnim, {
-  toValue: 0.7,
-  duration: 1800,
-  easing: Easing.out(Easing.exp),
-  useNativeDriver: false, // Keep this as false
-}),
-    ).start();
+    // Store animation references for cleanup
+    const animations = [];
     
-    // Floating animation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        })
-      ])
-    ).start();
+    // Separate animation creation from starting
+    const createAndStartAnimation = (animation) => {
+      animations.push(animation);
+      animation.start();
+      return animation;
+    };
     
-    // Rotating animation
-    Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 30000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    ).start();
-
-    // Master animation sequence
-    Animated.parallel([
-      // Fade in
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 1200,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      
-      // Slide up
-      Animated.stagger(120, [
-        Animated.timing(slideAnim, {
-          toValue: 1,
-          duration: 1200,
-          easing: Easing.out(Easing.back(1.5)),
-          useNativeDriver: true,
-        }),
-        // Progress bar animation
+    // Wave animation - already infinite with Animated.loop
+    const waveAnimation = createAndStartAnimation(
+      Animated.loop(
         Animated.timing(progressAnim, {
           toValue: 0.7,
           duration: 1800,
           easing: Easing.out(Easing.exp),
-          useNativeDriver: false,
+          useNativeDriver: false, // Required for layout animations like width
         })
-      ]),
-      
-      // Scale animation
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 1500,
-        easing: Easing.elastic(1),
-        useNativeDriver: true,
-      }),
-      
-      // Blur intensity animation
-      Animated.timing(blurIntensityAnim, {
-        toValue: 1,
-        duration: 2000,
-        easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: false,
-      }),
-      
-      // Pulse effect
+      )
+    );
+    
+    // Floating animation - already infinite with Animated.loop
+    const floatAnimation = createAndStartAnimation(
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.05,
-            duration: 1200,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
+          Animated.timing(floatAnim, {
             toValue: 1,
-            duration: 1200,
-            easing: Easing.inOut(Easing.sin),
+            duration: 2000,
+            easing: Easing.inOut(Easing.quad),
             useNativeDriver: true,
           }),
+          Animated.timing(floatAnim, {
+            toValue: 0,
+            duration: 2000,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          })
         ])
       )
-    ]).start();
-  }, []);
+    );
+    
+    // Rotating animation - already infinite with Animated.loop
+    const rotateAnimation = createAndStartAnimation(
+      Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 20000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      )
+    );
+  
+    // Master animation sequence - making it infinite with Animated.loop
+    const masterAnimation = createAndStartAnimation(
+      Animated.loop( // Added loop here to make the entire sequence infinite
+        Animated.sequence([
+          // Initial animations sequence
+          Animated.stagger(80, [
+            // Fade in
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 800,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+            
+            // Parallel animations for core elements
+            Animated.parallel([
+              // Slide up with improved back easing
+              Animated.timing(slideAnim, {
+                toValue: 1,
+                duration: 1000,
+                easing: Easing.out(Easing.back(1.7)),
+                useNativeDriver: true,
+              }),
+              
+              // Progress bar animation
+              Animated.timing(progressAnim, {
+                toValue: 0.7,
+                duration: 1500,
+                easing: Easing.out(Easing.exp),
+                useNativeDriver: false,
+              }),
+              
+              // Scale animation with reduced elasticity
+              Animated.timing(scaleAnim, {
+                toValue: 1,
+                duration: 1200,
+                easing: Easing.elastic(1.2),
+                useNativeDriver: true,
+              }),
+            ]),
+          ]),
+          
+          // Long-running continuous animations
+          Animated.parallel([
+            // Blur intensity animation cycle
+            Animated.sequence([
+              Animated.timing(blurIntensityAnim, {
+                toValue: 1,
+                duration: 1500,
+                easing: Easing.inOut(Easing.cubic),
+                useNativeDriver: false,
+              }),
+              Animated.timing(blurIntensityAnim, {
+                toValue: 0.5, // Cycle between full and half blur
+                duration: 1500,
+                easing: Easing.inOut(Easing.cubic),
+                useNativeDriver: false,
+              })
+            ]),
+            
+            // Pulse effect - already infinite
+            Animated.loop(
+              Animated.sequence([
+                Animated.timing(pulseAnim, {
+                  toValue: 1.03,
+                  duration: 1500,
+                  easing: Easing.inOut(Easing.sin),
+                  useNativeDriver: true,
+                }),
+                Animated.timing(pulseAnim, {
+                  toValue: 1,
+                  duration: 1500,
+                  easing: Easing.inOut(Easing.sin),
+                  useNativeDriver: true,
+                }),
+              ])
+            ),
+            
+            // Add delay before resetting the main sequence
+            Animated.delay(10000) // Allow animations to run for 10 seconds before restarting
+          ]),
+          
+          // Reset animations before looping
+          Animated.parallel([
+            Animated.timing(fadeAnim, {
+              toValue: 0, // Reset fade
+              duration: 800,
+              easing: Easing.in(Easing.cubic),
+              useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+              toValue: 0, // Reset slide
+              duration: 800,
+              easing: Easing.in(Easing.cubic),
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 0, // Reset scale
+              duration: 800,
+              easing: Easing.in(Easing.cubic),
+              useNativeDriver: true,
+            }),
+          ])
+        ])
+      )
+    );
+  
+    // Cleanup function to stop all animations when component unmounts
+    return () => {
+      animations.forEach(animation => animation.stop());
+    };
+  }, );
 
   const features = [
     {
@@ -152,7 +216,7 @@ Animated.timing(progressAnim, {
     {
       id: 3,
       title: 'Vocabulary',
-      icon: 'dictionary',
+      icon: 'book-open-variant',
       color: '#45B7D1',
       gradientColors: ['#45B7D1', '#67D1E9'],
       route: 'Vocabulary',
@@ -179,26 +243,31 @@ Animated.timing(progressAnim, {
     setIsDarkMode(!isDarkMode);
   };
 
-  const theme = {
-    background: isDarkMode ? '#0A0A0A' : '#F5F7FA',
-    text: isDarkMode ? '#FFFFFF' : '#1A1A1A',
-    card: isDarkMode ? 'rgba(25,25,25,0.85)' : 'rgba(255,255,255,0.92)',
+const theme = {
+    background: isDarkMode ? '#0A0A0A' : '#F8FAFC',
+    text: isDarkMode ? '#FFFFFF' : '#0F172A',
+    card: isDarkMode ? 'rgba(20,20,20,0.95)' : 'rgba(255,255,255,0.96)',
     accent: isDarkMode ? '#A78AFF' : '#6C63FF',
-    secondaryText: isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
-    shadow: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.15)',
-    featureCard: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.85)',
-    featureText: isDarkMode ? '#FFFFFF' : '#1A1A1A',
-    tabBar: isDarkMode ? 'rgba(18,18,18,0.92)' : 'rgba(255,255,255,0.92)',
-    progressBackground: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(108,99,255,0.1)',
-    iconBackground: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(108,99,255,0.1)',
-    cardBorder: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-    wavePrimary: isDarkMode ? 'rgba(138,124,255,0.15)' : 'rgba(108,99,255,0.1)',
-    waveSecondary: isDarkMode ? 'rgba(167,138,255,0.1)' : 'rgba(167,138,255,0.05)',
-    glassReflection: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.2)',
-    glassBorder: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.5)',
+    accentHover: isDarkMode ? '#917CFF' : '#574FD1',
+    secondaryText: isDarkMode ? 'rgba(255,255,255,0.85)' : 'rgba(15,23,42,0.75)',
+    shadow: isDarkMode ? 'rgba(108,99,255,0.15)' : 'rgba(108,99,255,0.1)',
+    featureCard: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.9)',
+    featureText: isDarkMode ? '#FFFFFF' : '#0F172A',
+    tabBar: isDarkMode ? 'rgba(25,25,25,0.95)' : 'rgba(255,255,255,0.95)',
+    progressBackground: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(108,99,255,0.15)',
+    iconBackground: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(108,99,255,0.15)',
+    cardBorder: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+    wavePrimary: isDarkMode ? 'rgba(138,124,255,0.2)' : 'rgba(108,99,255,0.15)',
+    waveSecondary: isDarkMode ? 'rgba(167,138,255,0.15)' : 'rgba(167,138,255,0.1)',
+    glassReflection: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.25)',
+    glassBorder: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)',
     backgroundGlow1: isDarkMode ? '#6C63FF' : '#A78AFF',
     backgroundGlow2: isDarkMode ? '#8A42A5' : '#6C63FF',
     backgroundGlow3: isDarkMode ? '#4E46E5' : '#FFD166',
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444',
+    overlay: isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)',
   };
 
   // Animated Background Component
@@ -550,111 +619,164 @@ Animated.timing(progressAnim, {
         </Animated.View>
 
         {/* Daily Goal Progress */}
-        <Animated.View 
-          style={[
-            styles.goalContainer,
-            { 
-              opacity: slideAnim,
-              transform: [{
-                translateY: slideAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [50, 0]
-                })
-              }]
-            }
-          ]}
-        >
-          <GlassPanel
-          onPress={()=>{}}
-            style={[
-              styles.goalCard,
-              {
-                shadowColor: theme.shadow,
-                shadowOffset: { width: 0, height: 12 },
-                shadowOpacity: isDarkMode ? 0.3 : 0.2,
-                shadowRadius: 20,
-                elevation: 15,
-                borderColor: theme.glassBorder,
-                borderWidth: 1
-              }
-            ]}
-            intensity={70}
+<Animated.View 
+  style={[
+    styles.goalContainer,
+    { 
+      opacity: slideAnim,
+      transform: [{
+        translateY: slideAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [50, 0]
+        })
+      }]
+    }
+  ]}
+>
+  <GlassPanel
+    onPress={() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      navigation.navigate('Achievements');
+    }}
+    style={[
+      styles.goalCard,
+      {
+        shadowColor: theme.shadow,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: isDarkMode ? 0.3 : 0.2,
+        shadowRadius: 16,
+        elevation: 10,
+        borderColor: theme.glassBorder,
+        borderWidth: 1
+      }
+    ]}
+    intensity={75}
+  >
+    <View style={styles.goalHeader}>
+      <View style={styles.titleContainer}>
+        <MaterialCommunityIcons name="trophy-outline" size={18} color={theme.accent} style={{marginRight: 6}} />
+        <Text style={[styles.goalTitle, { color: theme.text }]}>Daily Goal</Text>
+      </View>
+      <Pressable 
+        style={({ pressed }) => ({ 
+          opacity: pressed ? 0.7 : 1,
+          transform: [{ scale: pressed ? 0.95 : 1 }],
+          flexDirection: 'row',
+          alignItems: 'center'
+        })}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          navigation.navigate('Achievements');
+        }}
+      >
+        <Text style={[styles.viewAll, { color: theme.accent }]}>View All</Text>
+        <MaterialCommunityIcons name="chevron-right" size={16} color={theme.accent} style={{marginLeft: 2}} />
+      </Pressable>
+    </View>
+    
+    <View style={styles.progressContainer}>
+      <View style={[styles.progressBar, { backgroundColor: theme.progressBackground }]}>
+        <Animated.View style={{
+          width: progressAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['0%', '100%']
+          }),
+          height: '100%',
+          borderRadius: 8,
+        }}>
+          <LinearGradient
+            colors={isDarkMode ? ['#8A7CFF', '#A78AFF'] : ['#6C63FF', '#A78AFF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.progress, {
+              shadowColor: isDarkMode ? '#8A7CFF' : '#6C63FF',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.8,
+              shadowRadius: 8,
+            }]}
           >
-            <View style={styles.goalHeader}>
-              <Text style={[styles.goalTitle, { color: theme.text }]}>Daily Goal</Text>
-              <Pressable 
-                style={({ pressed }) => ({ 
-                  opacity: pressed ? 0.7 : 1,
-                  transform: [{ scale: pressed ? 0.95 : 1 }]
-                })}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  navigation.navigate('Achievements');
-                }}
-              >
-                <Text style={[styles.viewAll, { color: theme.accent }]}>View All</Text>
-              </Pressable>
-            </View>
-            
-            <View style={[styles.progressBar, { backgroundColor: theme.progressBackground }]}>
-              <Animated.View style={{
-                width: progressAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0%', '100%']
-                }),
-                height: '100%',
-                borderRadius: 8,
-              }}>
-                <LinearGradient
-                  colors={isDarkMode ? ['#8A7CFF', '#A78AFF'] : ['#6C63FF', '#A78AFF']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={[styles.progress, {
-                    shadowColor: isDarkMode ? '#8A7CFF' : '#6C63FF',
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.8,
-                    shadowRadius: 8,
-                  }]}
-                >
-                  <Animated.View 
-                    style={[
-                      styles.progressGlow,
-                      {
-                        opacity: pulseAnim.interpolate({
-                          inputRange: [1, 1.05],
-                          outputRange: [0.5, 0.8]
-                        })
-                      }
-                    ]}
-                  />
-                </LinearGradient>
-              </Animated.View>
-            </View>
-            
-            <View style={styles.goalDetails}>
-              <View style={styles.goalFooter}>
-                <Text style={[styles.goalText, { color: theme.secondaryText }]}>7/10 Task completed</Text>
-                <View style={[styles.badge, { backgroundColor: isDarkMode ? 'rgba(255,215,0,0.2)' : 'rgba(255,215,0,0.15)' }]}>
-                  <Animated.View style={{
-                    transform: [{
-                      rotate: pulseAnim.interpolate({
-                        inputRange: [1, 1.05],
-                        outputRange: ['0deg', '20deg']
-                      })
-                    }]
-                  }}>
-                    <MaterialCommunityIcons name="star" size={16} color="#FFD700" />
-                  </Animated.View>
-                </View>
-              </View>
-              
-              <View style={styles.timeContainer}>
-                <MaterialCommunityIcons name="clock-outline" size={14} color={theme.secondaryText} />
-                <Text style={[styles.timeText, { color: theme.secondaryText }]}>20 mins left</Text>
-              </View>
-            </View>
-          </GlassPanel>
+            <Animated.View 
+              style={[
+                styles.progressGlow,
+                {
+                  opacity: pulseAnim.interpolate({
+                    inputRange: [1, 1.05],
+                    outputRange: [0.5, 0.8]
+                  })
+                }
+              ]}
+            />
+          </LinearGradient>
         </Animated.View>
+      </View>
+      
+      <Text style={[styles.progressText, { color: theme.text, marginLeft: 0 }]}>
+        70<Text style={{ fontSize: 14, color: theme.secondaryText }}>%</Text>
+      </Text>
+    </View>
+    
+    <View style={styles.goalDetails}>
+      <View style={styles.goalFooter}>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <MaterialCommunityIcons name="checkbox-marked-circle-outline" size={16} color={theme.accent} style={{marginRight: 4}} />
+          <Text style={[styles.goalText, { color: theme.secondaryText }]}>
+            <Text >7</Text>/10 Tasks completed
+          </Text>
+        </View>
+        <View style={[styles.badge, { 
+          backgroundColor: isDarkMode ? 'rgba(255,215,0,0.15)' : 'rgba(255,215,0,0.1)',
+          borderWidth: 1,
+          borderColor: 'rgba(255,215,0,0.3)',
+          paddingHorizontal: 8,
+          paddingVertical: 4,
+          borderRadius: 12,
+          flexDirection: 'row',
+          alignItems: 'center'
+        }]}>
+          <Animated.View style={{
+            transform: [{
+              rotate: pulseAnim.interpolate({
+                inputRange: [1, 1.05],
+                outputRange: ['0deg', '15deg']
+              })
+            }]
+          }}>
+            <MaterialCommunityIcons name="star" size={16} color="#000" />
+          </Animated.View>
+          <Text style={{ color: '#000', marginLeft: 4, fontWeight: '800', fontSize: 12 }}>70 pts</Text>
+        </View>
+      </View>
+      
+      <View style={styles.timeContainer}>
+        <MaterialCommunityIcons name="clock-outline" size={14} color={theme.secondaryText} style={{marginRight: 4}} />
+
+      </View>
+    </View>
+    
+    <Pressable 
+      style={({ pressed }) => ([
+        styles.continueButton, {
+          backgroundColor: theme.accent,
+          opacity: pressed ? 0.9 : 1,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
+          marginTop: 12,
+          paddingVertical: 10,
+          borderRadius: 8,
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }
+      ])}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        // Handle continue action
+      }}
+    >
+      <Text style={{color: '#FFFFFF', fontWeight: '600', marginRight: 6}}>Continue</Text>
+      <MaterialCommunityIcons name="arrow-right" size={18} color="#FFFFFF" />
+    </Pressable>
+  </GlassPanel>
+</Animated.View>
 
         {/* Features Grid */}
         <View style={styles.featuresGrid}>
