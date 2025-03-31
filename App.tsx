@@ -8,7 +8,7 @@ import ConversationScreen from "./screens/ConversationScreen"
 import GrammarScreen from "./screens/GrammarScreen"
 import VocabularyScreen from "./screens/VocabularyScreen"
 import PronunciationScreen from "./screens/PronunciationScreen"
-
+import 'react-native-gesture-handler';
 const Stack = createNativeStackNavigator();
 
 function RootStack() {
