@@ -166,24 +166,6 @@ Animated.timing(progressAnim, {
       gradientColors: ['#96CEB4', '#B6E8D3'],
       route: 'Pronunciation',
       description: 'Perfect your accent'
-    },
-    {
-      id: 5,
-      title: 'Challenges',
-      icon: 'trophy',
-      color: '#FFD166',
-      gradientColors: ['#FFD166', '#FFE38A'],
-      route: 'Challenge',
-      description: 'Test your knowledge'
-    },
-    {
-      id: 6,
-      title: 'Culture',
-      icon: 'earth',
-      color: '#A78AFF',
-      gradientColors: ['#A78AFF', '#C3AFFF'],
-      route: 'Culture',
-      description: 'Learn cultural context'
     }
   ];
 
@@ -651,7 +633,7 @@ Animated.timing(progressAnim, {
             
             <View style={styles.goalDetails}>
               <View style={styles.goalFooter}>
-                <Text style={[styles.goalText, { color: theme.secondaryText }]}>7/10 exercises completed</Text>
+                <Text style={[styles.goalText, { color: theme.secondaryText }]}>7/10 Task completed</Text>
                 <View style={[styles.badge, { backgroundColor: isDarkMode ? 'rgba(255,215,0,0.2)' : 'rgba(255,215,0,0.15)' }]}>
                   <Animated.View style={{
                     transform: [{
@@ -668,7 +650,7 @@ Animated.timing(progressAnim, {
               
               <View style={styles.timeContainer}>
                 <MaterialCommunityIcons name="clock-outline" size={14} color={theme.secondaryText} />
-                <Text style={[styles.timeText, { color: theme.secondaryText }]}>20 mins left today</Text>
+                <Text style={[styles.timeText, { color: theme.secondaryText }]}>20 mins left</Text>
               </View>
             </View>
           </GlassPanel>

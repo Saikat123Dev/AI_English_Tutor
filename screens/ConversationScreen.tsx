@@ -15,16 +15,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 
+
 export default function ConversationScreen({ navigation }) {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: "Hi! I'm your language learning assistant. Let's practice conversation! What would you like to talk about?", timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+    { 
+      role: 'assistant', 
+      content: "Hi! I'm your language learning assistant. Let's practice conversation! What would you like to talk about?",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+    }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollViewRef = useRef();
 
   useEffect(() => {
-    // Scroll to bottom when messages change
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollToEnd({ animated: true });
     }
@@ -72,112 +76,97 @@ export default function ConversationScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#128C7E" barStyle="light-content" />
+      <StatusBar backgroundColor="#6C63FF" barStyle="light-content" />
       
+      {/* Redesigned Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-            <Ionicons name="arrow-back" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <Image 
-            source={{ uri: 'https://via.placeholder.com/40' }} 
-            style={styles.avatar} 
-          />
-          <View>
-            <Text style={styles.headerTitle}>Language Assistant</Text>
-            <Text style={styles.headerSubtitle}>online</Text>
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('Home')}
+          style={styles.backButton}
+        >
+          <Ionicons name="chevron-back" size={28} color="#FFF" />
+        </TouchableOpacity>
+        
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Language Partner</Text>
+          <View style={styles.onlineIndicator}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.onlineText}>Active now</Text>
           </View>
         </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="videocam" size={22} color="#FFF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="call" size={20} color="#FFF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="ellipsis-vertical" size={20} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.chatBackground}>
-        <Image 
-          source={{ uri: 'https://i.stack.imgur.com/RLQNm.png' }} 
-          style={styles.backgroundImage} 
-          resizeMode="repeat" 
-        />
         
-        <ScrollView 
-          style={styles.chatContainer}
-          ref={scrollViewRef}
-          contentContainerStyle={styles.chatContentContainer}
-        >
-          {messages.map((message, index) => (
-            <View
-              key={index}
-              style={[
-                styles.messageContainer,
-                message.role === 'user' ? styles.userMessage : styles.assistantMessage
-              ]}
-            >
-              <View style={[
-                styles.messageBubble,
-                message.role === 'user' ? styles.userBubble : styles.assistantBubble
-              ]}>
-                <Text style={[
-                  styles.messageText,
-                  message.role === 'user' ? styles.userText : styles.assistantText
-                ]}>
-                  {message.content}
-                </Text>
-                <Text style={styles.timestamp}>{message.timestamp}</Text>
-              </View>
-            </View>
-          ))}
-          {isLoading && (
-            <View style={[styles.messageContainer, styles.assistantMessage]}>
-              <View style={[styles.messageBubble, styles.assistantBubble, styles.loadingBubble]}>
-                <Text style={styles.typingText}>typing</Text>
-                <ActivityIndicator size="small" color="#34B7F1" />
-              </View>
-            </View>
-          )}
-        </ScrollView>
+        <TouchableOpacity style={styles.infoButton}>
+          <Ionicons name="information-circle-outline" size={28} color="#FFF" />
+        </TouchableOpacity>
       </View>
 
+      {/* Chat Area */}
+      <ScrollView 
+        ref={scrollViewRef}
+        contentContainerStyle={styles.chatContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {messages.map((message, index) => (
+          <View
+            key={index}
+            style={[
+              styles.messageRow,
+              message.role === 'user' && styles.userRow
+            ]}
+          >
+            <View style={[
+              styles.messageBubble,
+              message.role === 'user' ? styles.userBubble : styles.assistantBubble
+            ]}>
+              <Text style={styles.messageText}>{message.content}</Text>
+              <Text style={styles.timestamp}>{message.timestamp}</Text>
+            </View>
+          </View>
+        ))}
+        
+        {isLoading && (
+          <View style={[styles.messageRow, styles.typingIndicator]}>
+            <View style={styles.typingBubble}>
+              <View style={styles.typingDot} />
+              <View style={styles.typingDot} />
+              <View style={styles.typingDot} />
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Input Area */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.inputContainer}
       >
-        <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.attachButton}>
-            <Ionicons name="add" size={24} color="#128C7E" />
-          </TouchableOpacity>
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.input}
-              value={input}
-              onChangeText={setInput}
-              placeholder="Message"
-              placeholderTextColor="#8696A0"
-              multiline
-            />
-            <TouchableOpacity style={styles.emojiButton}>
-              <Ionicons name="happy-outline" size={24} color="#8696A0" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cameraButton}>
-              <Ionicons name="camera-outline" size={24} color="#8696A0" />
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Type your message..."
+            placeholderTextColor="#A0A0A0"
+            multiline
+          />
+          
+          <TouchableOpacity 
             onPress={sendMessage}
             style={styles.sendButton}
             disabled={isLoading || !input.trim()}
           >
             {input.trim() ? (
-              <Ionicons name="send" size={20} color="#FFF" />
+              <MaterialCommunityIcons 
+                name="send" 
+                size={24} 
+                color={input.trim() ? "#6C63FF" : "#C0C0C0"} 
+              />
             ) : (
-              <Ionicons name="mic" size={20} color="#FFF" />
+              <MaterialCommunityIcons 
+                name="microphone" 
+                size={24} 
+                color="#C0C0C0" 
+              />
             )}
           </TouchableOpacity>
         </View>
@@ -189,152 +178,139 @@ export default function ConversationScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#194007',
+    backgroundColor: '#F8F9FD',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#128C7E',
-    padding: 10,
-    height: 60,
+    backgroundColor: '#6C63FF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    elevation: 4,
   },
-  headerLeft: {
-    flexDirection: 'row',
+  backButton: {
+    padding: 8,
+  },
+  headerCenter: {
     alignItems: 'center',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerButton: {
-    marginLeft: 20,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginLeft: 10,
-    marginRight: 10,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '600',
     color: '#FFF',
+    letterSpacing: 0.5,
   },
-  headerSubtitle: {
+  onlineIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  onlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#76FF03',
+    marginRight: 6,
+  },
+  onlineText: {
     fontSize: 12,
     color: '#E0E0E0',
   },
-  chatBackground: {
-    flex: 1,
-    position: 'relative',
-  },
-  backgroundImage: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    opacity: 0.5,
+  infoButton: {
+    padding: 8,
   },
   chatContainer: {
-    flex: 1,
+    padding: 16,
+    paddingBottom: 24,
   },
-  chatContentContainer: {
-    padding: 10,
-    paddingBottom: 20,
+  messageRow: {
+    flexDirection: 'row',
+    marginVertical: 8,
   },
-  messageContainer: {
-    marginVertical: 2,
-    maxWidth: '80%',
-  },
-  userMessage: {
-    alignSelf: 'flex-end',
-  },
-  assistantMessage: {
-    alignSelf: 'flex-start',
+  userRow: {
+    justifyContent: 'flex-end',
   },
   messageBubble: {
-    borderRadius: 8,
-    padding: 8,
-    paddingVertical: 6,
-    minWidth: 80,
+    maxWidth: '80%',
+    borderRadius: 20,
+    padding: 16,
+    paddingBottom: 24,
   },
   userBubble: {
-    backgroundColor: '#DCF8C6',
-    borderTopRightRadius: 0,
+    backgroundColor: '#6C63FF',
+    borderBottomRightRadius: 4,
   },
   assistantBubble: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 0,
-  },
-  loadingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  typingText: {
-    color: '#8696A0',
-    marginRight: 5,
-    fontSize: 14,
+    borderBottomLeftRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   messageText: {
     fontSize: 16,
-    paddingRight: 40,
+    color: '#333',
+    lineHeight: 24,
   },
-  userText: {
-    color: '#000000',
-  },
-  assistantText: {
-    color: '#000000',
+  userBubbleText: {
+    color: '#FFF',
   },
   timestamp: {
-    fontSize: 11,
-    color: '#8696A0',
-    alignSelf: 'flex-end',
     position: 'absolute',
-    right: 6,
-    bottom: 4,
+    right: 12,
+    bottom: 8,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  assistantTimestamp: {
+    color: '#A0A0A0',
+  },
+  typingIndicator: {
+    marginTop: 8,
+  },
+  typingBubble: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  typingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#6C63FF',
+    marginHorizontal: 2,
   },
   inputContainer: {
-    flexDirection: 'row',
-    padding: 8,
-    alignItems: 'flex-end',
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#FFF',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
   },
   inputWrapper: {
-    flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    alignItems: 'flex-end',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F7',
+    borderRadius: 24,
+    paddingHorizontal: 16,
   },
   input: {
     flex: 1,
-    color: '#000000',
+    color: '#333',
     fontSize: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
-    maxHeight: 100,
-  },
-  attachButton: {
-    padding: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emojiButton: {
-    padding: 8,
-  },
-  cameraButton: {
-    padding: 8,
+    maxHeight: 120,
+    paddingVertical: 12,
   },
   sendButton: {
-    backgroundColor: '#128C7E',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
+    marginLeft: 12,
+    padding: 8,
   },
 });
