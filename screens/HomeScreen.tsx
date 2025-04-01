@@ -1008,14 +1008,14 @@ const theme = {
             
             <View style={styles.activityItem}>
               <View style={[styles.activityIcon, { backgroundColor: isDarkMode ? 'rgba(255,209,102,0.2)' : 'rgba(255,209,102,0.1)' }]}>
-                <MaterialCommunityIcons name="trophy" size={20} color="#FFD166" />
+                <MaterialCommunityIcons name="trophy" size={20} color="#4CD964" />
               </View>
               <View style={styles.activityTextContainer}>
                 <Text style={[styles.activityTitle, { color: theme.text }]}>Daily Challenge</Text>
                 <Text style={[styles.activityTime, { color: theme.secondaryText }]}>Yesterday</Text>
               </View>
               <View style={[styles.activityBadge, { backgroundColor: isDarkMode ? 'rgba(255,215,0,0.2)' : 'rgba(255,215,0,0.1)' }]}>
-                <Text style={[styles.activityBadgeText, { color: '#FFD700' }]}>+50 XP</Text>
+                <Text style={[styles.activityBadgeText, { color: '#4CD964' }]}>+50 XP</Text>
               </View>
             </View>
           </GlassPanel>
