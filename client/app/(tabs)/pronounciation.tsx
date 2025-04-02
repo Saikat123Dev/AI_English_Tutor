@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -24,7 +24,7 @@ export default function PronunciationScreen() {
     }, 2000);
   };
 
-  const renderWordItem = (item) => {
+  const renderWordItem = (item:any) => {
     const isSelected = selectedWord?.id === item.id;
 
     return (
