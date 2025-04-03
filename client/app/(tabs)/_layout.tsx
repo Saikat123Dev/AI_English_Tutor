@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.05)',
-    height: 70 + Platform.select({ ios: 0, android: 10 }), // Slightly taller for balance
+    height: 70 + Platform?.select({ ios: 0, android: 10 }), // Slightly taller for balance
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',

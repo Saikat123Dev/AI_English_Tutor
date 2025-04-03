@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../utils/theme/ThemeProvider';
+import { router } from 'expo-router';
 
 interface ProfileOptionProps {
   title: string;
@@ -334,16 +335,11 @@ export function ProfileScreen() {
         <View style={styles.sectionContainer}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>ACCOUNT</Text>
 
-          <ProfileOption
-            title="Edit Profile"
-            icon={<Ionicons name="person-outline" size={20} color={colors.primary} />}
-            onPress={() => navigation.navigate('EditProfile' as never)}
-          />
 
           <ProfileOption
-            title="Preferences"
+            title="Settings"
             icon={<Ionicons name="settings-outline" size={20} color={colors.primary} />}
-            onPress={() => navigation.navigate('Preferences' as never)}
+            onPress={() =>  router.push('/settings')}
           />
 
         </View>
