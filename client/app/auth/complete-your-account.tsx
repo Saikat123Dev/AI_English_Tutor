@@ -1,3 +1,7 @@
+import { useUser } from "@clerk/clerk-expo";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -6,13 +10,9 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { set, useForm } from "react-hook-form";
-import { useRouter } from "expo-router";
-import { useUser } from "@clerk/clerk-expo";
-import { useEffect, useMemo, useState } from "react";
 
-import TextInput from "@/components/Forms/TextInput";
 import RadioButtonInput from "@/components/Forms/RadioButtonInput";
+import TextInput from "@/components/Forms/TextInput";
 
 const CompleteYourAccountScreen = () => {
   const { user, isLoaded } = useUser();
@@ -45,7 +45,7 @@ const CompleteYourAccountScreen = () => {
 
       await user?.reload();
 
-      return router.push("/(tabs)");
+     return router.push("/auth/selectLanguage");
     } catch (error: any) {
       if (error.message === "That username is taken. Please try another.") {
         return setError("username", { message: "Username is already taken" });

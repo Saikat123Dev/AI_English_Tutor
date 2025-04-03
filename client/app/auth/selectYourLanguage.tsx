@@ -69,7 +69,7 @@ const LanguageLevelScreen = () => {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      router.push('/lesson-recommendations');
+      router.push('/auth/learningGoal');
     });
   };
 

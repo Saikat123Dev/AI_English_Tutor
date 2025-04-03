@@ -1,36 +1,38 @@
 import express from 'express';
-import { prisma } from '../index.js';
 
+import { prisma } from "../lib/db.js";
 const router = express.Router();
 
 // Signup endpoint
-router.post('/signup', async (req, res) => {
-  const { email } = req.body;
+router.post('/create', async (req, res) => {
+  const { email ,motherToung,englishLevel,learningGoal,interests,focus,voice} = req.body;
 
   // Validate email
   if (!email) {
     console.log('Signup attempt failed: No email provided');
     return res.status(400).json({ error: 'Email is required' });
   }
-
+ console.log(email,motherToung,englishLevel,learningGoal,interests,focus,voice);
   console.log(`Signup attempt with email: ${email}`);
 
   try {
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
 
-    if (existingUser) {
-      console.log(`User already exists with email: ${email}`);
-      return res.json({ user: existingUser, message: 'User already exists' });
-    }
 
     // Create new user
-    const user = await prisma.user.create({
-      data: {
+    const user = await prisma.user.upsert({
+      where: { email },
+      update:{
+        motherToung,
+        englishLevel,
+        learningGoal,
+        interests,
+        focus,
+        voice
+      },
+      create: {
         email,
-        name: email.split('@')[0],
+       name: email.split('@')[0]
       },
     });
 
@@ -39,7 +41,6 @@ router.post('/signup', async (req, res) => {
   } catch (error) {
     console.error('Error creating user:', error);
 
-    // Check for specific Prisma errors
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Email already exists' });
     }

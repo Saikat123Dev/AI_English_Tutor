@@ -14,9 +14,26 @@ datasource db {
 }
 
 model user {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String?
+  motherToung  String?
+  englishLevel String?
+  learningGoal String?
+  interests    String?
+  focus        String?
+  voice        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  questions    question[]
+}
+
+model question {
   id        String   @id @default(cuid())
+  llmres    String
+  userres   String
+  userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  email     String   @unique
-  name      String?
+  user      user     @relation(fields: [userId], references: [id])
 }
