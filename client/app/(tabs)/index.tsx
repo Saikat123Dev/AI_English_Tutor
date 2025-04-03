@@ -8,95 +8,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ }) {
   const [activeTab, setActiveTab] = useState('home');
   
-  // Animation values for futuristic background
+  // Replace the existing animation refs with these:
+  const scrollY = useRef(new Animated.Value(0)).current;
   const circuitAnimation = useRef(new Animated.Value(0)).current;
   const nodePulseAnimations = useRef(
-    Array(8).fill().map(() => new Animated.Value(0))
+    Array(8).fill().map((_, i) => new Animated.Value(i % 2 === 0 ? 0.2 : 0.4))
   ).current;
-  const connectionAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    // Main circuit animation - flows like electricity
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(circuitAnimation, {
-          toValue: 1,
-          duration: 3000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-        Animated.timing(circuitAnimation, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: true,
-        })
-      ])
-    ).start();
-
-    // Node pulsing animations
-    nodePulseAnimations.forEach((anim, index) => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(index * 300),
-          Animated.timing(anim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad)
-          }),
-          Animated.timing(anim, {
-            toValue: 0,
-            duration: 1000,
-            useNativeDriver: true,
-          })
-        ])
-      ).start();
-    });
-
-    // Connection animation between nodes
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(connectionAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.quad)
-        }),
-        Animated.timing(connectionAnim, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        })
-      ])
-    ).start();
-
-    return () => {
-      circuitAnimation.stopAnimation();
-      nodePulseAnimations.forEach(anim => anim.stopAnimation());
-      connectionAnim.stopAnimation();
-    };
-  }, []);
-
-  // Circuit path data - creates a tech circuit board pattern
-  const circuitPath = `
-    M ${width * 0.2} ${height * 0.1}
-    L ${width * 0.5} ${height * 0.1}
-    L ${width * 0.5} ${height * 0.3}
-    L ${width * 0.8} ${height * 0.3}
-    L ${width * 0.8} ${height * 0.6}
-    L ${width * 0.2} ${height * 0.6}
-    L ${width * 0.2} ${height * 0.1}
-    Z
-    M ${width * 0.3} ${height * 0.4}
-    L ${width * 0.7} ${height * 0.4}
-    M ${width * 0.4} ${height * 0.2}
-    L ${width * 0.4} ${height * 0.5}
-    M ${width * 0.6} ${height * 0.2}
-    L ${width * 0.6} ${height * 0.5}
-  `;
 
   // Circuit nodes positions
   const circuitNodes = [
@@ -109,6 +29,61 @@ export default function HomeScreen({ navigation }) {
     { x: width * 0.7, y: height * 0.4 }, // right-middle
     { x: width * 0.5, y: height * 0.3 }, // center-top
   ];
+
+  // Circuit paths - connections between nodes
+  const circuitPaths = [
+    { from: 0, to: 1 }, // Top left to top middle
+    { from: 1, to: 7 }, // Top middle to center top
+    { from: 7, to: 2 }, // Center top to right top
+    { from: 2, to: 6 }, // Right top to right middle
+    { from: 6, to: 3 }, // Right middle to right bottom
+    { from: 3, to: 4 }, // Right bottom to bottom left
+    { from: 4, to: 5 }, // Bottom left to left middle
+    { from: 5, to: 0 }, // Left middle to top left
+    { from: 5, to: 7 }, // Left middle to center top
+    { from: 6, to: 7 }, // Right middle to center top
+  ];
+
+  useEffect(() => {
+    // Main circuit flow animation - smoother with easing
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(circuitAnimation, {
+          toValue: 1,
+          duration: 4000,
+          easing: Easing.bezier(0.4, 0, 0.2, 1),
+          useNativeDriver: true,
+        }),
+        Animated.delay(500),
+      ])
+    ).start();
+  
+    // Improved node pulsing with varied timing and intensity
+    nodePulseAnimations.forEach((anim, index) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(index * 200),
+          Animated.timing(anim, {
+            toValue: index % 2 === 0 ? 0.6 : 0.8,
+            duration: 2000 + index * 300,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.quad)
+          }),
+          Animated.timing(anim, {
+            toValue: index % 2 === 0 ? 0.2 : 0.4,
+            duration: 2000 + index * 300,
+            useNativeDriver: true,
+            easing: Easing.in(Easing.quad)
+          })
+        ])
+      ).start();
+    });
+  
+    return () => {
+      circuitAnimation.stopAnimation();
+      nodePulseAnimations.forEach(anim => anim.stopAnimation());
+    };
+  }, []);
 
   const features = [
     {
@@ -155,15 +130,87 @@ export default function HomeScreen({ navigation }) {
   };
 
   const theme = {
-    background: '#0F0824', // Dark purple for futuristic feel
     text: '#FFFFFF',
-    card: 'rgba(255, 255, 255, 0.08)',
     accent: '#7C3AED',
     secondaryText: 'rgba(255,255,255,0.7)',
     progressBackground: 'rgba(124,58,237,0.15)',
-    cardBorder: 'rgba(255,255,255,0.1)',
-    cardGlow: 'rgba(124,58,237,0.3)',
+    cardBorder: 'rgba(255,255,255,0.2)',
+    cardGlow: 'rgba(124,58,237,1)',
   };
+
+  const renderCircuitPaths = () => {
+  return circuitPaths.map((path, index) => {
+    const fromNode = circuitNodes[path.from];
+    const toNode = circuitNodes[path.to];
+    
+    const pathLength = Math.sqrt(
+      Math.pow(toNode.x - fromNode.x, 2) + 
+      Math.pow(toNode.y - fromNode.y, 2)
+    );
+    
+    const angle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
+    
+    // Create staggered delays for each path
+    const flowDelay = index * 200;
+    const animatedValue = Animated.add(
+      circuitAnimation,
+      flowDelay / 4000
+    ).interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+      extrapolate: 'extend'
+    });
+    
+    return (
+      <Animated.View
+        key={`path-${index}`}
+        style={[
+          styles.circuitPath,
+          {
+            position: 'absolute',
+            left: fromNode.x,
+            top: fromNode.y,
+            width: pathLength,
+            height: 1,
+            backgroundColor: 'rgba(124, 58, 237, 0.2)',
+            transform: [
+              { rotate: `${angle}rad` }
+            ],
+          }
+        ]}
+      >
+        <Animated.View
+          style={[
+            styles.circuitFlowEffect,
+            {
+              position: 'absolute',
+              height: '100%',
+              width: 30,
+              opacity: Animated.modulo(animatedValue, 1).interpolate({
+                inputRange: [0, 0.5, 1],
+                outputRange: [0.3, 0.8, 0.3]
+              }),
+              transform: [{
+                translateX: Animated.modulo(animatedValue, 1).interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, pathLength + 30]
+                })
+              }],
+            }
+          ]}
+        >
+          <LinearGradient
+            colors={['rgba(124, 58, 237, 0)', 'rgba(255, 255, 255, 0.8)', 'rgba(124, 58, 237, 0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      </Animated.View>
+    );
+  });
+};
+
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -178,22 +225,8 @@ export default function HomeScreen({ navigation }) {
         
         {/* Circuit Board Pattern */}
         <View style={styles.circuitContainer}>
-          {/* Circuit path with animated "electricity" */}
-          <View style={styles.circuitPathContainer}>
-            <Animated.View
-              style={[
-                styles.circuitHighlight,
-                {
-                  transform: [{
-                    translateX: circuitAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-200, width + 200]
-                    })
-                  }]
-                }
-              ]}
-            />
-          </View>
+          {/* Render all circuit paths */}
+          {renderCircuitPaths()}
           
           {/* Circuit nodes with pulsing animation */}
           {circuitNodes.map((node, index) => (
@@ -220,19 +253,6 @@ export default function HomeScreen({ navigation }) {
               <View style={styles.circuitNodeInner} />
             </Animated.View>
           ))}
-          
-          {/* Animated connections between nodes */}
-          <Animated.View
-            style={[
-              styles.circuitConnection,
-              {
-                opacity: connectionAnim.interpolate({
-                  inputRange: [0, 0.5, 1],
-                  outputRange: [0.3, 1, 0.3]
-                })
-              }
-            ]}
-          />
         </View>
         
         {/* Floating AI elements */}
@@ -294,7 +314,7 @@ export default function HomeScreen({ navigation }) {
         {/* Daily Goal Progress */}
         <View style={styles.goalContainer}>
           <View style={[styles.goalCard, { 
-            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+            backgroundColor: 'rgba(124, 58, 237, 0.01)',
             borderWidth: 1,
             borderColor: theme.cardBorder,
           }]}>
@@ -313,7 +333,7 @@ export default function HomeScreen({ navigation }) {
                   })}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    navigation.navigate('Achievements');
+                    router.push('/achievements');
                   }}
                 >
                   <Text style={[styles.viewAll, { color: theme.accent }]}>View All</Text>
@@ -379,7 +399,7 @@ export default function HomeScreen({ navigation }) {
                 styles.featureCard,
                 {
                   transform: [{ scale: pressed ? 0.95 : 1 }],
-                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  backgroundColor: 'rgba(124, 58, 237, 0.2)',
                   borderWidth: 1,
                   borderColor: theme.cardBorder,
                 }
@@ -405,9 +425,6 @@ export default function HomeScreen({ navigation }) {
                   <Text style={[styles.progressMiniText, { color: theme.secondaryText }]}>40%</Text>
                 </View>
                 
-                <View style={styles.featureArrow}>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color={theme.secondaryText} />
-                </View>
               </View>
             </Pressable>
           ))}
@@ -420,13 +437,13 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.quickActions}>
             <Pressable
               style={[styles.quickAction, { 
-                backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                backgroundColor: 'rgba(124, 58, 237, 0.2)',
                 borderWidth: 1,
                 borderColor: theme.cardBorder,
               }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                navigation.navigate('Leaderboard');
+                router.push('/leaderboard');
               }}
             >
               <View style={styles.quickActionContent}>
@@ -435,19 +452,19 @@ export default function HomeScreen({ navigation }) {
                 }]}>
                   <MaterialCommunityIcons name="podium" size={24} color={theme.accent} />
                 </View>
-                <Text style={[styles.quickActionText, { color: theme.text }]}>Leaderboard</Text>
+                <Text style={[styles.quickActionText, { color: theme.text }]}>Rank</Text>
               </View>
             </Pressable>
 
             <Pressable
               style={[styles.quickAction, { 
-                backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                backgroundColor: 'rgba(124, 58, 237, 0.2)',
                 borderWidth: 1,
                 borderColor: theme.cardBorder,
               }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                navigation.navigate('Practice');
+                router.push('/practice');
               }}
             >
               <View style={styles.quickActionContent}>
@@ -456,7 +473,7 @@ export default function HomeScreen({ navigation }) {
                 }]}>
                   <MaterialCommunityIcons name="repeat" size={24} color={theme.accent} />
                 </View>
-                <Text style={[styles.quickActionText, { color: theme.text }]}>Daily Practice</Text>
+                <Text style={[styles.quickActionText, { color: theme.text }]}>Repeat</Text>
               </View>
             </Pressable>
           </View>
@@ -472,7 +489,7 @@ export default function HomeScreen({ navigation }) {
               })}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                navigation.navigate('Activity');
+                router.push('/activity');
               }}
             >
               <Text style={[styles.viewAll, { color: theme.accent }]}>View All</Text>
@@ -480,7 +497,7 @@ export default function HomeScreen({ navigation }) {
           </View>
 
           <View style={[styles.activityCard, { 
-            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+            backgroundColor: 'rgba(124, 58, 237, 0.2)',
             borderWidth: 1,
             borderColor: theme.cardBorder,
           }]}>
@@ -524,7 +541,7 @@ export default function HomeScreen({ navigation }) {
               </View>
               <View style={[styles.activityBadge, { backgroundColor: 'rgba(76,217,100,0.1)' }]}>
                 <Text style={[styles.activityBadgeText, { color: '#4CD964' }]}>+50 XP</Text>
-              </View>
+                </View>
             </View>
           </View>
         </View>
@@ -533,28 +550,11 @@ export default function HomeScreen({ navigation }) {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Bottom Tab Bar */}
-      <View style={[styles.tabBar, { 
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-        borderTopColor: theme.cardBorder 
-      }]}>
-        {/* Tab items */}
-        <Pressable style={styles.tabItem}>
-          <MaterialCommunityIcons name="home" size={24} color={theme.accent} />
-        </Pressable>
-        <Pressable style={styles.tabItem}>
-          <MaterialCommunityIcons name="book-open-variant" size={24} color={theme.secondaryText} />
-        </Pressable>
-        <Pressable style={styles.tabItem}>
-          <MaterialCommunityIcons name="trophy-outline" size={24} color={theme.secondaryText} />
-        </Pressable>
-        <Pressable style={styles.tabItem}>
-          <MaterialCommunityIcons name="account-outline" size={24} color={theme.secondaryText} />
-        </Pressable>
-      </View>
     </SafeAreaView>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: {
@@ -590,46 +590,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(124, 58, 237, 0.15)',
     transform: [{ skewX: '-20deg' }],
   },
-  circuitNode: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(124, 58, 237, 0.3)',
-    borderWidth: 2,
-    borderColor: 'rgba(124, 58, 237, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  circuitNodeInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-  },
+
   circuitConnection: {
     position: 'absolute',
     height: 2,
     backgroundColor: 'rgba(124, 58, 237, 0.4)',
   },
-  aiElement1: {
-    position: 'absolute',
-    top: height * 0.2,
-    left: width * 0.1,
-    transform: [{ rotate: '-15deg' }],
-  },
-  aiElement2: {
-    position: 'absolute',
-    bottom: height * 0.2,
-    right: width * 0.1,
-    transform: [{ rotate: '15deg' }],
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    paddingBottom: 20,
-  },
+
   header: {
     paddingHorizontal: 24,
     paddingTop: 16,
@@ -642,8 +609,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   profileButton: {
-    width: 60,
-    height: 60,
+    width: 50,
+    height: 50,
     borderRadius: 20,
     overflow: 'hidden',
   },
@@ -668,13 +635,9 @@ const styles = StyleSheet.create({
   },
   goalCard: {
     borderRadius: 20,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     overflow: 'hidden',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-    position: 'relative',
+    shadowColor: '#fff',
   },
   blurOverlay: {
     position: 'absolute',
@@ -682,7 +645,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+    backgroundColor: 'rgba(124, 58, 237, 0.2)',
   },
   goalContent: {
     padding: 20,
@@ -769,14 +732,8 @@ const styles = StyleSheet.create({
   },
   featureCard: {
     width: (width - 56) / 2,
-    height: 180,
+    height: 170,
     borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
     position: 'relative',
   },
   featureContent: {
@@ -784,8 +741,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   featureIconContainer: {
-    width: 44,
-    height: 44,
+    width: 34,
+    height: 34,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -821,11 +778,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  featureArrow: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-  },
+
   quickActionsContainer: {
     paddingHorizontal: 24,
     marginTop: 32,
@@ -848,7 +801,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
   },
   quickActionContent: {
     flexDirection: 'row',
@@ -883,7 +835,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 6,
-    elevation: 4,
   },
   activityItem: {
     flexDirection: 'row',
@@ -919,19 +870,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginHorizontal: 16,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    height: 70,
-    borderTopWidth: 1,
-  },
-  tabItem: {
-    flex: 1,
+
+  circuitNode: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(124, 58, 237, 0.3)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-  }
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 6,
+    shadowOpacity: 0.4,
+  },
+  circuitNodeInner: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  circuitPath: {
+    position: 'absolute',
+    overflow: 'hidden',
+  },
+  circuitFlowEffect: {
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
 });
