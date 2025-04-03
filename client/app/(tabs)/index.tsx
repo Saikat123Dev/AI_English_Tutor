@@ -7,83 +7,115 @@ import { Animated, Dimensions, Easing, Pressable, ScrollView, StyleSheet, Text, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
+const nodeCount = 25;
 
-export default function HomeScreen({ }) {
-  const [activeTab, setActiveTab] = useState('home');
-  
-  // Replace the existing animation refs with these:
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const circuitAnimation = useRef(new Animated.Value(0)).current;
-  const nodePulseAnimations = useRef(
-    Array(8).fill().map((_, i) => new Animated.Value(i % 2 === 0 ? 0.2 : 0.4))
-  ).current;
-
-  // Circuit nodes positions
-  const circuitNodes = [
-    { x: width * 0.2, y: height * 0.1 }, // top-left
-    { x: width * 0.5, y: height * 0.1 }, // top-middle
-    { x: width * 0.8, y: height * 0.3 }, // right-top
-    { x: width * 0.8, y: height * 0.6 }, // right-bottom
-    { x: width * 0.2, y: height * 0.6 }, // bottom-left
-    { x: width * 0.3, y: height * 0.4 }, // left-middle
-    { x: width * 0.7, y: height * 0.4 }, // right-middle
-    { x: width * 0.5, y: height * 0.3 }, // center-top
-  ];
-
-  // Circuit paths - connections between nodes
-  const circuitPaths = [
-    { from: 0, to: 1 }, // Top left to top middle
-    { from: 1, to: 7 }, // Top middle to center top
-    { from: 7, to: 2 }, // Center top to right top
-    { from: 2, to: 6 }, // Right top to right middle
-    { from: 6, to: 3 }, // Right middle to right bottom
-    { from: 3, to: 4 }, // Right bottom to bottom left
-    { from: 4, to: 5 }, // Bottom left to left middle
-    { from: 5, to: 0 }, // Left middle to top left
-    { from: 5, to: 7 }, // Left middle to center top
-    { from: 6, to: 7 }, // Right middle to center top
-  ];
+export default function HomeScreen() {
+  const [activeTab] = useState('home');
+  const [nodePositions, setNodePositions] = useState([]);
+  const nodeAnimations = useRef(Array(nodeCount).fill().map(() => ({
+    opacity: new Animated.Value(0),
+    scale: new Animated.Value(0.5),
+    position: new Animated.ValueXY()
+  }))).current;
+  const connectionOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Main circuit flow animation - smoother with easing
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(circuitAnimation, {
-          toValue: 1,
-          duration: 4000,
-          easing: Easing.bezier(0.4, 0, 0.2, 1),
-          useNativeDriver: true,
-        }),
-        Animated.delay(500),
-      ])
-    ).start();
-  
-    // Improved node pulsing with varied timing and intensity
-    nodePulseAnimations.forEach((anim, index) => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(index * 200),
-          Animated.timing(anim, {
-            toValue: index % 2 === 0 ? 0.6 : 0.8,
-            duration: 2000 + index * 300,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad)
-          }),
-          Animated.timing(anim, {
-            toValue: index % 2 === 0 ? 0.2 : 0.4,
-            duration: 2000 + index * 300,
-            useNativeDriver: true,
-            easing: Easing.in(Easing.quad)
-          })
-        ])
-      ).start();
+    const initialNodePositions = Array(nodeCount).fill().map(() => {
+      const centerX = Math.random() > 0.5 ? width * 0.3 : width * 0.7;
+      const centerY = Math.random() > 0.5 ? height * 0.3 : height * 0.7;
+      const radius = Math.min(width, height) * 0.25;
+      const angle = Math.random() * Math.PI * 2;
+      const distance = Math.random() * radius;
+      
+      return {
+        x: centerX + Math.cos(angle) * distance,
+        y: centerY + Math.sin(angle) * distance,
+        size: Math.random() * 15 + 5,
+        delay: Math.random() * 3000,
+        duration: Math.random() * 2000 + 2000,
+        color: `rgba(${Math.floor(Math.random() * 100 + 155)}, ${Math.floor(Math.random() * 100 + 155)}, 255, 0.5)`
+      };
     });
-  
-    return () => {
-      circuitAnimation.stopAnimation();
-      nodePulseAnimations.forEach(anim => anim.stopAnimation());
-    };
+    setNodePositions(initialNodePositions);
+
+    nodeAnimations.forEach((anim, index) => {
+      const { x, y, delay, duration } = initialNodePositions[index];
+      const destX = x + (Math.random() - 0.5) * width * 0.2;
+      const destY = y + (Math.random() - 0.5) * height * 0.2;
+      
+      anim.position.setValue({ x, y });
+      
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.parallel([
+          Animated.timing(anim.opacity, {
+            toValue: Math.random() * 0.1 + 0.3,
+            duration: duration * 0.3,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim.scale, {
+            toValue: Math.random() * 0.1 + 0.8,
+            duration: duration * 0.4,
+            easing: Easing.out(Easing.elastic(1)),
+            useNativeDriver: true,
+          })
+        ]),
+        Animated.loop(Animated.sequence([
+          Animated.timing(anim.position, {
+            toValue: { x: destX, y: destY },
+            duration,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim.position, {
+            toValue: { x, y },
+            duration,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          })
+        ]))
+      ]).start();
+    });
+
+    return () => nodeAnimations.forEach(anim => {
+      anim.opacity.stopAnimation();
+      anim.scale.stopAnimation();
+      anim.position.stopAnimation();
+    });
   }, []);
+
+  const renderConnections = () => {
+    const connectionDistance = Math.min(width, height) * 0.2;
+    return nodePositions.flatMap((nodeA, i) => 
+      nodePositions.slice(i + 1).map((nodeB, j) => {
+        const dx = nodeA.x - nodeB.x;
+        const dy = nodeA.y - nodeB.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        return distance < connectionDistance ? (
+          <Animated.View
+            key={`connection-${i}-${j}`}
+            style={{
+
+              width: distance,
+              height: 1,
+              backgroundColor: 'rgba(255, 255, 255, 0.5)',
+              opacity: Animated.multiply(connectionOpacity, 
+                Animated.subtract(1, Animated.divide(distance, connectionDistance))),
+              transform: [
+                { translateX: -distance / 2 },
+                { translateY: 0 },
+                { rotate: `${Math.atan2(dy, dx)}rad` },
+                { translateX: distance / 2 },
+              ]
+            }}
+          />
+        ) : null;
+      })
+    ).filter(Boolean);
+  };
+
 
   const features = [
     {
@@ -136,85 +168,12 @@ export default function HomeScreen({ }) {
     progressBackground: 'rgba(124,58,237,0.15)',
     cardBorder: 'rgba(255,255,255,0.2)',
     cardGlow: 'rgba(124,58,237,1)',
+    background: '#121212'
   };
-
-  const renderCircuitPaths = () => {
-  return circuitPaths.map((path, index) => {
-    const fromNode = circuitNodes[path.from];
-    const toNode = circuitNodes[path.to];
-    
-    const pathLength = Math.sqrt(
-      Math.pow(toNode.x - fromNode.x, 2) + 
-      Math.pow(toNode.y - fromNode.y, 2)
-    );
-    
-    const angle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
-    
-    // Create staggered delays for each path
-    const flowDelay = index * 200;
-    const animatedValue = Animated.add(
-      circuitAnimation,
-      flowDelay / 4000
-    ).interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 1],
-      extrapolate: 'extend'
-    });
-    
-    return (
-      <Animated.View
-        key={`path-${index}`}
-        style={[
-          styles.circuitPath,
-          {
-            position: 'absolute',
-            left: fromNode.x,
-            top: fromNode.y,
-            width: pathLength,
-            height: 1,
-            backgroundColor: 'rgba(124, 58, 237, 0.2)',
-            transform: [
-              { rotate: `${angle}rad` }
-            ],
-          }
-        ]}
-      >
-        <Animated.View
-          style={[
-            styles.circuitFlowEffect,
-            {
-              position: 'absolute',
-              height: '100%',
-              width: 30,
-              opacity: Animated.modulo(animatedValue, 1).interpolate({
-                inputRange: [0, 0.5, 1],
-                outputRange: [0.3, 0.8, 0.3]
-              }),
-              transform: [{
-                translateX: Animated.modulo(animatedValue, 1).interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, pathLength + 30]
-                })
-              }],
-            }
-          ]}
-        >
-          <LinearGradient
-            colors={['rgba(124, 58, 237, 0)', 'rgba(255, 255, 255, 0.8)', 'rgba(124, 58, 237, 0)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-      </Animated.View>
-    );
-  });
-};
-
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Futuristic Background with Circuit Animation */}
+      {/* Enhanced Background with Animated Nodes and Connections */}
       <View style={styles.backgroundContainer}>
         <LinearGradient
           colors={['#1E0B4B', '#0F0824', '#0A061D']}
@@ -223,62 +182,34 @@ export default function HomeScreen({ }) {
           end={{ x: 0.5, y: 1 }}
         />
         
-        {/* Circuit Board Pattern */}
-        <View style={styles.circuitContainer}>
-          {/* Render all circuit paths */}
-          {renderCircuitPaths()}
-          
-          {/* Circuit nodes with pulsing animation */}
-          {circuitNodes.map((node, index) => (
-            <Animated.View
-              key={`node-${index}`}
-              style={[
-                styles.circuitNode,
-                {
-                  left: node.x - 10,
-                  top: node.y - 10,
-                  opacity: nodePulseAnimations[index].interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0.3, 1, 0.3]
-                  }),
-                  transform: [{
-                    scale: nodePulseAnimations[index].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.8, 1.2]
-                    })
-                  }]
-                }
-              ]}
-            >
-              <View style={styles.circuitNodeInner} />
-            </Animated.View>
-          ))}
-        </View>
+        {/* Render connections */}
+        {nodePositions.length > 0 && renderConnections()}
         
-        {/* Floating AI elements */}
-        <Animated.View style={[
-          styles.aiElement1,
-          {
-            opacity: nodePulseAnimations[0].interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.1, 0.3]
-            })
-          }
-        ]}>
-          <MaterialCommunityIcons name="robot" size={40} color="rgba(124,58,237,0.5)" />
-        </Animated.View>
+        {/* Render nodes */}
+        {nodePositions.map((node, index) => (
+          <Animated.View
+            key={`node-${index}`}
+            style={{
+              position: 'absolute',
+              width: node.size,
+              height: node.size,
+              borderRadius: node.size / 2,
+              backgroundColor: node.color || '#5F9EFF',
+              transform: [
+                { translateX: Animated.subtract(nodeAnimations[index].position.x, node.size / 2) },
+                { translateY: Animated.subtract(nodeAnimations[index].position.y, node.size / 2) },
+                { scale: nodeAnimations[index].scale }
+              ],
+              opacity: nodeAnimations[index].opacity,
+              shadowColor: '#fff',
+              shadowOpacity: 0.5,
+              shadowRadius: 10,
+              elevation: 5,
+            }}
+          />
+        ))}
         
-        <Animated.View style={[
-          styles.aiElement2,
-          {
-            opacity: nodePulseAnimations[3].interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.1, 0.3]
-            })
-          }
-        ]}>
-          <MaterialCommunityIcons name="chip" size={40} color="rgba(124,58,237,0.5)" />
-        </Animated.View>
+      
       </View>
 
       <ScrollView
@@ -549,12 +480,9 @@ export default function HomeScreen({ }) {
         {/* Bottom Spacer */}
         <View style={{ height: 100 }} />
       </ScrollView>
-
     </SafeAreaView>
   );
 }
-
-
 
 const styles = StyleSheet.create({
   container: {
@@ -573,30 +501,12 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  circuitContainer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
+  scrollView: {
+    flex: 1,
   },
-  circuitPathContainer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
+  scrollViewContent: {
+    paddingBottom: 20,
   },
-  circuitHighlight: {
-    position: 'absolute',
-    width: 200,
-    height: '100%',
-    backgroundColor: 'rgba(124, 58, 237, 0.15)',
-    transform: [{ skewX: '-20deg' }],
-  },
-
-  circuitConnection: {
-    position: 'absolute',
-    height: 2,
-    backgroundColor: 'rgba(124, 58, 237, 0.4)',
-  },
-
   header: {
     paddingHorizontal: 24,
     paddingTop: 16,
@@ -778,7 +688,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-
   quickActionsContainer: {
     paddingHorizontal: 24,
     marginTop: 32,
@@ -871,33 +780,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  circuitNode: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(124, 58, 237, 0.3)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 6,
-    shadowOpacity: 0.4,
-  },
-  circuitNodeInner: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-  },
-  circuitPath: {
-    position: 'absolute',
-    overflow: 'hidden',
-  },
-  circuitFlowEffect: {
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
 });
