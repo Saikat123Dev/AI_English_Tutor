@@ -1,20 +1,22 @@
-import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
 import express from 'express';
+import { prisma } from "./lib/db.js";
 import authRoutes from './routes/auth.js';
-
-const prisma = new PrismaClient();
+import conversationRoutes from './routes/conversation.js';
+import initialQuestionsRoutes from './routes/initialQuestions.js';
 const app = express();
 
 app.use(express.json());
 app.use(cors());
 
 app.use('/api/auth', authRoutes);
+app.use('/api/initialQuestions', initialQuestionsRoutes);
+app.use('/api/conversation', conversationRoutes);
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 app.listen(PORT,  "0.0.0.0",() => {
   console.log(`Server is running on port ${PORT}`);
 }).on('error', (err) => {
@@ -34,5 +36,3 @@ process.on('SIGINT', async () => {
   console.log('Prisma client disconnected');
   process.exit(0);
 });
-
-export { prisma };

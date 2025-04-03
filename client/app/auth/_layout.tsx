@@ -12,9 +12,9 @@ export default function AuthLayout() {
     }
   }
 
-  if (isSignedIn && user?.unsafeMetadata?.onboarding_completed === true) {
-    return <Redirect href="/(tabs)" />;
-  }
+  // if (isSignedIn && user?.unsafeMetadata?.onboarding_completed === true) {
+  //   return <Redirect href="/(tabs)" />;
+  // }
 
   return (
     <Stack>
