@@ -197,12 +197,12 @@ export default function ConversationScreen() {
       try {
         if (!user?.primaryEmailAddress?.emailAddress) return false;
 
-        const response = await fetch('https://8ba0-2409-40e1-3119-3b58-1af-fc75-e011-5abe.ngrok-free.app/api/initialQuestions', {
+        const response = await fetch('https://affe-2409-40e1-3094-f34b-e040-863f-eb38-7726.ngrok-free.app/api/initialQuestions', {
           method: 'POST',
           headers: {
             "ngrok-skip-browser-warning": "true",
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
+            'Accept':'application/json',
+            'Content-Type':'application/json',
           },
           body: JSON.stringify({
             email: user.primaryEmailAddress.emailAddress
@@ -308,7 +308,7 @@ const handleScroll = useCallback((event) => {
     try {
       if (!user?.primaryEmailAddress?.emailAddress) return false;
 
-      const response = await fetch('https://8ba0-2409-40e1-3119-3b58-1af-fc75-e011-5abe.ngrok-free.app/api/conversation/ask', {
+      const response = await fetch('https://affe-2409-40e1-3094-f34b-e040-863f-eb38-7726.ngrok-free.app/api/conversation/ask', {
         method: 'POST',
         headers: {
           "ngrok-skip-browser-warning": "true",
