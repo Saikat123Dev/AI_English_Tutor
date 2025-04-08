@@ -199,7 +199,7 @@ router.get("/history", async (req, res) => {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: email.toString() },
+      where: { email},
       select: { id: true }
     });
 
@@ -223,10 +223,10 @@ router.get("/history", async (req, res) => {
         word: true,
         accuracy: true,
         feedback: true,
-        createdAt: true
+
       }
     });
-
+console.log(history);
     // Format the history records
     const formattedHistory = history.map(attempt => {
       let feedbackObj = attempt.feedback;
