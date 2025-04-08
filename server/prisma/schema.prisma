@@ -1,6 +1,5 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
@@ -27,6 +26,10 @@ model user {
   updatedAt             DateTime               @updatedAt
   questions             question[]
   pronunciationAttempts pronunciationAttempt[]
+  vocabularyWords       vocabularyWord[] // Relation to vocabulary words
+  favorites             favorite[] // Relation to favorites
+  studySessions         studySession[] // Relation to study sessions
+  dailyStreaks          dailyStreak[] // Relation to daily streaks
 }
 
 model question {
@@ -52,4 +55,83 @@ model pronunciationAttempt {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+// New models for vocabulary feature
+model vocabularyWord {
+  id           String        @id @default(cuid())
+  word         String
+  phonetic     String?
+  origin       String?       @db.Text
+  meanings     Json // Stores meanings data as JSON
+  timestamp    DateTime      @default(now())
+  userId       String
+  user         user          @relation(fields: [userId], references: [id])
+  favorites    favorite[] // Relation to favorites
+  studyRecords studyRecord[] // Relation to study records
+
+  @@unique([userId, word])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+model favorite {
+  id        String         @id @default(cuid())
+  wordId    String
+  userId    String
+  createdAt DateTime       @default(now())
+  word      vocabularyWord @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  user      user           @relation(fields: [userId], references: [id])
+
+  @@unique([userId, wordId])
+  @@index([userId])
+}
+
+model studySession {
+  id        String        @id @default(cuid())
+  userId    String
+  startTime DateTime      @default(now())
+  endTime   DateTime?
+  mode      String // 'study' or 'flashcard'
+  records   studyRecord[]
+  user      user          @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([startTime])
+}
+
+model studyRecord {
+  id               String         @id @default(cuid())
+  wordId           String
+  sessionId        String
+  difficultyRating String? // 'easy', 'medium', 'hard'
+  isCorrect        Boolean?
+  timeSpent        Int? // Time spent in milliseconds
+  createdAt        DateTime       @default(now())
+  word             vocabularyWord @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  session          studySession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([wordId])
+}
+
+model dailyStreak {
+  id     String   @id @default(cuid())
+  userId String
+  date   DateTime @default(now()) @db.Date
+  count  Int      @default(1)
+  user   user     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model searchHistory {
+  id        String   @id @default(cuid())
+  term      String
+  userId    String
+  timestamp DateTime @default(now())
+
+  @@index([userId])
+  @@index([timestamp])
 }
