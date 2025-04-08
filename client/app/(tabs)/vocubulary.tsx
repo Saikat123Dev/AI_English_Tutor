@@ -1,62 +1,733 @@
-import React, { useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNetInfo } from '@react-native-community/netinfo';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 export default function VocabularyScreen() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [vocabularyWords, setVocabularyWords] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedWord, setSelectedWord] = useState(null);
+  const [randomWords, setRandomWords] = useState([]);
+  const [favorites, setFavorites] = useState([]);
+  const [filter, setFilter] = useState('all'); // 'all', 'favorites', 'recent'
+  const [history, setHistory] = useState([]);
+  const [studyMode, setStudyMode] = useState(false);
+  const [currentStudyIndex, setCurrentStudyIndex] = useState(0);
+  const [revealDefinition, setRevealDefinition] = useState(false);
+  const [dailyStreak, setDailyStreak] = useState(0);
+  const [lastOpened, setLastOpened] = useState(null);
+  const [flashcardMode, setFlashcardMode] = useState(false);
 
-  // Sample vocabulary words - you would likely fetch these from your API or database
-  const [vocabularyWords, setVocabularyWords] = useState([
-    { id: '1', word: 'Ubiquitous', definition: 'Present, appearing, or found everywhere.', example: 'Mobile phones are now ubiquitous in modern society.' },
-    { id: '2', word: 'Ephemeral', definition: 'Lasting for a very short time.', example: 'The ephemeral nature of fashion trends makes it hard to keep up.' },
-    { id: '3', word: 'Serendipity', definition: 'The occurrence of events by chance in a happy or beneficial way.', example: 'Finding that rare book was pure serendipity.' },
-    { id: '4', word: 'Eloquent', definition: 'Fluent or persuasive in speaking or writing.', example: 'Her eloquent speech moved the entire audience.' },
-    { id: '5', word: 'Resilience', definition: 'The capacity to recover quickly from difficulties.', example: 'The resilience of children often surprises adults.' },
-  ]);
+  const netInfo = useNetInfo();
 
-  const filteredWords = vocabularyWords.filter(item =>
-    item.word.toLowerCase().includes(searchTerm.toLowerCase())
+  // Load data on component mount
+  useEffect(() => {
+    loadDataFromStorage();
+    fetchRandomWords();
+    checkDailyStreak();
+  }, []);
+
+  // Save data when it changes
+  useEffect(() => {
+    saveDataToStorage();
+  }, [vocabularyWords, favorites, history, dailyStreak, lastOpened]);
+
+  const loadDataFromStorage = async () => {
+    try {
+      const vocabData = await AsyncStorage.getItem('vocabularyData');
+      if (vocabData) {
+        const parsedData = JSON.parse(vocabData);
+        setVocabularyWords(parsedData.words || []);
+        setFavorites(parsedData.favorites || []);
+        setHistory(parsedData.history || []);
+        setDailyStreak(parsedData.dailyStreak || 0);
+        setLastOpened(parsedData.lastOpened || null);
+      }
+    } catch (err) {
+      console.error('Failed to load data from storage', err);
+    }
+  };
+
+  const saveDataToStorage = async () => {
+    try {
+      const data = {
+        words: vocabularyWords,
+        favorites: favorites,
+        history: history,
+        dailyStreak: dailyStreak,
+        lastOpened: lastOpened
+      };
+      await AsyncStorage.setItem('vocabularyData', JSON.stringify(data));
+    } catch (err) {
+      console.error('Failed to save data to storage', err);
+    }
+  };
+
+  const checkDailyStreak = () => {
+    const today = new Date().toDateString();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayString = yesterday.toDateString();
+
+    if (lastOpened === today) {
+      // Already logged in today, do nothing
+      return;
+    } else if (lastOpened === yesterdayString) {
+      // Last opened yesterday, increase streak
+      setDailyStreak(prev => prev + 1);
+      setLastOpened(today);
+      if ((dailyStreak + 1) % 5 === 0) {
+        Alert.alert("Streak Milestone!", `Amazing! You've reached a ${dailyStreak + 1} day streak!`);
+      }
+    } else if (lastOpened) {
+      // Streak broken
+      Alert.alert("Streak Reset", "You missed a day. Your streak has been reset.");
+      setDailyStreak(1);
+      setLastOpened(today);
+    } else {
+      // First time
+      setDailyStreak(1);
+      setLastOpened(today);
+    }
+  };
+
+  const fetchRandomWords = async () => {
+    if (!netInfo.isConnected) {
+      setError('No internet connection. Using cached words only.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch('https://random-word-api.herokuapp.com/all');
+      const words = await response.json();
+      // Take first 100 words for demo purposes
+      setRandomWords(words.slice(0, 100));
+    } catch (err) {
+      setError('Failed to fetch random words');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchWordDetails = async (word) => {
+    if (!netInfo.isConnected) {
+      setError('No internet connection. Cannot fetch word details.');
+      return null;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word.toLowerCase().trim()}`);
+      if (!response.ok) throw new Error('Word not found');
+      const data = await response.json();
+
+      // Add timestamp for sorting by recent
+      const wordData = data[0];
+      wordData.timestamp = Date.now();
+
+      // Update search history
+      updateHistory(word.toLowerCase().trim());
+
+      return wordData;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateHistory = (word) => {
+    // Keep only unique entries and limit to 20 most recent
+    const updatedHistory = [word, ...history.filter(w => w !== word)].slice(0, 20);
+    setHistory(updatedHistory);
+  };
+
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) return;
+
+    const wordDetails = await fetchWordDetails(searchTerm);
+    if (wordDetails) {
+      setSelectedWord(wordDetails);
+      // Add to vocabulary if not already present
+      if (!vocabularyWords.some(w => w.word === wordDetails.word)) {
+        setVocabularyWords(prev => [wordDetails, ...prev]);
+      } else {
+        // Update existing word's timestamp to bring it to top of recent list
+        setVocabularyWords(prev =>
+          prev.map(w => w.word === wordDetails.word ? {...w, timestamp: Date.now()} : w)
+        );
+      }
+    }
+  };
+
+  const handleRandomWord = async () => {
+    if (randomWords.length === 0) {
+      setError('No random words available');
+      return;
+    }
+
+    const randomIndex = Math.floor(Math.random() * randomWords.length);
+    const randomWord = randomWords[randomIndex];
+    setSearchTerm(randomWord);
+    const wordDetails = await fetchWordDetails(randomWord);
+    if (wordDetails) {
+      setSelectedWord(wordDetails);
+      // Add to vocabulary if not already present
+      if (!vocabularyWords.some(w => w.word === wordDetails.word)) {
+        setVocabularyWords(prev => [wordDetails, ...prev]);
+      }
+    }
+  };
+
+  const toggleFavorite = (word) => {
+    if (favorites.includes(word)) {
+      setFavorites(prev => prev.filter(w => w !== word));
+    } else {
+      setFavorites(prev => [...prev, word]);
+    }
+  };
+
+  const deleteWord = (word) => {
+    Alert.alert(
+      "Remove Word",
+      `Remove "${word}" from your vocabulary list?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => {
+            setVocabularyWords(prev => prev.filter(w => w.word !== word));
+            setFavorites(prev => prev.filter(w => w !== word));
+            if (selectedWord && selectedWord.word === word) {
+              setSelectedWord(null);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Filter words based on current filter
+  const getFilteredWords = () => {
+    switch (filter) {
+      case 'favorites':
+        return vocabularyWords.filter(word => favorites.includes(word.word));
+      case 'recent':
+        return [...vocabularyWords].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      default:
+        return vocabularyWords;
+    }
+  };
+
+  const filteredWords = getFilteredWords();
+
+  // Study mode functions
+  const startStudyMode = () => {
+    if (vocabularyWords.length === 0) {
+      Alert.alert("No Words", "Add some words to your vocabulary first!");
+      return;
+    }
+    setStudyMode(true);
+    setFlashcardMode(false);
+    setCurrentStudyIndex(0);
+    setRevealDefinition(false);
+    setSelectedWord(null);
+  };
+
+  const startFlashcardMode = () => {
+    if (vocabularyWords.length === 0) {
+      Alert.alert("No Words", "Add some words to your vocabulary first!");
+      return;
+    }
+    setFlashcardMode(true);
+    setStudyMode(false);
+    setCurrentStudyIndex(0);
+    setRevealDefinition(false);
+    setSelectedWord(null);
+  };
+
+  const nextStudyCard = () => {
+    if (currentStudyIndex < filteredWords.length - 1) {
+      setCurrentStudyIndex(prev => prev + 1);
+      setRevealDefinition(false);
+    } else {
+      // End of the deck
+      Alert.alert(
+        "Study Complete!",
+        "You've reviewed all the words in this set!",
+        [
+          {
+            text: "Start Over",
+            onPress: () => {
+              setCurrentStudyIndex(0);
+              setRevealDefinition(false);
+            }
+          },
+          {
+            text: "Exit Study Mode",
+            onPress: () => {
+              setStudyMode(false);
+              setFlashcardMode(false);
+            }
+          }
+        ]
+      );
+    }
+  };
+
+  const prevStudyCard = () => {
+    if (currentStudyIndex > 0) {
+      setCurrentStudyIndex(prev => prev - 1);
+      setRevealDefinition(false);
+    }
+  };
+
+  const renderMeaning = (meaning) => (
+    <View key={meaning.partOfSpeech} style={styles.meaningContainer}>
+      <Text style={styles.partOfSpeech}>{meaning.partOfSpeech}</Text>
+      {meaning.definitions.slice(0, 3).map((def, idx) => (
+        <View key={idx} style={styles.definitionContainer}>
+          <Text style={styles.definitionText}>• {def.definition}</Text>
+          {def.example && <Text style={styles.exampleText}>Example: "{def.example}"</Text>}
+          {def.synonyms && def.synonyms.length > 0 && (
+            <Text style={styles.synonymsText}>
+              Synonyms: {def.synonyms.slice(0, 5).join(", ")}
+            </Text>
+          )}
+        </View>
+      ))}
+    </View>
   );
 
   const renderVocabularyItem = ({ item }) => (
-    <TouchableOpacity style={styles.wordCard}>
-      <Text style={styles.wordText}>{item.word}</Text>
-      <Text style={styles.definitionText}>Definition: {item.definition}</Text>
-      <Text style={styles.exampleText}>Example: {item.example}</Text>
+    <TouchableOpacity
+      style={styles.wordCard}
+      onPress={() => {
+        setSelectedWord(item);
+        setStudyMode(false);
+        setFlashcardMode(false);
+      }}
+    >
+      <View style={styles.wordCardHeader}>
+        <Text style={styles.wordText}>{item.word}</Text>
+        <View style={styles.wordCardActions}>
+          <TouchableOpacity
+            onPress={() => toggleFavorite(item.word)}
+            style={styles.actionButton}
+          >
+            <Icon
+              name={favorites.includes(item.word) ? "star" : "star-border"}
+              size={24}
+              color={favorites.includes(item.word) ? "#FFD700" : "#BDC3C7"}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => deleteWord(item.word)}
+            style={styles.actionButton}
+          >
+            <Icon name="delete-outline" size={24} color="#FF6B6B" />
+          </TouchableOpacity>
+        </View>
+      </View>
+      {item.phonetic && <Text style={styles.phoneticText}>{item.phonetic}</Text>}
+      {item.meanings && item.meanings.length > 0 && (
+        <Text style={styles.quickDefinition}>
+          {item.meanings[0].partOfSpeech}: {item.meanings[0].definitions[0].definition.length > 80
+            ? item.meanings[0].definitions[0].definition.substring(0, 80) + '...'
+            : item.meanings[0].definitions[0].definition}
+        </Text>
+      )}
     </TouchableOpacity>
   );
+
+  const renderStudyMode = () => {
+    if (filteredWords.length === 0) return null;
+
+    const currentWord = filteredWords[currentStudyIndex];
+
+    return (
+      <View style={styles.studyContainer}>
+        <View style={styles.studyProgress}>
+          <Text style={styles.studyProgressText}>
+            {currentStudyIndex + 1} / {filteredWords.length}
+          </Text>
+        </View>
+
+        <View style={styles.flashcardContainer}>
+          <Text style={styles.flashcardWord}>{currentWord.word}</Text>
+          {currentWord.phonetic && (
+            <Text style={styles.flashcardPhonetic}>{currentWord.phonetic}</Text>
+          )}
+
+          {revealDefinition ? (
+            <View style={styles.definitionReveal}>
+              {currentWord.meanings && currentWord.meanings.length > 0 && (
+                <Text style={styles.flashcardDefinition}>
+                  <Text style={styles.flashcardPartOfSpeech}>
+                    {currentWord.meanings[0].partOfSpeech}:{' '}
+                  </Text>
+                  {currentWord.meanings[0].definitions[0].definition}
+                </Text>
+              )}
+
+              {currentWord.meanings &&
+               currentWord.meanings[0].definitions[0].example && (
+                <Text style={styles.flashcardExample}>
+                  "{currentWord.meanings[0].definitions[0].example}"
+                </Text>
+              )}
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.revealButton}
+              onPress={() => setRevealDefinition(true)}
+            >
+              <Text style={styles.revealButtonText}>Tap to reveal definition</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.studyControls}>
+          <TouchableOpacity
+            style={[styles.studyControlButton, styles.prevButton]}
+            onPress={prevStudyCard}
+            disabled={currentStudyIndex === 0}
+          >
+            <Icon
+              name="arrow-back"
+              size={24}
+              color={currentStudyIndex === 0 ? "#BDC3C7" : "#4A90E2"}
+            />
+            <Text style={[
+              styles.studyControlText,
+              currentStudyIndex === 0 ? styles.disabledText : null
+            ]}>
+              Previous
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.studyControlButton, styles.nextButton]}
+            onPress={nextStudyCard}
+          >
+            <Text style={styles.studyControlText}>Next</Text>
+            <Icon name="arrow-forward" size={24} color="#4A90E2" />
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={styles.exitStudyButton}
+          onPress={() => {
+            setStudyMode(false);
+            setFlashcardMode(false);
+          }}
+        >
+          <Text style={styles.exitStudyText}>Exit Study Mode</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderFlashcardMode = () => {
+    if (filteredWords.length === 0) return null;
+
+    const currentWord = filteredWords[currentStudyIndex];
+
+    return (
+      <View style={styles.studyContainer}>
+        <View style={styles.studyProgress}>
+          <Text style={styles.studyProgressText}>
+            {currentStudyIndex + 1} / {filteredWords.length}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.flashcard}
+          onPress={() => setRevealDefinition(!revealDefinition)}
+        >
+          {!revealDefinition ? (
+            <>
+              <Text style={styles.flashcardWord}>{currentWord.word}</Text>
+              {currentWord.phonetic && (
+                <Text style={styles.flashcardPhonetic}>{currentWord.phonetic}</Text>
+              )}
+              <Text style={styles.flipPrompt}>Tap to flip</Text>
+            </>
+          ) : (
+            <>
+              {currentWord.meanings && currentWord.meanings.length > 0 && (
+                <View style={styles.flashcardContent}>
+                  <Text style={styles.flashcardPartOfSpeech}>
+                    {currentWord.meanings[0].partOfSpeech}
+                  </Text>
+                  <Text style={styles.flashcardDefinition}>
+                    {currentWord.meanings[0].definitions[0].definition}
+                  </Text>
+
+                  {currentWord.meanings[0].definitions[0].example && (
+                    <Text style={styles.flashcardExample}>
+                      "{currentWord.meanings[0].definitions[0].example}"
+                    </Text>
+                  )}
+                </View>
+              )}
+              <Text style={styles.flipPrompt}>Tap to flip</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        <View style={styles.flashcardButtons}>
+          <TouchableOpacity
+            style={styles.difficultyButton}
+            onPress={() => {
+              // Mark as difficult (for future implementation)
+              nextStudyCard();
+            }}
+          >
+            <Icon name="error-outline" size={24} color="#FF6B6B" />
+            <Text style={styles.difficultyText}>Hard</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.difficultyButton}
+            onPress={() => {
+              // Mark as medium (for future implementation)
+              nextStudyCard();
+            }}
+          >
+            <Icon name="offline-bolt" size={24} color="#FFA500" />
+            <Text style={styles.difficultyText}>Medium</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.difficultyButton}
+            onPress={() => {
+              // Mark as easy (for future implementation)
+              nextStudyCard();
+            }}
+          >
+            <Icon name="check-circle-outline" size={24} color="#4CAF50" />
+            <Text style={styles.difficultyText}>Easy</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={styles.exitStudyButton}
+          onPress={() => {
+            setFlashcardMode(false);
+          }}
+        >
+          <Text style={styles.exitStudyText}>Exit Flashcard Mode</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Vocabulary</Text>
+        <Image
+          source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png' }}
+          style={styles.logo}
+        />
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Vocabulary Builder</Text>
+          <View style={styles.streakContainer}>
+            <Icon name="local-fire-department" size={16} color="#FFD700" />
+            <Text style={styles.streakText}>{dailyStreak} day streak</Text>
+          </View>
+        </View>
       </View>
 
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search words..."
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-        />
-      </View>
+      {!studyMode && !flashcardMode && (
+        <>
+          <View style={styles.searchContainer}>
+            <View style={styles.searchInputContainer}>
+              <Icon name="search" size={24} color="#666" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search for a word..."
+                placeholderTextColor="#999"
+                value={searchTerm}
+                onChangeText={setSearchTerm}
+                onSubmitEditing={handleSearch}
+                returnKeyType="search"
+              />
+              <TouchableOpacity
+                style={styles.randomButton}
+                onPress={handleRandomWord}
+                disabled={loading}
+              >
+                <Icon name="casino" size={24} color="#4A90E2" />
+              </TouchableOpacity>
+            </View>
+          </View>
 
-      {filteredWords.length > 0 ? (
-        <FlatList
-          data={filteredWords}
-          renderItem={renderVocabularyItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContainer}
-        />
-      ) : (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateText}>No vocabulary words found</Text>
+          <View style={styles.filterContainer}>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                filter === 'all' ? styles.activeFilter : null
+              ]}
+              onPress={() => setFilter('all')}
+            >
+              <Text style={[
+                styles.filterText,
+                filter === 'all' ? styles.activeFilterText : null
+              ]}>
+                All
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                filter === 'favorites' ? styles.activeFilter : null
+              ]}
+              onPress={() => setFilter('favorites')}
+            >
+              <Text style={[
+                styles.filterText,
+                filter === 'favorites' ? styles.activeFilterText : null
+              ]}>
+                Favorites
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                filter === 'recent' ? styles.activeFilter : null
+              ]}
+              onPress={() => setFilter('recent')}
+            >
+              <Text style={[
+                styles.filterText,
+                filter === 'recent' ? styles.activeFilterText : null
+              ]}>
+                Recent
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.studyButtonsContainer}>
+            <TouchableOpacity
+              style={styles.studyButton}
+              onPress={startStudyMode}
+            >
+              <Icon name="book" size={20} color="white" />
+              <Text style={styles.studyButtonText}>Study Mode</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.flashcardButton}
+              onPress={startFlashcardMode}
+            >
+              <Icon name="flip" size={20} color="white" />
+              <Text style={styles.studyButtonText}>Flashcards</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4A90E2" />
         </View>
       )}
 
-      <TouchableOpacity style={styles.addButton}>
-        <Text style={styles.addButtonText}>+ Add New Word</Text>
-      </TouchableOpacity>
+      {error && (
+        <View style={styles.errorContainer}>
+          <Icon name="error-outline" size={24} color="#FF6B6B" />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {studyMode && renderStudyMode()}
+
+      {flashcardMode && renderFlashcardMode()}
+
+      {!studyMode && !flashcardMode && selectedWord ? (
+        <View style={styles.wordDetailContainer}>
+          <View style={styles.wordHeader}>
+            <View style={styles.wordHeaderTitleSection}>
+              <Text style={styles.detailWordText}>{selectedWord.word}</Text>
+              {selectedWord.phonetic && (
+                <Text style={styles.detailPhoneticText}>{selectedWord.phonetic}</Text>
+              )}
+            </View>
+            <TouchableOpacity
+              onPress={() => toggleFavorite(selectedWord.word)}
+              style={styles.favoriteButton}
+            >
+              <Icon
+                name={favorites.includes(selectedWord.word) ? "star" : "star-border"}
+                size={28}
+                color={favorites.includes(selectedWord.word) ? "#FFD700" : "#BDC3C7"}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {selectedWord.origin && (
+            <View style={styles.originContainer}>
+              <Text style={styles.originLabel}>Origin:</Text>
+              <Text style={styles.originText}>{selectedWord.origin}</Text>
+            </View>
+          )}
+
+          <FlatList
+            data={selectedWord.meanings}
+            renderItem={({ item }) => renderMeaning(item)}
+            keyExtractor={(item, index) => index.toString()}
+            contentContainerStyle={styles.meaningsList}
+            ListHeaderComponent={() => (
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => setSelectedWord(null)}
+              >
+                <Icon name="arrow-back" size={20} color="#4A90E2" />
+                <Text style={styles.backButtonText}>Back to list</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      ) : !studyMode && !flashcardMode ? (
+        <FlatList
+          data={filteredWords}
+          renderItem={renderVocabularyItem}
+          keyExtractor={(item, index) => index.toString()}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Image
+                source={{ uri: 'https://cdn-icons-png.flaticon.com/512/4076/4076478.png' }}
+                style={styles.emptyImage}
+              />
+              <Text style={styles.emptyStateText}>
+                {filter === 'all'
+                  ? 'No words searched yet'
+                  : filter === 'favorites'
+                    ? 'No favorite words yet'
+                    : 'No recent words yet'}
+              </Text>
+              <Text style={styles.emptyStateSubtext}>
+                {filter === 'all'
+                  ? 'Search for a word or try a random one'
+                  : filter === 'favorites'
+                    ? 'Mark words as favorite to see them here'
+                    : 'Search for words to see them here'}
+              </Text>
+            </View>
+          }
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -64,80 +735,485 @@ export default function VocabularyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#F8FAFF',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
     backgroundColor: '#4A90E2',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    marginRight: 12,
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: 'white',
-    textAlign: 'center',
+  },
+  streakContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  streakText: {
+    color: 'white',
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: '600',
   },
   searchContainer: {
     padding: 16,
   },
-  searchInput: {
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  listContainer: {
-    padding: 16,
-  },
-  wordCard: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    paddingHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  wordText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 50,
+    fontSize: 16,
     color: '#333',
   },
-  definitionText: {
-    fontSize: 16,
+  randomButton: {
+    padding: 8,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
     marginBottom: 8,
-    color: '#555',
   },
-  exampleText: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    color: '#777',
+  filterButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginRight: 8,
+    backgroundColor: '#EEF2F7',
   },
-  emptyState: {
+  activeFilter: {
+    backgroundColor: '#4A90E2',
+  },
+  filterText: {
+    color: '#7F8C8D',
+    fontWeight: '600',
+  },
+  activeFilterText: {
+    color: 'white',
+  },
+  studyButtonsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  studyButton: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#4A90E2',
+    borderRadius: 8,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  flashcardButton: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#5DA271',
+    borderRadius: 8,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  studyButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    backgroundColor: '#FFEEEE',
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  errorText: {
+    color: '#FF6B6B',
+    marginLeft: 8,
+    fontSize: 16,
+  },
+  listContainer: {
+    padding: 16,
+    paddingBottom: 80,
+  },
+  wordCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  wordCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  wordCardActions: {
+    flexDirection: 'row',
+  },
+  actionButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  wordText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2C3E50',
+  },
+  phoneticText: {
+    fontSize: 14,
+    color: '#7F8C8D',
+    marginBottom: 8,
+  },
+  quickDefinition: {
+    fontSize: 14,
+    color: '#555',
+    lineHeight: 20,
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyImage: {
+    width: 120,
+    height: 120,
+    marginBottom: 16,
+    opacity: 0.8,
   },
   emptyStateText: {
     fontSize: 18,
-    color: '#999',
+    fontWeight: '600',
+    color: '#7F8C8D',
     textAlign: 'center',
+    marginBottom: 8,
   },
-  addButton: {
-    backgroundColor: '#4A90E2',
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#95A5A6',
+    textAlign: 'center',
+    paddingHorizontal: 40,
+  },
+  wordDetailContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+    padding: 20,
+  },
+  wordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  wordHeaderTitleSection: {
+    flex: 1,
+  },
+  detailWordText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#2C3E50',
+  },
+  detailPhoneticText: {
+    fontSize: 16,
+    color: '#7F8C8D',
+    marginTop: 4,
+  },
+  favoriteButton: {
+    padding: 8,
+  },
+  originContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#F8F9FA',
     borderRadius: 8,
+  },
+  originLabel: {
+    fontWeight: '600',
+    color: '#34495E',
+    marginRight: 8,
+  },
+  originText: {
+    flex: 1,
+    color: '#2C3E50',
+    lineHeight: 20,
+  },
+  meaningsList: {
+    paddingBottom: 40,
+  },
+  meaningContainer: {
+    marginBottom: 24,
+  },
+  partOfSpeech: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#4A90E2',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  definitionContainer: {
+    marginBottom: 12,
+  },
+  definitionText: {
+    fontSize: 16,
+    color: '#2C3E50',
+    lineHeight: 24,
+    marginBottom: 4,
+  },
+  exampleText: {
+    fontSize: 14,
+    color: '#7F8C8D',
+    fontStyle: 'italic',
+    marginLeft: 16,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  synonymsText: {
+    fontSize: 14,
+    color: '#16A085',
+    marginLeft: 16,
+    marginTop: 4,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  backButtonText: {
+    color: '#4A90E2',
+    marginLeft: 4,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  studyContainer: {
+    flex: 1,
     padding: 16,
-    margin: 16,
+  },
+  studyProgress: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  studyProgressText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#7F8C8D',
+  },
+  flashcardContainer: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 20,
+  },
+  flashcardWord: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#2C3E50',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  flashcardPhonetic: {
+    fontSize: 18,
+    color: '#7F8C8D',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  revealButton: {
+    backgroundColor: '#F8F9FA',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginTop: 16,
     alignItems: 'center',
   },
-  addButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+  revealButtonText: {
+    color: '#4A90E2',
+    fontWeight: '600',
   },
+  definitionReveal: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  flashcardDefinition: {
+    fontSize: 18,
+    color: '#2C3E50',
+    textAlign: 'center',
+    lineHeight: 26,
+  },
+  flashcardPartOfSpeech: {
+    fontStyle: 'italic',
+    color: '#4A90E2',
+    fontWeight: '600',
+  },
+  flashcardExample: {
+    fontSize: 16,
+    color: '#7F8C8D',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  studyControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  studyControlButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  prevButton: {
+    paddingLeft: 16,
+  },
+  nextButton: {
+    paddingRight: 16,
+  },
+  studyControlText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4A90E2',
+    marginHorizontal: 8,
+  },
+  disabledText: {
+    color: '#BDC3C7',
+  },
+  exitStudyButton: {
+    padding: 16,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  exitStudyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#E74C3C',
+  },
+  flashcard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 300,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 20,
+  },
+  flashcardContent: {
+    alignItems: 'center',
+  },
+  flipPrompt: {
+    color: '#95A5A6',
+    fontSize: 14,
+    fontStyle: 'italic',
+    position: 'absolute',
+    bottom: 16,
+  },
+  flashcardButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  difficultyButton: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'white',
+    marginHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  difficultyText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 4,
+  }
 });
