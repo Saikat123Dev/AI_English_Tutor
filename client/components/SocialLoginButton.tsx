@@ -61,7 +61,7 @@ const SocialLoginButton = ({
   const createUserInDatabase = async (email) => {
     try {
       console.log("Attempting to create user with email:", email);
-      const response = await fetch(`https://3b5b-2409-40e1-3102-6a82-5350-710c-4d20-c0f9.ngrok-free.app/api/auth/create`, {
+      const response = await fetch(`https://fd79-14-139-220-69.ngrok-free.app/api/auth/create`, {
         method: 'POST',
         headers: {
             "ngrok-skip-browser-warning": "true",
@@ -97,7 +97,7 @@ const SocialLoginButton = ({
           const email = user.primaryEmailAddress.emailAddress;
           console.log("User email found:", email);
           await createUserInDatabase(email);
-           router.replace("/auth/selectLanguage");
+           router.replace("/auth/complete-your-account");
         } catch (error) {
           console.error("Error handling user data:", error);
         } finally {
@@ -113,7 +113,7 @@ const SocialLoginButton = ({
     try {
       setIsLoading(true);
       const { createdSessionId, setActive } = await startOAuthFlow({
-        redirectUrl: Linking.createURL("/auth/selectLanguage", { scheme: "myapp" }),
+        redirectUrl: Linking.createURL("/auth/complete-your-account", { scheme: "myapp" }),
       });
 
       // If sign in was successful, set the active session

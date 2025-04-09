@@ -70,7 +70,6 @@ model vocabularyWord {
   favorites    favorite[] // Relation to favorites
   studyRecords studyRecord[] // Relation to study records
 
-  @@unique([userId, word])
   @@index([userId])
   @@index([timestamp])
 }

@@ -1,5 +1,6 @@
 import { SignedIn, useClerk } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
+import { Picker } from '@react-native-picker/picker';
 import { BlurView } from "expo-blur";
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from "react";
@@ -31,6 +32,14 @@ const SettingsScreen = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
 
+  // Language learning profile state
+  const [motherTongue, setMotherTongue] = useState(user?.unsafeMetadata?.motherToung || "");
+  const [englishLevel, setEnglishLevel] = useState(user?.unsafeMetadata?.englishLevel || "intermediate");
+  const [learningGoal, setLearningGoal] = useState(user?.unsafeMetadata?.learningGoal || "");
+  const [interests, setInterests] = useState(user?.unsafeMetadata?.interests || "");
+  const [focus, setFocus] = useState(user?.unsafeMetadata?.focus || "speaking");
+  const [voice, setVoice] = useState(user?.unsafeMetadata?.voice || "female");
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
@@ -48,6 +57,17 @@ const SettingsScreen = () => {
         useNativeDriver: true,
       })
     ]).start();
+
+    // Load language learning profile data if available
+    const metadata = user?.unsafeMetadata;
+    if (metadata) {
+      setMotherTongue(metadata.motherToung || "");
+      setEnglishLevel(metadata.englishLevel || "intermediate");
+      setLearningGoal(metadata.learningGoal || "");
+      setInterests(metadata.interests || "");
+      setFocus(metadata.focus || "speaking");
+      setVoice(metadata.voice || "female");
+    }
   }, []);
 
   const handleEdit = () => {
@@ -60,15 +80,52 @@ const SettingsScreen = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Update Clerk user profile
+      await user?.update({
+        username,
+        firstName: fullName.split(" ")[0],
+        lastName: fullName.split(" ")[1] || "",
+        unsafeMetadata: {
+          // Preserve existing metadata
+          ...user?.unsafeMetadata,
+          // Update language learning profile
+          motherToung: motherTongue,
+          englishLevel,
+          learningGoal,
+          interests,
+          focus,
+          voice
+        },
+      });
 
-      // Update user info (in a real app, this would call user.update())
-      // await user?.update({ firstName, lastName, username });
+      // Update user in your database
+      const email = user?.primaryEmailAddress?.emailAddress;
+      if (email) {
+        const response = await fetch("https://fd79-14-139-220-69.ngrok-free.app/api/auth/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            motherToung: motherTongue,
+            englishLevel,
+            learningGoal,
+            interests,
+            focus,
+            voice,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to update user profile in database");
+        }
+      }
 
       setIsEditing(false);
       Alert.alert("Success", "Your profile has been updated successfully!");
     } catch (error) {
+      console.error("Error updating profile:", error);
       Alert.alert("Error", "Failed to update profile");
     } finally {
       setIsSaving(false);
@@ -77,8 +134,20 @@ const SettingsScreen = () => {
 
   const handleCancel = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Reset all fields to current user values
     setFullName(user?.fullName || "");
     setUsername(user?.username || "");
+
+    const metadata = user?.unsafeMetadata;
+    if (metadata) {
+      setMotherTongue(metadata.motherToung || "");
+      setEnglishLevel(metadata.englishLevel || "intermediate");
+      setLearningGoal(metadata.learningGoal || "");
+      setInterests(metadata.interests || "");
+      setFocus(metadata.focus || "speaking");
+      setVoice(metadata.voice || "female");
+    }
+
     setIsEditing(false);
   };
 
@@ -93,6 +162,32 @@ const SettingsScreen = () => {
       ]
     );
   };
+
+  // Helper function to render picker fields
+  const renderPicker = (label, value, setValue, options) => (
+    <View style={styles.inputGroup}>
+      <Text style={styles.label}>{label}</Text>
+      {isEditing ? (
+        <View style={[styles.inputContainer, styles.pickerContainer]}>
+          <Picker
+            selectedValue={value}
+            onValueChange={(itemValue) => setValue(itemValue)}
+            style={styles.picker}
+          >
+            {options.map((option) => (
+              <Picker.Item key={option.value} label={option.label} value={option.value} />
+            ))}
+          </Picker>
+        </View>
+      ) : (
+        <View style={[styles.inputContainer, styles.disabledInput]}>
+          <Text style={styles.inputText}>
+            {options.find(opt => opt.value === value)?.label || "Not set"}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -119,6 +214,7 @@ const SettingsScreen = () => {
               <Text style={styles.headerText}>Account Settings</Text>
             </Animated.View>
 
+            {/* Basic Profile Information */}
             <Animated.View
               style={[
                 styles.cardContainer,
@@ -193,29 +289,111 @@ const SettingsScreen = () => {
                       )}
                     </View>
                   </View>
-
-                  {isEditing && (
-                    <View style={styles.buttonGroup}>
-                      <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-                        <Text style={styles.cancelText}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.saveButton, isSaving && styles.savingButton]}
-                        onPress={handleSave}
-                        disabled={isSaving}
-                      >
-                        {isSaving ? (
-                          <ActivityIndicator size="small" color="white" />
-                        ) : (
-                          <Text style={styles.saveText}>Save Changes</Text>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  )}
                 </View>
               </BlurView>
             </Animated.View>
 
+            {/* Language Learning Profile */}
+            <Animated.View
+              style={[
+                styles.cardContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ scale: scaleAnim }]
+                }
+              ]}
+            >
+              <BlurView intensity={80} tint="light" style={styles.blurContainer}>
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.heading}>Language Learning Profile</Text>
+                  </View>
+
+                  <View style={styles.formContainer}>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.label}>Native Language</Text>
+                      {isEditing ? (
+                        <View style={styles.inputContainer}>
+                          <Ionicons name="language-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <TextInput
+                            style={styles.input}
+                            value={motherTongue}
+                            onChangeText={setMotherTongue}
+                            placeholder="Your native language"
+                            autoCapitalize="words"
+                          />
+                        </View>
+                      ) : (
+                        <View style={[styles.inputContainer, styles.disabledInput]}>
+                          <Ionicons name="language-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Text style={styles.inputText}>{motherTongue || "Not provided"}</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {renderPicker("English Level", englishLevel, setEnglishLevel, [
+                      { label: "Beginner", value: "beginner" },
+                      { label: "Intermediate", value: "intermediate" },
+                      { label: "Advanced", value: "advanced" },
+                    ])}
+
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.label}>Learning Goal</Text>
+                      {isEditing ? (
+                        <View style={styles.inputContainer}>
+                          <Ionicons name="trophy-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <TextInput
+                            style={styles.input}
+                            value={learningGoal}
+                            onChangeText={setLearningGoal}
+                            placeholder="Your language learning goal"
+                          />
+                        </View>
+                      ) : (
+                        <View style={[styles.inputContainer, styles.disabledInput]}>
+                          <Ionicons name="trophy-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Text style={styles.inputText}>{learningGoal || "Not provided"}</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.label}>Interests</Text>
+                      {isEditing ? (
+                        <View style={styles.inputContainer}>
+                          <Ionicons name="heart-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <TextInput
+                            style={styles.input}
+                            value={interests}
+                            onChangeText={setInterests}
+                            placeholder="Your interests (comma separated)"
+                          />
+                        </View>
+                      ) : (
+                        <View style={[styles.inputContainer, styles.disabledInput]}>
+                          <Ionicons name="heart-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Text style={styles.inputText}>{interests || "Not provided"}</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {renderPicker("Learning Focus", focus, setFocus, [
+                      { label: "Speaking", value: "speaking" },
+                      { label: "Listening", value: "listening" },
+                      { label: "Reading", value: "reading" },
+                      { label: "Writing", value: "writing" },
+                    ])}
+
+                    {renderPicker("Preferred Voice", voice, setVoice, [
+                      { label: "Male", value: "male" },
+                      { label: "Female", value: "female" },
+                    ])}
+                  </View>
+                </View>
+              </BlurView>
+            </Animated.View>
+
+            {/* Preferences */}
             <Animated.View
               style={[
                 styles.cardContainer,
@@ -259,6 +437,34 @@ const SettingsScreen = () => {
                 </View>
               </BlurView>
             </Animated.View>
+
+            {/* Action Buttons */}
+            {isEditing && (
+              <Animated.View
+                style={[
+                  styles.buttonContainer,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{ scale: scaleAnim }]
+                  }
+                ]}
+              >
+                <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.saveButton, isSaving && styles.savingButton]}
+                  onPress={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text style={styles.saveText}>Save Changes</Text>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+            )}
 
             <AnimatedTouchable
               style={[
@@ -405,31 +611,47 @@ const styles = StyleSheet.create({
   inputText: {
     fontSize: 16,
     color: "#333",
+    paddingVertical: 12,
   },
-  buttonGroup: {
+  pickerContainer: {
+    padding: 0,
+    overflow: 'hidden',
+  },
+  picker: {
+    flex: 1,
+    height: 50,
+  },
+  buttonContainer: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "center",
+    width: "100%",
+    maxWidth: 500,
     gap: 12,
-    marginTop: 20,
+    marginBottom: 20,
   },
   cancelButton: {
-    paddingVertical: 10,
+    flex: 1,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: "#F2F2F7",
+    alignItems: "center",
   },
   cancelText: {
     color: "#555",
     fontWeight: "600",
-    fontSize: 15,
+    fontSize: 16,
   },
   saveButton: {
-    paddingVertical: 10,
+    flex: 2,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: "#007AFF",
-    minWidth: 120,
     alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
   },
   savingButton: {
     backgroundColor: "#5CA5FF",
@@ -437,7 +659,7 @@ const styles = StyleSheet.create({
   saveText: {
     color: "white",
     fontWeight: "600",
-    fontSize: 15,
+    fontSize: 16,
   },
   settingRow: {
     flexDirection: "row",

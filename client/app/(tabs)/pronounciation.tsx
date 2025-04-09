@@ -23,7 +23,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const API_BASE_URL = 'https://1ddb-2409-40e1-3117-fc5-8158-f08c-6b8-3a88.ngrok-free.app/api/pronounciation';
+const API_BASE_URL = 'https://fd79-14-139-220-69.ngrok-free.app/api/pronounciation';
 const RANDOM_WORD_API = 'https://random-word-api.herokuapp.com/all';
 const DICTIONARY_API = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
 
