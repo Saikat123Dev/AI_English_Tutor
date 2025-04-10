@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-const API_BASE_URL = 'https://ce61-2409-40e1-30dd-16d-ee07-1b03-9db-c953.ngrok-free.app/api'; // Replace with your actual API base URL
+const API_BASE_URL = 'https://ai-english-tutor-9ixt.onrender.com/api'; // Replace with your actual API base URL
 
 export default function VocabularyScreen() {
   const { user } = useUser(); // Get authenticated user from Clerk
@@ -175,10 +175,7 @@ export default function VocabularyScreen() {
   };
 
   const fetchRandomWords = async () => {
-    if (!netInfo.isConnected) {
-      setError('No internet connection. Using cached words only.');
-      return;
-    }
+
 
     try {
       setLoading(true);

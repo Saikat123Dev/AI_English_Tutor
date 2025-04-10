@@ -61,7 +61,7 @@ const SocialLoginButton = ({
   const createUserInDatabase = async (email) => {
     try {
       console.log("Attempting to create user with email:", email);
-      const response = await fetch(`https://fd79-14-139-220-69.ngrok-free.app/api/auth/create`, {
+      const response = await fetch(`https://ai-english-tutor-9ixt.onrender.com/api/auth/create`, {
         method: 'POST',
         headers: {
             "ngrok-skip-browser-warning": "true",

@@ -101,7 +101,7 @@ const SettingsScreen = () => {
       // Update user in your database
       const email = user?.primaryEmailAddress?.emailAddress;
       if (email) {
-        const response = await fetch("https://fd79-14-139-220-69.ngrok-free.app/api/auth/create", {
+        const response = await fetch("https://ai-english-tutor-9ixt.onrender.com/api/auth/create", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
