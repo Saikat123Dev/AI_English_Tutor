@@ -1,11 +1,25 @@
+import { useUser } from '@clerk/clerk-expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNetInfo } from '@react-native-community/netinfo';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
+const API_BASE_URL = 'https://ai-english-tutor-9ixt.onrender.com/api'; // Replace with your actual API base URL
+
 export default function VocabularyScreen() {
+  const { user } = useUser(); // Get authenticated user from Clerk
   const [searchTerm, setSearchTerm] = useState('');
   const [vocabularyWords, setVocabularyWords] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -21,6 +35,7 @@ export default function VocabularyScreen() {
   const [dailyStreak, setDailyStreak] = useState(0);
   const [lastOpened, setLastOpened] = useState(null);
   const [flashcardMode, setFlashcardMode] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
 
   const netInfo = useNetInfo();
 
@@ -28,8 +43,12 @@ export default function VocabularyScreen() {
   useEffect(() => {
     loadDataFromStorage();
     fetchRandomWords();
-    checkDailyStreak();
-  }, []);
+    if (user) {
+      checkDailyStreak();
+      fetchVocabulary();
+      fetchSearchHistory();
+    }
+  }, [filter, user]);
 
   // Save data when it changes
   useEffect(() => {
@@ -59,7 +78,7 @@ export default function VocabularyScreen() {
         favorites: favorites,
         history: history,
         dailyStreak: dailyStreak,
-        lastOpened: lastOpened
+        lastOpened: lastOpened,
       };
       await AsyncStorage.setItem('vocabularyData', JSON.stringify(data));
     } catch (err) {
@@ -67,46 +86,108 @@ export default function VocabularyScreen() {
     }
   };
 
-  const checkDailyStreak = () => {
-    const today = new Date().toDateString();
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayString = yesterday.toDateString();
+  const fetchVocabulary = async () => {
+    if (!user) return;
 
-    if (lastOpened === today) {
-      // Already logged in today, do nothing
-      return;
-    } else if (lastOpened === yesterdayString) {
-      // Last opened yesterday, increase streak
-      setDailyStreak(prev => prev + 1);
-      setLastOpened(today);
-      if ((dailyStreak + 1) % 5 === 0) {
-        Alert.alert("Streak Milestone!", `Amazing! You've reached a ${dailyStreak + 1} day streak!`);
+    try {
+      setLoading(true);
+      const email = user?.emailAddresses?.[0]?.emailAddress;
+      const response = await fetch(
+        `${API_BASE_URL}/words?filter=${filter}&email=${encodeURIComponent(email)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch vocabulary');
       }
-    } else if (lastOpened) {
-      // Streak broken
-      Alert.alert("Streak Reset", "You missed a day. Your streak has been reset.");
-      setDailyStreak(1);
-      setLastOpened(today);
-    } else {
-      // First time
-      setDailyStreak(1);
-      setLastOpened(today);
+
+      const data = await response.json();
+      setVocabularyWords(data);
+
+      // Extract favorites
+      const favs = data.filter((word) => word.isFavorite).map((word) => word.word);
+      setFavorites(favs);
+    } catch (err) {
+      setError(err.message);
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSearchHistory = async () => {
+    if (!user) return;
+
+    try {
+      const email = user?.emailAddresses?.[0]?.emailAddress;
+      const response = await fetch(
+        `${API_BASE_URL}/search-history?email=${encodeURIComponent(email)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch search history');
+      }
+
+      const data = await response.json();
+      setHistory(data.map((item) => item.term));
+    } catch (err) {
+      console.error('Failed to fetch search history', err);
+      setError(err.message);
+    }
+  };
+
+  const checkDailyStreak = async () => {
+    if (!user) return;
+
+    try {
+      const email = user?.emailAddresses?.[0]?.emailAddress;
+      const response = await fetch(`${API_BASE_URL}/streak?email=${encodeURIComponent(email)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch streak');
+      }
+
+      const { streak } = await response.json();
+      setDailyStreak(streak);
+    } catch (err) {
+      console.error('Failed to fetch streak', err);
+      setError(err.message);
     }
   };
 
   const fetchRandomWords = async () => {
-    if (!netInfo.isConnected) {
-      setError('No internet connection. Using cached words only.');
-      return;
-    }
+
 
     try {
       setLoading(true);
-      const response = await fetch('https://random-word-api.herokuapp.com/all');
+      const response = await fetch(`${API_BASE_URL}/random?limit=100`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch random words');
       const words = await response.json();
-      // Take first 100 words for demo purposes
-      setRandomWords(words.slice(0, 100));
+      setRandomWords(words);
     } catch (err) {
       setError('Failed to fetch random words');
       console.error(err);
@@ -124,16 +205,47 @@ export default function VocabularyScreen() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word.toLowerCase().trim()}`);
-      if (!response.ok) throw new Error('Word not found');
+
+      let response;
+      if (user) {
+        const email = user?.emailAddresses?.[0]?.emailAddress;
+        response = await fetch(
+          `${API_BASE_URL}/search/${encodeURIComponent(word.toLowerCase())}?email=${encodeURIComponent(email)}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      } else {
+        // Fallback to public API if not authenticated
+        response = await fetch(
+          `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.toLowerCase().trim())}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Word not found');
+      }
+
       const data = await response.json();
+      const wordData = user ? data : data[0]; // Our API returns the word directly, public API returns array
 
       // Add timestamp for sorting by recent
-      const wordData = data[0];
       wordData.timestamp = Date.now();
 
-      // Update search history
-      updateHistory(word.toLowerCase().trim());
+      // Update search history locally
+      if (user) {
+        updateHistory(word.toLowerCase().trim());
+      }
 
       return wordData;
     } catch (err) {
@@ -146,8 +258,48 @@ export default function VocabularyScreen() {
 
   const updateHistory = (word) => {
     // Keep only unique entries and limit to 20 most recent
-    const updatedHistory = [word, ...history.filter(w => w !== word)].slice(0, 20);
+    const updatedHistory = [word, ...history.filter((w) => w !== word)].slice(0, 20);
     setHistory(updatedHistory);
+  };
+
+  const saveWordToVocabulary = async (wordDetails) => {
+    if (!user) {
+      // If not authenticated, just save locally
+      if (!vocabularyWords.some((w) => w.word === wordDetails.word)) {
+        setVocabularyWords((prev) => [wordDetails, ...prev]);
+      }
+      return;
+    }
+
+    try {
+      const email = user?.emailAddresses?.[0]?.emailAddress;
+      const response = await fetch(`${API_BASE_URL}/words`, {
+        method: 'POST',
+        headers: {
+          "ngrok-skip-browser-warning": "true",
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          word: wordDetails.word,
+          phonetic: wordDetails.phonetic,
+          origin: wordDetails.origin,
+          meanings: wordDetails.meanings,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save word');
+      }
+
+      const savedWord = await response.json();
+      return savedWord;
+    } catch (err) {
+      console.error('Failed to save word', err);
+      return null;
+    }
   };
 
   const handleSearch = async () => {
@@ -156,13 +308,21 @@ export default function VocabularyScreen() {
     const wordDetails = await fetchWordDetails(searchTerm);
     if (wordDetails) {
       setSelectedWord(wordDetails);
-      // Add to vocabulary if not already present
-      if (!vocabularyWords.some(w => w.word === wordDetails.word)) {
-        setVocabularyWords(prev => [wordDetails, ...prev]);
+
+      // Save to vocabulary if not already present
+      if (!vocabularyWords.some((w) => w.word === wordDetails.word)) {
+        const savedWord = await saveWordToVocabulary(wordDetails);
+        if (savedWord) {
+          setVocabularyWords((prev) => [savedWord, ...prev]);
+        } else {
+          setVocabularyWords((prev) => [wordDetails, ...prev]);
+        }
       } else {
         // Update existing word's timestamp to bring it to top of recent list
-        setVocabularyWords(prev =>
-          prev.map(w => w.word === wordDetails.word ? {...w, timestamp: Date.now()} : w)
+        setVocabularyWords((prev) =>
+          prev.map((w) =>
+            w.word === wordDetails.word ? { ...w, timestamp: Date.now() } : w
+          )
         );
       }
     }
@@ -181,46 +341,112 @@ export default function VocabularyScreen() {
     if (wordDetails) {
       setSelectedWord(wordDetails);
       // Add to vocabulary if not already present
-      if (!vocabularyWords.some(w => w.word === wordDetails.word)) {
-        setVocabularyWords(prev => [wordDetails, ...prev]);
+      if (!vocabularyWords.some((w) => w.word === wordDetails.word)) {
+        const savedWord = await saveWordToVocabulary(wordDetails);
+        if (savedWord) {
+          setVocabularyWords((prev) => [savedWord, ...prev]);
+        } else {
+          setVocabularyWords((prev) => [wordDetails, ...prev]);
+        }
       }
     }
   };
 
-  const toggleFavorite = (word) => {
-    if (favorites.includes(word)) {
-      setFavorites(prev => prev.filter(w => w !== word));
-    } else {
-      setFavorites(prev => [...prev, word]);
+  const toggleFavorite = async (word) => {
+    if (!user) {
+      // Local only
+      if (favorites.includes(word)) {
+        setFavorites((prev) => prev.filter((w) => w !== word));
+      } else {
+        setFavorites((prev) => [...prev, word]);
+      }
+      return;
+    }
+
+    try {
+      const email = user?.emailAddresses?.[0]?.emailAddress;
+      const wordEntry = vocabularyWords.find((w) => w.word === word);
+      if (!wordEntry) return;
+
+      const response = await fetch(`${API_BASE_URL}/favorites`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          wordId: wordEntry.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to toggle favorite');
+      }
+
+      const { isFavorite } = await response.json();
+
+      // Update local state
+      if (isFavorite) {
+        setFavorites((prev) => [...prev, word]);
+      } else {
+        setFavorites((prev) => prev.filter((w) => w !== word));
+      }
+    } catch (err) {
+      console.error('Failed to toggle favorite', err);
     }
   };
 
-  const deleteWord = (word) => {
+  const deleteWord = async (word) => {
     Alert.alert(
-      "Remove Word",
+      'Remove Word',
       `Remove "${word}" from your vocabulary list?`,
       [
-        { text: "Cancel", style: "cancel" },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => {
-            setVocabularyWords(prev => prev.filter(w => w.word !== word));
-            setFavorites(prev => prev.filter(w => w !== word));
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            if (user) {
+              const email = user?.emailAddresses?.[0]?.emailAddress;
+              const wordEntry = vocabularyWords.find((w) => w.word === word);
+              if (!wordEntry) return;
+
+              try {
+                const response = await fetch(`${API_BASE_URL}/words/${wordEntry.id}`, {
+                  method: 'DELETE',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ email }),
+                });
+
+                if (!response.ok) {
+                  const errorData = await response.json();
+                  throw new Error(errorData.message || 'Failed to delete word');
+                }
+              } catch (err) {
+                console.error('Failed to delete word', err);
+                return;
+              }
+            }
+
+            // Update local state
+            setVocabularyWords((prev) => prev.filter((w) => w.word !== word));
+            setFavorites((prev) => prev.filter((w) => w !== word));
             if (selectedWord && selectedWord.word === word) {
               setSelectedWord(null);
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
-  // Filter words based on current filter
   const getFilteredWords = () => {
     switch (filter) {
       case 'favorites':
-        return vocabularyWords.filter(word => favorites.includes(word.word));
+        return vocabularyWords.filter((word) => favorites.includes(word.word));
       case 'recent':
         return [...vocabularyWords].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
       default:
@@ -230,12 +456,38 @@ export default function VocabularyScreen() {
 
   const filteredWords = getFilteredWords();
 
-  // Study mode functions
-  const startStudyMode = () => {
+  const startStudyMode = async () => {
     if (vocabularyWords.length === 0) {
-      Alert.alert("No Words", "Add some words to your vocabulary first!");
+      Alert.alert('No Words', 'Add some words to your vocabulary first!');
       return;
     }
+
+    if (user) {
+      try {
+        const email = user?.emailAddresses?.[0]?.emailAddress;
+        const response = await fetch(`${API_BASE_URL}/study-sessions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email,
+            mode: 'study',
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to start study session');
+        }
+
+        const session = await response.json();
+        setCurrentSessionId(session.id);
+      } catch (err) {
+        console.error('Failed to start study session', err);
+      }
+    }
+
     setStudyMode(true);
     setFlashcardMode(false);
     setCurrentStudyIndex(0);
@@ -243,11 +495,38 @@ export default function VocabularyScreen() {
     setSelectedWord(null);
   };
 
-  const startFlashcardMode = () => {
+  const startFlashcardMode = async () => {
     if (vocabularyWords.length === 0) {
-      Alert.alert("No Words", "Add some words to your vocabulary first!");
+      Alert.alert('No Words', 'Add some words to your vocabulary first!');
       return;
     }
+
+    if (user) {
+      try {
+        const email = user?.emailAddresses?.[0]?.emailAddress;
+        const response = await fetch(`${API_BASE_URL}/study-sessions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email,
+            mode: 'flashcard',
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to start flashcard session');
+        }
+
+        const session = await response.json();
+        setCurrentSessionId(session.id);
+      } catch (err) {
+        console.error('Failed to start flashcard session', err);
+      }
+    }
+
     setFlashcardMode(true);
     setStudyMode(false);
     setCurrentStudyIndex(0);
@@ -255,30 +534,80 @@ export default function VocabularyScreen() {
     setSelectedWord(null);
   };
 
+  const endStudySession = async () => {
+    if (user && currentSessionId) {
+      try {
+        const email = user?.emailAddresses?.[0]?.emailAddress;
+        const response = await fetch(`${API_BASE_URL}/study-sessions/${currentSessionId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to end study session');
+        }
+      } catch (err) {
+        console.error('Failed to end study session', err);
+      }
+    }
+
+    setStudyMode(false);
+    setFlashcardMode(false);
+    setCurrentSessionId(null);
+  };
+
+  const recordStudyAttempt = async (wordId, difficultyRating, isCorrect) => {
+    if (!user || !currentSessionId) return;
+
+    try {
+      const email = user?.emailAddresses?.[0]?.emailAddress;
+      const response = await fetch(`${API_BASE_URL}/study-records`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          sessionId: currentSessionId,
+          wordId,
+          difficultyRating,
+          isCorrect,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to record study attempt');
+      }
+    } catch (err) {
+      console.error('Failed to record study attempt', err);
+    }
+  };
+
   const nextStudyCard = () => {
     if (currentStudyIndex < filteredWords.length - 1) {
-      setCurrentStudyIndex(prev => prev + 1);
+      setCurrentStudyIndex((prev) => prev + 1);
       setRevealDefinition(false);
     } else {
-      // End of the deck
       Alert.alert(
-        "Study Complete!",
+        'Study Complete!',
         "You've reviewed all the words in this set!",
         [
           {
-            text: "Start Over",
+            text: 'Start Over',
             onPress: () => {
               setCurrentStudyIndex(0);
               setRevealDefinition(false);
-            }
+            },
           },
           {
-            text: "Exit Study Mode",
-            onPress: () => {
-              setStudyMode(false);
-              setFlashcardMode(false);
-            }
-          }
+            text: 'Exit Study Mode',
+            onPress: endStudySession,
+          },
         ]
       );
     }
@@ -286,9 +615,20 @@ export default function VocabularyScreen() {
 
   const prevStudyCard = () => {
     if (currentStudyIndex > 0) {
-      setCurrentStudyIndex(prev => prev - 1);
+      setCurrentStudyIndex((prev) => prev - 1);
       setRevealDefinition(false);
     }
+  };
+
+  const handleDifficultyRating = (difficulty) => {
+    if (filteredWords.length === 0) return;
+
+    const currentWord = filteredWords[currentStudyIndex];
+    if (user && currentWord.id) {
+      recordStudyAttempt(currentWord.id, difficulty, true);
+    }
+
+    nextStudyCard();
   };
 
   const renderMeaning = (meaning) => (
@@ -300,7 +640,7 @@ export default function VocabularyScreen() {
           {def.example && <Text style={styles.exampleText}>Example: "{def.example}"</Text>}
           {def.synonyms && def.synonyms.length > 0 && (
             <Text style={styles.synonymsText}>
-              Synonyms: {def.synonyms.slice(0, 5).join(", ")}
+              Synonyms: {def.synonyms.slice(0, 5).join(', ')}
             </Text>
           )}
         </View>
@@ -321,27 +661,34 @@ export default function VocabularyScreen() {
         <Text style={styles.wordText}>{item.word}</Text>
         <View style={styles.wordCardActions}>
           <TouchableOpacity
-            onPress={() => toggleFavorite(item.word)}
+            onPress={(e) => {
+              e.stopPropagation();
+              toggleFavorite(item.word);
+            }}
             style={styles.actionButton}
           >
             <Icon
-              name={favorites.includes(item.word) ? "star" : "star-border"}
+              name={favorites.includes(item.word) ? 'star' : 'star-border'}
               size={24}
-              color={favorites.includes(item.word) ? "#FFD700" : "#BDC3C7"}
+              color={favorites.includes(item.word) ? '#FFD700' : '#BDC3C7'}
             />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => deleteWord(item.word)}
+            onPress={(e) => {
+              e.stopPropagation();
+              deleteWord(item.word);
+            }}
             style={styles.actionButton}
           >
-            <Icon name="delete-outline" size={24} color="#FF6B6B" />
+            <Icon name='delete-outline' size={24} color='#FF6B6B' />
           </TouchableOpacity>
         </View>
       </View>
       {item.phonetic && <Text style={styles.phoneticText}>{item.phonetic}</Text>}
       {item.meanings && item.meanings.length > 0 && (
         <Text style={styles.quickDefinition}>
-          {item.meanings[0].partOfSpeech}: {item.meanings[0].definitions[0].definition.length > 80
+          {item.meanings[0].partOfSpeech}:{' '}
+          {item.meanings[0].definitions[0].definition.length > 80
             ? item.meanings[0].definitions[0].definition.substring(0, 80) + '...'
             : item.meanings[0].definitions[0].definition}
         </Text>
@@ -379,8 +726,7 @@ export default function VocabularyScreen() {
                 </Text>
               )}
 
-              {currentWord.meanings &&
-               currentWord.meanings[0].definitions[0].example && (
+              {currentWord.meanings && currentWord.meanings[0].definitions[0].example && (
                 <Text style={styles.flashcardExample}>
                   "{currentWord.meanings[0].definitions[0].example}"
                 </Text>
@@ -403,14 +749,16 @@ export default function VocabularyScreen() {
             disabled={currentStudyIndex === 0}
           >
             <Icon
-              name="arrow-back"
+              name='arrow-back'
               size={24}
-              color={currentStudyIndex === 0 ? "#BDC3C7" : "#4A90E2"}
+              color={currentStudyIndex === 0 ? '#BDC3C7' : '#4A90E2'}
             />
-            <Text style={[
-              styles.studyControlText,
-              currentStudyIndex === 0 ? styles.disabledText : null
-            ]}>
+            <Text
+              style={[
+                styles.studyControlText,
+                currentStudyIndex === 0 ? styles.disabledText : null,
+              ]}
+            >
               Previous
             </Text>
           </TouchableOpacity>
@@ -420,17 +768,11 @@ export default function VocabularyScreen() {
             onPress={nextStudyCard}
           >
             <Text style={styles.studyControlText}>Next</Text>
-            <Icon name="arrow-forward" size={24} color="#4A90E2" />
+            <Icon name='arrow-forward' size={24} color='#4A90E2' />
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.exitStudyButton}
-          onPress={() => {
-            setStudyMode(false);
-            setFlashcardMode(false);
-          }}
-        >
+        <TouchableOpacity style={styles.exitStudyButton} onPress={endStudySession}>
           <Text style={styles.exitStudyText}>Exit Study Mode</Text>
         </TouchableOpacity>
       </View>
@@ -488,44 +830,30 @@ export default function VocabularyScreen() {
         <View style={styles.flashcardButtons}>
           <TouchableOpacity
             style={styles.difficultyButton}
-            onPress={() => {
-              // Mark as difficult (for future implementation)
-              nextStudyCard();
-            }}
+            onPress={() => handleDifficultyRating('hard')}
           >
-            <Icon name="error-outline" size={24} color="#FF6B6B" />
+            <Icon name='error-outline' size={24} color='#FF6B6B' />
             <Text style={styles.difficultyText}>Hard</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.difficultyButton}
-            onPress={() => {
-              // Mark as medium (for future implementation)
-              nextStudyCard();
-            }}
+            onPress={() => handleDifficultyRating('medium')}
           >
-            <Icon name="offline-bolt" size={24} color="#FFA500" />
+            <Icon name='offline-bolt' size={24} color='#FFA500' />
             <Text style={styles.difficultyText}>Medium</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.difficultyButton}
-            onPress={() => {
-              // Mark as easy (for future implementation)
-              nextStudyCard();
-            }}
+            onPress={() => handleDifficultyRating('easy')}
           >
-            <Icon name="check-circle-outline" size={24} color="#4CAF50" />
+            <Icon name='check-circle-outline' size={24} color='#4CAF50' />
             <Text style={styles.difficultyText}>Easy</Text>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.exitStudyButton}
-          onPress={() => {
-            setFlashcardMode(false);
-          }}
-        >
+        <TouchableOpacity style={styles.exitStudyButton} onPress={endStudySession}>
           <Text style={styles.exitStudyText}>Exit Flashcard Mode</Text>
         </TouchableOpacity>
       </View>
@@ -542,7 +870,7 @@ export default function VocabularyScreen() {
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Vocabulary Builder</Text>
           <View style={styles.streakContainer}>
-            <Icon name="local-fire-department" size={16} color="#FFD700" />
+            <Icon name='local-fire-department' size={16} color='#FFD700' />
             <Text style={styles.streakText}>{dailyStreak} day streak</Text>
           </View>
         </View>
@@ -552,85 +880,82 @@ export default function VocabularyScreen() {
         <>
           <View style={styles.searchContainer}>
             <View style={styles.searchInputContainer}>
-              <Icon name="search" size={24} color="#666" style={styles.searchIcon} />
+              <Icon name='search' size={24} color='#666' style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search for a word..."
-                placeholderTextColor="#999"
+                placeholder='Search for a word...'
+                placeholderTextColor='#999'
                 value={searchTerm}
                 onChangeText={setSearchTerm}
                 onSubmitEditing={handleSearch}
-                returnKeyType="search"
+                returnKeyType='search'
               />
               <TouchableOpacity
                 style={styles.randomButton}
                 onPress={handleRandomWord}
                 disabled={loading}
               >
-                <Icon name="casino" size={24} color="#4A90E2" />
+                <Icon name='casino' size={24} color='#4A90E2' />
               </TouchableOpacity>
             </View>
           </View>
 
           <View style={styles.filterContainer}>
             <TouchableOpacity
-              style={[
-                styles.filterButton,
-                filter === 'all' ? styles.activeFilter : null
-              ]}
+              style={[styles.filterButton, filter === 'all' ? styles.activeFilter : null]}
               onPress={() => setFilter('all')}
             >
-              <Text style={[
-                styles.filterText,
-                filter === 'all' ? styles.activeFilterText : null
-              ]}>
+              <Text
+                style={[
+                  styles.filterText,
+                  filter === 'all' ? styles.activeFilterText : null,
+                ]}
+              >
                 All
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.filterButton,
-                filter === 'favorites' ? styles.activeFilter : null
+                filter === 'favorites' ? styles.activeFilter : null,
               ]}
               onPress={() => setFilter('favorites')}
             >
-              <Text style={[
-                styles.filterText,
-                filter === 'favorites' ? styles.activeFilterText : null
-              ]}>
+              <Text
+                style={[
+                  styles.filterText,
+                  filter === 'favorites' ? styles.activeFilterText : null,
+                ]}
+              >
                 Favorites
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.filterButton,
-                filter === 'recent' ? styles.activeFilter : null
+                filter === 'recent' ? styles.activeFilter : null,
               ]}
               onPress={() => setFilter('recent')}
             >
-              <Text style={[
-                styles.filterText,
-                filter === 'recent' ? styles.activeFilterText : null
-              ]}>
+              <Text
+                style={[
+                  styles.filterText,
+                  filter === 'recent' ? styles.activeFilterText : null,
+                ]}
+              >
                 Recent
               </Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.studyButtonsContainer}>
-            <TouchableOpacity
-              style={styles.studyButton}
-              onPress={startStudyMode}
-            >
-              <Icon name="book" size={20} color="white" />
+            <TouchableOpacity style={styles.studyButton} onPress={startStudyMode}>
+              <Icon name='book' size={20} color='white' />
               <Text style={styles.studyButtonText}>Study Mode</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.flashcardButton}
-              onPress={startFlashcardMode}
-            >
-              <Icon name="flip" size={20} color="white" />
+            <TouchableOpacity style={styles.flashcardButton} onPress={startFlashcardMode}>
+              <Icon name='flip' size={20} color='white' />
               <Text style={styles.studyButtonText}>Flashcards</Text>
             </TouchableOpacity>
           </View>
@@ -639,13 +964,13 @@ export default function VocabularyScreen() {
 
       {loading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90E2" />
+          <ActivityIndicator size='large' color='#4A90E2' />
         </View>
       )}
 
       {error && (
         <View style={styles.errorContainer}>
-          <Icon name="error-outline" size={24} color="#FF6B6B" />
+          <Icon name='error-outline' size={24} color='#FF6B6B' />
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
@@ -668,9 +993,9 @@ export default function VocabularyScreen() {
               style={styles.favoriteButton}
             >
               <Icon
-                name={favorites.includes(selectedWord.word) ? "star" : "star-border"}
+                name={favorites.includes(selectedWord.word) ? 'star' : 'star-border'}
                 size={28}
-                color={favorites.includes(selectedWord.word) ? "#FFD700" : "#BDC3C7"}
+                color={favorites.includes(selectedWord.word) ? '#FFD700' : '#BDC3C7'}
               />
             </TouchableOpacity>
           </View>
@@ -688,11 +1013,8 @@ export default function VocabularyScreen() {
             keyExtractor={(item, index) => index.toString()}
             contentContainerStyle={styles.meaningsList}
             ListHeaderComponent={() => (
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => setSelectedWord(null)}
-              >
-                <Icon name="arrow-back" size={20} color="#4A90E2" />
+              <TouchableOpacity style={styles.backButton} onPress={() => setSelectedWord(null)}>
+                <Icon name='arrow-back' size={20} color='#4A90E2' />
                 <Text style={styles.backButtonText}>Back to list</Text>
               </TouchableOpacity>
             )}
@@ -714,15 +1036,15 @@ export default function VocabularyScreen() {
                 {filter === 'all'
                   ? 'No words searched yet'
                   : filter === 'favorites'
-                    ? 'No favorite words yet'
-                    : 'No recent words yet'}
+                  ? 'No favorite words yet'
+                  : 'No recent words yet'}
               </Text>
               <Text style={styles.emptyStateSubtext}>
                 {filter === 'all'
                   ? 'Search for a word or try a random one'
                   : filter === 'favorites'
-                    ? 'Mark words as favorite to see them here'
-                    : 'Search for words to see them here'}
+                  ? 'Mark words as favorite to see them here'
+                  : 'Search for words to see them here'}
               </Text>
             </View>
           }
@@ -732,6 +1054,7 @@ export default function VocabularyScreen() {
   );
 }
 
+// Styles remain unchanged
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1215,5 +1538,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginTop: 4,
-  }
+  },
 });

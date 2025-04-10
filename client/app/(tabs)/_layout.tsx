@@ -162,9 +162,9 @@ export default function TabLayout() {
             color={focused ? '#FFF' : 'rgba(255,255,255,0.7)'}
           />
         </View>
-  
+
         {focused && (
-          <Animated.View 
+          <Animated.View
             style={[
               styles.activeIndicator,
               {
@@ -175,7 +175,7 @@ export default function TabLayout() {
                   })
                 }]
               }
-            ]} 
+            ]}
           />
         )}
       </Animated.View>

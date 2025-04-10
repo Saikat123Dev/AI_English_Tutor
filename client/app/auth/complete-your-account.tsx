@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   ActivityIndicator,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -25,18 +26,36 @@ const CompleteYourAccountScreen = () => {
       full_name: "",
       username: "",
       gender: "",
+      motherToung: "",
+      englishLevel: "",
+      learningGoal: "",
+      interests: "",
+      focus: "",
+      voice: "",
     },
   });
 
-  const onSubmit = async (data: any) => {
-    const { full_name, username, gender } = data;
+  const onSubmit = async (data) => {
+    const {
+      full_name,
+      username,
+      gender,
+      motherToung,
+      englishLevel,
+      learningGoal,
+      interests,
+      focus,
+      voice
+    } = data;
 
     try {
       setIsLoading(true);
+
+      // Update Clerk user profile
       await user?.update({
         username: username,
         firstName: full_name.split(" ")[0],
-        lastName: full_name.split(" ")[1],
+        lastName: full_name.split(" ")[1] || "",
         unsafeMetadata: {
           gender,
           onboarding_completed: true,
@@ -45,99 +64,206 @@ const CompleteYourAccountScreen = () => {
 
       await user?.reload();
 
-     return router.push("/auth/selectLanguage");
-    } catch (error: any) {
+      // Create or update user in your database
+      const email = user?.primaryEmailAddress?.emailAddress;
+      if (email) {
+        const response = await fetch("https://ai-english-tutor-9ixt.onrender.com/api/auth/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            motherToung,
+            englishLevel,
+            learningGoal,
+            interests,
+            focus,
+            voice,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to update user profile in database");
+        }
+      }
+
+      return router.push("/(tabs)");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+
       if (error.message === "That username is taken. Please try another.") {
         return setError("username", { message: "Username is already taken" });
       }
 
-      return setError("full_name", { message: "An error occurred" });
+      return setError("full_name", { message: "An error occurred while updating profile" });
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!isLoaded) {
-      return;
-    }
-
-    if (!user) {
+    if (!isLoaded || !user) {
       return;
     }
 
     setValue("full_name", user?.fullName || "");
     setValue("username", user?.username || "");
     setValue("gender", String(user?.unsafeMetadata?.gender) || "");
+
+    // Load additional fields from metadata if available
+    const metadata = user?.unsafeMetadata;
+    if (metadata) {
+      setValue("motherToung", metadata.motherToung || "");
+      setValue("englishLevel", metadata.englishLevel || "");
+      setValue("learningGoal", metadata.learningGoal || "");
+      setValue("interests", metadata.interests || "");
+      setValue("focus", metadata.focus || "");
+      setValue("voice", metadata.voice || "");
+    }
   }, [isLoaded, user]);
 
+  const englishLevels = [
+    { label: "Beginner", value: "beginner" },
+    { label: "Intermediate", value: "intermediate" },
+    { label: "Advanced", value: "advanced" },
+  ];
+
+  const focusOptions = [
+    { label: "Speaking", value: "speaking" },
+    { label: "Listening", value: "listening" },
+    { label: "Reading", value: "reading" },
+    { label: "Writing", value: "writing" },
+  ];
+
+  const voiceOptions = [
+    { label: "Male", value: "male" },
+    { label: "Female", value: "female" },
+  ];
+
   return (
-    <View
-      style={[
-        styles.container,
-        { paddingTop: insets.top + 40, paddingBottom: insets.bottom },
-      ]}
-    >
-      <View style={styles.headingContainer}>
-        <Text style={styles.label}>Complete your account</Text>
-        <Text style={styles.description}>
-          Complete your account to start your journey with thousands of
-          developers around the world.
-        </Text>
-      </View>
+    <ScrollView style={styles.scrollView}>
+      <View
+        style={[
+          styles.container,
+          { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 20 },
+        ]}
+      >
+        <View style={styles.headingContainer}>
+          <Text style={styles.label}>Complete your account</Text>
+          <Text style={styles.description}>
+            Complete your account to start your language learning journey with thousands of
+            learners around the world.
+          </Text>
+        </View>
 
-      <View style={styles.formContainer}>
-        <TextInput
-          control={control}
-          placeholder="Enter your full name"
-          label="Full Name"
-          required
-          name="full_name"
-        />
+        <View style={styles.formContainer}>
+          <TextInput
+            control={control}
+            placeholder="Enter your full name"
+            label="Full Name"
+            required
+            name="full_name"
+          />
 
-        <TextInput
-          control={control}
-          placeholder="Enter your username"
-          label="Username"
-          required
-          name="username"
-        />
+          <TextInput
+            control={control}
+            placeholder="Enter your username"
+            label="Username"
+            required
+            name="username"
+          />
 
-        <RadioButtonInput
-          control={control}
-          placeholder="Select your gender"
-          label="Gender"
-          required
-          name="gender"
-          options={[
-            { label: "Male", value: "male" },
-            { label: "Female", value: "female" },
-            { label: "Other", value: "other" },
-          ]}
-        />
+          <RadioButtonInput
+            control={control}
+            placeholder="Select your gender"
+            label="Gender"
+            required
+            name="gender"
+            options={[
+              { label: "Male", value: "male" },
+              { label: "Female", value: "female" },
+              { label: "Other", value: "other" },
+            ]}
+          />
 
-        <View style={{ marginTop: 20 }}>
-          <TouchableOpacity
-            style={[styles.button, { opacity: isLoading ? 0.7 : 1 }]}
-            onPress={handleSubmit(onSubmit)}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : null}
-            <Text style={styles.buttonText}>
-              {isLoading ? "Loading..." : "Complete Account"}
-            </Text>
-          </TouchableOpacity>
+          <TextInput
+            control={control}
+            placeholder="Enter your native language"
+            label="Native Language"
+            required
+            name="motherToung"
+          />
+
+          <RadioButtonInput
+            control={control}
+            placeholder="Select your English level"
+            label="English Level"
+            required
+            name="englishLevel"
+            options={englishLevels}
+          />
+
+          <TextInput
+            control={control}
+            placeholder="What is your learning goal?"
+            label="Learning Goal"
+            required
+            name="learningGoal"
+          />
+
+          <TextInput
+            control={control}
+            placeholder="Enter your interests (comma separated)"
+            label="Interests"
+            name="interests"
+          />
+
+          <RadioButtonInput
+            control={control}
+            placeholder="Select your primary focus"
+            label="Learning Focus"
+            required
+            name="focus"
+            options={focusOptions}
+          />
+
+          <RadioButtonInput
+            control={control}
+            placeholder="Select preferred AI voice"
+            label="Preferred Voice"
+            required
+            name="voice"
+            options={voiceOptions}
+          />
+
+          <View style={{ marginTop: 20 }}>
+            <TouchableOpacity
+              style={[styles.button, { opacity: isLoading ? 0.7 : 1 }]}
+              onPress={handleSubmit(onSubmit)}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : null}
+              <Text style={styles.buttonText}>
+                {isLoading ? "Loading..." : "Complete Account"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 };
 
 export default CompleteYourAccountScreen;
 
 const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+    backgroundColor: "white",
+  },
   container: {
     flex: 1,
     backgroundColor: "white",
