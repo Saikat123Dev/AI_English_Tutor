@@ -1,24 +1,30 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { v2 as cloudinary } from 'cloudinary';
 import express from 'express';
-import fs from 'fs';
 import multer from 'multer';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from "../lib/db.js";
 
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
 const router = express.Router();
 
-// Configure multer for audio file uploads
+// Configure multer for temporary local storage before Cloudinary upload
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadsDir = path.join(process.cwd(), 'uploads');
+    const uploadsDir = path.join(process.cwd(), 'uploads/temp');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    // Create unique filename with original extension
     const uniqueFilename = `${uuidv4()}${path.extname(file.originalname)}`;
     cb(null, uniqueFilename);
   }
@@ -28,7 +34,6 @@ const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    // Accept common audio formats
     const validTypes = ['audio/wav', 'audio/mp3', 'audio/webm', 'audio/ogg', 'audio/mpeg'];
     if (validTypes.includes(file.mimetype)) {
       cb(null, true);
@@ -75,9 +80,18 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
       });
     }
 
-    // Convert audio to base64 for Gemini API (if needed)
-    // For this example, we're just using the file path, but you could convert to base64
-    const audioPath = audioFile.path;
+    // Upload audio to Cloudinary
+    const uploadResult = await cloudinary.uploader.upload(audioFile.path, {
+      resource_type: "video", // Audio files are handled as video in Cloudinary
+      public_id: `pronunciation/${uuidv4()}`,
+      folder: 'pronunciation_assessments'
+    });
+
+    // Clean up temporary file
+    fs.unlinkSync(audioFile.path);
+
+    // Store Cloudinary URL
+    const audioUrl = uploadResult.secure_url;
 
     // Create a more detailed prompt for the pronunciation assessment
     const prompt = `
@@ -100,26 +114,18 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
       {
         "success": true,
         "word": "${word}",
-        "accuracy": 85, // Percentage as number
+        "accuracy": 85,
         "correctSounds": ["specific sounds pronounced well"],
         "improvementNeeded": ["specific sounds needing work"],
         "commonIssues": "Brief explanation of typical issues for speakers of their language",
         "practiceExercises": ["2-3 specific practice exercises"],
         "encouragement": "Positive, encouraging feedback"
       }
-
-      Important: Return ONLY the JSON without any markdown formatting or code blocks.
     `;
 
     // Get the model
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // In a real implementation, you would:
-    // 1. Process the audio file (convert to compatible format if needed)
-    // 2. Send the actual audio with gemini-pro-vision model or use Speech-to-Text API first
-    // 3. Compare the transcription with the expected word
-
-    // For now, we'll simulate this process with the text-only model
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
@@ -127,7 +133,6 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
     // Parse the text response to JSON
     let jsonResponse;
     try {
-      // Remove any potential markdown code block formatting
       const cleanedText = text.replace(/```json|```/g, '').trim();
       jsonResponse = JSON.parse(cleanedText);
 
@@ -136,16 +141,16 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
         data: {
           userId: user.id,
           word: word,
-          audioPath: audioPath,
+          audioUrl: audioUrl, // Store Cloudinary URL instead of local path
           accuracy: jsonResponse.accuracy || 0,
           feedback: cleanedText,
         }
       });
 
-      // Add the attempt ID to the response
+      // Add the attempt ID and audio URL to the response
       jsonResponse.attemptId = savedAttempt.id;
+      jsonResponse.audioUrl = audioUrl;
 
-      // Return the parsed JSON
       res.json(jsonResponse);
     } catch (error) {
       console.error("Error parsing JSON response:", error);
@@ -155,23 +160,20 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
         data: {
           userId: user.id,
           word: word,
-          audioPath: audioPath,
+          audioUrl: audioUrl,
           accuracy: 0,
           feedback: text,
         }
       });
 
-      // If parsing fails, return a formatted response
       res.json({
         success: true,
         word: word,
         response: text,
-        attemptId: savedAttempt.id
+        attemptId: savedAttempt.id,
+        audioUrl: audioUrl
       });
     }
-
-    // Clean up the audio file (optional - you might want to keep it)
-    // fs.unlinkSync(audioPath);
 
   } catch (error) {
     console.error("Error processing pronunciation:", error);
@@ -199,7 +201,7 @@ router.get("/history", async (req, res) => {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email},
+      where: { email },
       select: { id: true }
     });
 
@@ -223,10 +225,11 @@ router.get("/history", async (req, res) => {
         word: true,
         accuracy: true,
         feedback: true,
-
+        audioUrl: true, // Now retrieves Cloudinary URL
+        createdAt: true
       }
     });
-console.log(history);
+
     // Format the history records
     const formattedHistory = history.map(attempt => {
       let feedbackObj = attempt.feedback;
@@ -245,6 +248,7 @@ console.log(history);
         word: attempt.word,
         accuracy: attempt.accuracy,
         feedback: feedbackObj,
+        audioUrl: attempt.audioUrl,
         date: attempt.createdAt
       };
     });
@@ -378,14 +382,27 @@ router.post("/compare", upload.fields([
       });
     }
 
-    const userAudioPath = files.userAudio[0].path;
-    const referenceAudioPath = files.referenceAudio[0].path;
+    // Upload both audio files to Cloudinary
+    const userUpload = await cloudinary.uploader.upload(files.userAudio[0].path, {
+      resource_type: "video",
+      public_id: `pronunciation/compare_user_${uuidv4()}`,
+      folder: 'pronunciation_comparisons'
+    });
 
-    // In a real implementation, you'd:
-    // 1. Use audio analysis APIs or services to compare the pronunciations
-    // 2. Extract features like phoneme timing, pitch, etc.
+    const referenceUpload = await cloudinary.uploader.upload(files.referenceAudio[0].path, {
+      resource_type: "video",
+      public_id: `pronunciation/compare_reference_${uuidv4()}`,
+      folder: 'pronunciation_comparisons'
+    });
 
-    // For now, we'll use Gemini to simulate this feedback
+    // Clean up temporary files
+    fs.unlinkSync(files.userAudio[0].path);
+    fs.unlinkSync(files.referenceAudio[0].path);
+
+    const userAudioUrl = userUpload.secure_url;
+    const referenceAudioUrl = referenceUpload.secure_url;
+
+    // Initialize Gemini model
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `
@@ -406,7 +423,9 @@ router.post("/compare", upload.fields([
         "similarityScore": 78,
         "matchingAspects": ["aspects that match well"],
         "differences": ["aspects that differ"],
-        "improvements": ["specific tips"]
+        "improvements": ["specific tips"],
+        "userAudioUrl": "${userAudioUrl}",
+        "referenceAudioUrl": "${referenceAudioUrl}"
       }
     `;
 
@@ -415,10 +434,6 @@ router.post("/compare", upload.fields([
     const parsedResponse = JSON.parse(response.text().replace(/```json|```/g, '').trim());
 
     res.json(parsedResponse);
-
-    // Clean up (optional)
-    // fs.unlinkSync(userAudioPath);
-    // fs.unlinkSync(referenceAudioPath);
 
   } catch (error) {
     console.error("Error comparing pronunciations:", error);
