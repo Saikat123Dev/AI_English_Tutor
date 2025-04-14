@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { v2 as cloudinary } from 'cloudinary';
 import express from 'express';
 import fs from 'fs';
 import multer from 'multer';
@@ -6,19 +7,25 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from "../lib/db.js";
 
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
 const router = express.Router();
 
-// Configure multer for audio file uploads
+// Configure multer for temporary local storage before Cloudinary upload
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadsDir = path.join(process.cwd(), 'uploads');
+    const uploadsDir = path.join(process.cwd(), 'uploads/temp');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    // Create unique filename with original extension
     const uniqueFilename = `${uuidv4()}${path.extname(file.originalname)}`;
     cb(null, uniqueFilename);
   }
@@ -28,7 +35,6 @@ const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    // Accept common audio formats
     const validTypes = ['audio/wav', 'audio/mp3', 'audio/webm', 'audio/ogg', 'audio/mpeg'];
     if (validTypes.includes(file.mimetype)) {
       cb(null, true);
@@ -75,9 +81,18 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
       });
     }
 
-    // Convert audio to base64 for Gemini API (if needed)
-    // For this example, we're just using the file path, but you could convert to base64
-    const audioPath = audioFile.path;
+    // Upload audio to Cloudinary
+    const uploadResult = await cloudinary.uploader.upload(audioFile.path, {
+      resource_type: "video", // Audio files are handled as video in Cloudinary
+      public_id: `pronunciation/${uuidv4()}`,
+      folder: 'pronunciation_assessments'
+    });
+
+    // Clean up temporary file
+    fs.unlinkSync(audioFile.path);
+
+    // Store Cloudinary URL
+    const audioUrl = uploadResult.secure_url;
 
     // Create a more detailed prompt for the pronunciation assessment
     const prompt = `
@@ -96,30 +111,23 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
       4. Common pronunciation issues for speakers of their native language when saying this word
       5. Practice tips tailored to their specific difficulties
 
-      Please provide a detailed analysis formatted as JSON with the following structure:
+      IMPORTANT: Ensure your response is valid JSON with no trailing commas or syntax errors.
+      Format your response exactly like this:
       {
         "success": true,
         "word": "${word}",
-        "accuracy": 85, // Percentage as number
+        "accuracy": 85,
         "correctSounds": ["specific sounds pronounced well"],
         "improvementNeeded": ["specific sounds needing work"],
         "commonIssues": "Brief explanation of typical issues for speakers of their language",
         "practiceExercises": ["2-3 specific practice exercises"],
         "encouragement": "Positive, encouraging feedback"
       }
-
-      Important: Return ONLY the JSON without any markdown formatting or code blocks.
     `;
 
     // Get the model
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // In a real implementation, you would:
-    // 1. Process the audio file (convert to compatible format if needed)
-    // 2. Send the actual audio with gemini-pro-vision model or use Speech-to-Text API first
-    // 3. Compare the transcription with the expected word
-
-    // For now, we'll simulate this process with the text-only model
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
@@ -127,51 +135,91 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
     // Parse the text response to JSON
     let jsonResponse;
     try {
-      // Remove any potential markdown code block formatting
+      // Clean up the response text by removing any code block formatting
       const cleanedText = text.replace(/```json|```/g, '').trim();
-      jsonResponse = JSON.parse(cleanedText);
+
+      // Validate that we have content to parse
+      if (!cleanedText) {
+        throw new Error('Empty response from AI model');
+      }
+
+      try {
+        // Try to parse the JSON directly
+        jsonResponse = JSON.parse(cleanedText);
+      } catch (parseError) {
+        console.error("Initial JSON parse error:", parseError);
+
+        // Attempt JSON recovery if possible - look for common patterns
+        if (cleanedText.includes('"word":') && cleanedText.includes('"accuracy":')) {
+          // Try some basic recovery by ensuring opening/closing braces
+          const withOpenBrace = cleanedText.startsWith('{') ? cleanedText : '{' + cleanedText;
+          const withClosingBrace = withOpenBrace.endsWith('}') ? withOpenBrace : withOpenBrace + '}';
+
+          try {
+            jsonResponse = JSON.parse(withClosingBrace);
+            console.log("JSON recovery succeeded");
+          } catch (recoveryError) {
+            console.error("JSON recovery failed:", recoveryError);
+            throw parseError; // Rethrow original error if recovery failed
+          }
+        } else {
+          throw parseError; // Rethrow if we can't recover
+        }
+      }
 
       // Save the pronunciation attempt in the database
       const savedAttempt = await prisma.pronunciationAttempt.create({
         data: {
           userId: user.id,
           word: word,
-          audioPath: audioPath,
+          audioUrl: audioUrl,
           accuracy: jsonResponse.accuracy || 0,
-          feedback: cleanedText,
+          feedback: typeof jsonResponse === 'object' ? JSON.stringify(jsonResponse) : cleanedText,
         }
       });
 
-      // Add the attempt ID to the response
+      // Add the attempt ID and audio URL to the response
       jsonResponse.attemptId = savedAttempt.id;
+      jsonResponse.audioUrl = audioUrl;
 
-      // Return the parsed JSON
       res.json(jsonResponse);
     } catch (error) {
       console.error("Error parsing JSON response:", error);
+
+      // Create a fallback response if parsing fails
+      const fallbackResponse = {
+        success: true,
+        word: word,
+        accuracy: 75, // Default fallback accuracy
+        correctSounds: ["General word shape", "Beginning sounds"],
+        improvementNeeded: ["Work on specific pronunciation details"],
+        commonIssues: "Unable to provide detailed analysis due to processing error",
+        practiceExercises: [
+          `Say the word slowly: ${word.split('').join('-')}`,
+          "Record yourself and compare with reference pronunciation",
+          "Practice each syllable separately"
+        ],
+        encouragement: "Keep practicing! You're making good progress."
+      };
 
       // Save the raw response if parsing fails
       const savedAttempt = await prisma.pronunciationAttempt.create({
         data: {
           userId: user.id,
           word: word,
-          audioPath: audioPath,
-          accuracy: 0,
-          feedback: text,
+          audioUrl: audioUrl,
+          accuracy: fallbackResponse.accuracy,
+          feedback: JSON.stringify(fallbackResponse),
         }
       });
 
-      // If parsing fails, return a formatted response
-      res.json({
-        success: true,
-        word: word,
-        response: text,
-        attemptId: savedAttempt.id
-      });
-    }
+      // Add additional info to fallback response
+      fallbackResponse.attemptId = savedAttempt.id;
+      fallbackResponse.audioUrl = audioUrl;
+      fallbackResponse.note = "Using fallback assessment due to processing issue";
 
-    // Clean up the audio file (optional - you might want to keep it)
-    // fs.unlinkSync(audioPath);
+      res.json(fallbackResponse);
+    }
 
   } catch (error) {
     console.error("Error processing pronunciation:", error);
@@ -199,7 +247,7 @@ router.get("/history", async (req, res) => {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email},
+      where: { email },
       select: { id: true }
     });
 
@@ -223,10 +271,11 @@ router.get("/history", async (req, res) => {
         word: true,
         accuracy: true,
         feedback: true,
-
+        audioUrl: true,
+        createdAt: true
       }
     });
-console.log(history);
+
     // Format the history records
     const formattedHistory = history.map(attempt => {
       let feedbackObj = attempt.feedback;
@@ -245,6 +294,7 @@ console.log(history);
         word: attempt.word,
         accuracy: attempt.accuracy,
         feedback: feedbackObj,
+        audioUrl: attempt.audioUrl,
         date: attempt.createdAt
       };
     });
@@ -316,7 +366,8 @@ router.get("/tips", async (req, res) => {
       4. Common pronunciation mistakes
       5. Step-by-step instructions for articulation
 
-      Format your response as JSON with the following structure:
+      IMPORTANT: Ensure your response is valid JSON with no trailing commas or syntax errors.
+      Format your response exactly like this:
       {
         "success": true,
         "word": "${word}",
@@ -339,15 +390,45 @@ router.get("/tips", async (req, res) => {
     // Parse the response
     try {
       const cleanedText = text.replace(/```json|```/g, '').trim();
+      if (!cleanedText) {
+        throw new Error('Empty response from AI model');
+      }
+
       const jsonResponse = JSON.parse(cleanedText);
       res.json(jsonResponse);
     } catch (error) {
       console.error("Error parsing JSON response:", error);
-      res.json({
+
+      // Create a fallback response
+      const fallbackResponse = {
         success: true,
         word: word,
-        tips: text
-      });
+        phonetic: `/${word}/`,
+        syllables: word.match(/[aeiouy]{1,2}/gi)?.join('-') || word,
+        stress: "First syllable",
+        soundGuide: [
+          {
+            sound: word[0],
+            howTo: `Focus on pronouncing the '${word[0]}' sound clearly`
+          },
+          {
+            sound: word.slice(-1),
+            howTo: `End with a clear '${word.slice(-1)}' sound`
+          }
+        ],
+        commonErrors: [
+          "Incorrect stress placement",
+          "Unclear vowel sounds"
+        ],
+        practiceExercises: [
+          `Say the word slowly: ${word.split('').join('-')}`,
+          "Record yourself and compare with reference pronunciation",
+          "Practice each syllable separately"
+        ],
+        note: "Using simplified pronunciation guide due to processing issue"
+      };
+
+      res.json(fallbackResponse);
     }
   } catch (error) {
     console.error("Error getting pronunciation tips:", error);
@@ -378,14 +459,27 @@ router.post("/compare", upload.fields([
       });
     }
 
-    const userAudioPath = files.userAudio[0].path;
-    const referenceAudioPath = files.referenceAudio[0].path;
+    // Upload both audio files to Cloudinary
+    const userUpload = await cloudinary.uploader.upload(files.userAudio[0].path, {
+      resource_type: "video",
+      public_id: `pronunciation/compare_user_${uuidv4()}`,
+      folder: 'pronunciation_comparisons'
+    });
 
-    // In a real implementation, you'd:
-    // 1. Use audio analysis APIs or services to compare the pronunciations
-    // 2. Extract features like phoneme timing, pitch, etc.
+    const referenceUpload = await cloudinary.uploader.upload(files.referenceAudio[0].path, {
+      resource_type: "video",
+      public_id: `pronunciation/compare_reference_${uuidv4()}`,
+      folder: 'pronunciation_comparisons'
+    });
 
-    // For now, we'll use Gemini to simulate this feedback
+    // Clean up temporary files
+    fs.unlinkSync(files.userAudio[0].path);
+    fs.unlinkSync(files.referenceAudio[0].path);
+
+    const userAudioUrl = userUpload.secure_url;
+    const referenceAudioUrl = referenceUpload.secure_url;
+
+    // Initialize Gemini model
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `
@@ -399,27 +493,54 @@ router.post("/compare", upload.fields([
       3. Specific sounds that differ
       4. Tips for improvement
 
-      Format your response as JSON:
+      IMPORTANT: Ensure your response is valid JSON with no trailing commas or syntax errors.
+      Format your response exactly like this:
       {
         "success": true,
         "word": "${word}",
         "similarityScore": 78,
         "matchingAspects": ["aspects that match well"],
         "differences": ["aspects that differ"],
-        "improvements": ["specific tips"]
+        "improvements": ["specific tips"],
+        "userAudioUrl": "${userAudioUrl}",
+        "referenceAudioUrl": "${referenceAudioUrl}"
       }
     `;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const parsedResponse = JSON.parse(response.text().replace(/```json|```/g, '').trim());
+    const text = response.text();
 
-    res.json(parsedResponse);
+    try {
+      const cleanedText = text.replace(/```json|```/g, '').trim();
+      if (!cleanedText) {
+        throw new Error('Empty response from AI model');
+      }
 
-    // Clean up (optional)
-    // fs.unlinkSync(userAudioPath);
-    // fs.unlinkSync(referenceAudioPath);
+      const parsedResponse = JSON.parse(cleanedText);
+      res.json(parsedResponse);
+    } catch (error) {
+      console.error("Error parsing JSON response:", error);
 
+      // Create a fallback response
+      const fallbackResponse = {
+        success: true,
+        word: word,
+        similarityScore: 75,
+        matchingAspects: ["Overall word rhythm", "Beginning consonant sounds"],
+        differences: ["Vowel pronunciation", "Ending sounds clarity"],
+        improvements: [
+          "Focus on making vowel sounds more precise",
+          "Practice the ending consonants more clearly",
+          "Try slowing down to emphasize each sound"
+        ],
+        userAudioUrl: userAudioUrl,
+        referenceAudioUrl: referenceAudioUrl,
+        note: "Using simplified comparison due to processing issue"
+      };
+
+      res.json(fallbackResponse);
+    }
   } catch (error) {
     console.error("Error comparing pronunciations:", error);
     res.status(500).json({

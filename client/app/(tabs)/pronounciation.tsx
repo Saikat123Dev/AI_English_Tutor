@@ -3,6 +3,7 @@ import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-ic
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -49,7 +50,6 @@ export default function PronunciationPracticeScreen() {
 
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingUri, setRecordingUri] = useState(null);
   const [pronunciationFeedback, setPronunciationFeedback] = useState(null);
   const [pronunciationHistory, setPronunciationHistory] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,8 +61,7 @@ export default function PronunciationPracticeScreen() {
   };
 
   useEffect(() => {
-    if (!userInfo.motherTongue || userInfo.motherTongue === 'Not provided' ||
-        !userInfo.englishLevel || userInfo.englishLevel === 'Not provided') {
+    if (!userInfo.motherTongue || !userInfo.englishLevel) {
       Alert.alert(
         'Profile Information Required',
         'Please complete your profile settings before using the pronunciation practice feature.',
@@ -113,7 +112,6 @@ export default function PronunciationPracticeScreen() {
         setAllWords(data);
       } catch (err) {
         console.error('Error fetching words:', err);
-        // Fallback words if API fails
         setAllWords([
           'hello', 'world', 'language', 'practice', 'pronunciation',
           'communication', 'education', 'technology', 'innovation', 'creativity',
@@ -131,32 +129,26 @@ export default function PronunciationPracticeScreen() {
     setSearchQuery(query);
     if (query.length > 0) {
       try {
-        // First check if word exists in dictionary API
         const dictionaryResponse = await fetch(`${DICTIONARY_API}${query}`);
-
         if (dictionaryResponse.ok) {
           const data = await dictionaryResponse.json();
           if (data && data.length > 0) {
-            setSearchResults([query]); // If found in dictionary, show it as the result
+            setSearchResults([query]);
           } else {
-            // If not found in dictionary, filter from our list
             const results = allWords.filter(word =>
               word.toLowerCase().includes(query.toLowerCase())
             ).slice(0, 10);
             setSearchResults(results);
           }
         } else {
-          // Dictionary API failed, fallback to local filtering
           const results = allWords.filter(word =>
             word.toLowerCase().includes(query.toLowerCase())
           ).slice(0, 10);
           setSearchResults(results);
         }
-
         setShowSearchResults(true);
       } catch (err) {
         console.error('Search error:', err);
-        // Fallback to local filtering if API fails
         const results = allWords.filter(word =>
           word.toLowerCase().includes(query.toLowerCase())
         ).slice(0, 10);
@@ -199,10 +191,8 @@ export default function PronunciationPracticeScreen() {
     try {
       const response = await fetch(`${DICTIONARY_API}${word}`);
       if (!response.ok) throw new Error('Word not found in dictionary');
-
       const data = await response.json();
       if (!data || !data.length) throw new Error('No data returned from dictionary');
-
       setDictionaryData(data[0]);
       return data[0];
     } catch (err) {
@@ -216,13 +206,11 @@ export default function PronunciationPracticeScreen() {
     setLoading(true);
     setError(null);
     try {
-      // First fetch dictionary data
       const dictionaryEntry = await fetchDictionaryData(word);
       if (!dictionaryEntry) {
         throw new Error('Word not found in dictionary');
       }
 
-      // Then try to get additional pronunciation tips from our API
       let ourApiData = {};
       try {
         const ourApiResponse = await fetch(`${API_BASE_URL}/tips?word=${word}&email=${userInfo.email}`);
@@ -233,7 +221,6 @@ export default function PronunciationPracticeScreen() {
         console.log('Using fallback tips, our API unavailable');
       }
 
-      // Combine data from both sources
       return {
         word: dictionaryEntry.word,
         phonetic: dictionaryEntry.phonetic || `/${word}/`,
@@ -273,7 +260,6 @@ export default function PronunciationPracticeScreen() {
       setPronunciationHistory(data.history || []);
     } catch (err) {
       console.error('Error fetching pronunciation history:', err);
-      // Fallback data if API fails
       setPronunciationHistory([
         { id: '1', word: 'communication', accuracy: 85, date: '2023-06-15T10:30:00Z' },
         { id: '2', word: 'technology', accuracy: 72, date: '2023-06-14T15:45:00Z' },
@@ -313,7 +299,6 @@ export default function PronunciationPracticeScreen() {
         playThroughEarpieceAndroid: false
       });
 
-      // Stop any playing audio before recording
       if (sound) {
         await sound.unloadAsync();
         setSound(null);
@@ -341,7 +326,6 @@ export default function PronunciationPracticeScreen() {
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
 
       const uri = recording.getURI();
-      setRecordingUri(uri);
       setRecording(null);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -383,7 +367,6 @@ export default function PronunciationPracticeScreen() {
       });
 
       if (!response.ok) {
-        // If server responds with error, throw it
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to assess pronunciation');
       }
@@ -393,7 +376,6 @@ export default function PronunciationPracticeScreen() {
       fetchPronunciationHistory();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      // Scroll to feedback
       if (scrollViewRef.current) {
         setTimeout(() => {
           scrollViewRef.current.scrollToEnd({ animated: true });
@@ -401,15 +383,10 @@ export default function PronunciationPracticeScreen() {
       }
     } catch (err) {
       console.error('Error submitting pronunciation:', err);
-
-      // Show error to user
       Alert.alert('Submission Error', 'Failed to submit pronunciation. Using simulated feedback.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
-      // Generate fallback feedback
       const accuracy = Math.floor(Math.random() * 30) + 70;
-
-      // Customize feedback based on accuracy
       let correctSounds = [];
       let improvementNeeded = [];
 
@@ -468,11 +445,8 @@ export default function PronunciationPracticeScreen() {
       return;
     }
 
-    // Find phonetic entry with audio
     const phoneticWithAudio = wordData.phonetics.find(p => p.audio && p.audio.trim() !== '');
-
     if (!phoneticWithAudio?.audio) {
-      // If no audio in the dictionary data, use text-to-speech
       try {
         setIsPlaying(true);
         await Speech.speak(wordData.word, {
@@ -499,15 +473,12 @@ export default function PronunciationPracticeScreen() {
         await sound.unloadAsync();
       }
 
-      // Fix URL if needed
       let audioUrl = phoneticWithAudio.audio;
       if (audioUrl.startsWith('//')) {
         audioUrl = `https:${audioUrl}`;
       } else if (!audioUrl.startsWith('http')) {
         audioUrl = `https://${audioUrl}`;
       }
-
-      console.log('Playing audio from URL:', audioUrl);
 
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audioUrl },
@@ -528,7 +499,6 @@ export default function PronunciationPracticeScreen() {
       console.error('Error playing audio:', err);
       setIsPlaying(false);
 
-      // Fallback to text-to-speech if audio playback fails
       try {
         await Speech.speak(wordData.word, {
           language: 'en-US',
@@ -546,8 +516,9 @@ export default function PronunciationPracticeScreen() {
     }
   };
 
-  const playRecordedAudio = async () => {
-    if (!recordingUri) return;
+  const playCloudinaryAudio = async (audioUrl) => {
+    if (!audioUrl) return;
+
     try {
       setIsPlaying(true);
       if (sound) {
@@ -555,20 +526,20 @@ export default function PronunciationPracticeScreen() {
       }
 
       const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: recordingUri },
+        { uri: audioUrl },
         { shouldPlay: true }
       );
 
       setSound(newSound);
       newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.didJustFinish) {
+        if (status.didJustFinish || !status.isLoaded) {
           setIsPlaying(false);
         }
       });
 
       Haptics.selectionAsync();
     } catch (err) {
-      console.error('Error playing recorded audio:', err);
+      console.error('Error playing Cloudinary audio:', err);
       Alert.alert('Playback Error', 'Could not play your recording.');
       setIsPlaying(false);
     }
@@ -639,7 +610,7 @@ export default function PronunciationPracticeScreen() {
     );
   };
 
-  const renderPronunciationFeedback = () => {
+  const renderPronunciationFeedback = () =>	{
     if (!pronunciationFeedback) return null;
     const rotate = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
@@ -710,11 +681,27 @@ export default function PronunciationPracticeScreen() {
           </View>
         )}
 
+        {pronunciationFeedback.audioUrl && (
+          <TouchableOpacity
+            style={styles.playRecordingButton}
+            onPress={() => playCloudinaryAudio(pronunciationFeedback.audioUrl)}
+            disabled={isPlaying}
+          >
+            <Ionicons
+              name={isPlaying ? "pause" : "play"}
+              size={24}
+              color="#0ea5e9"
+            />
+            <Text style={styles.playRecordingText}>
+              {isPlaying ? "Playing..." : "Play Your Recording"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={styles.rerecordButton}
           onPress={() => {
             setPronunciationFeedback(null);
-            setRecordingUri(null);
             Haptics.selectionAsync();
           }}
         >
@@ -750,10 +737,18 @@ export default function PronunciationPracticeScreen() {
         })}
       </Text>
       <View style={styles.historyActions}>
+        {item.audioUrl && (
+          <TouchableOpacity
+            style={styles.historyActionButton}
+            onPress={() => playCloudinaryAudio(item.audioUrl)}
+          >
+            <Ionicons name="play" size={16} color="#0ea5e9" />
+            <Text style={styles.historyActionText}>Play Recording</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.historyActionButton}
           onPress={() => {
-            // Set this word as selected to practice it again
             const wordObj = {
               id: item.word,
               word: item.word,
@@ -774,7 +769,6 @@ export default function PronunciationPracticeScreen() {
         <TouchableOpacity
           style={styles.historyActionButton}
           onPress={() => {
-            // Show a details popup for this history item
             Alert.alert(
               `Details for ${item.word}`,
               `You practiced this word on ${new Date(item.date).toLocaleDateString()} with ${item.accuracy}% accuracy.`,
@@ -940,7 +934,7 @@ export default function PronunciationPracticeScreen() {
                       <MaterialCommunityIcons name="volume-vibrate" size={18} color="#0ea5e9" />
                       <Text style={styles.tipTitle}>Word Stress:</Text>
                     </View>
-                    <Text style={styles.tipContent}>{wordData.stress || 'First syllable'}</Text>
+                    <Text style={styles.tipContent}>{wordData.stress || 'TEN syllable'}</Text>
                   </View>
 
                   {wordData.soundGuide && (
@@ -974,7 +968,6 @@ export default function PronunciationPracticeScreen() {
                   )}
                 </View>
 
-                {/* Recording section */}
                 <View style={styles.recordingContainer}>
                   <Text style={styles.recordingTitle}>Record Your Pronunciation</Text>
 
@@ -1002,23 +995,6 @@ export default function PronunciationPracticeScreen() {
                         {isRecording ? "Stop Recording" : "Start Recording"}
                       </Text>
                     </TouchableOpacity>
-
-                    {recordingUri && !isSubmitting && !pronunciationFeedback && (
-                      <TouchableOpacity
-                        style={styles.playRecordingButton}
-                        onPress={playRecordedAudio}
-                        disabled={isPlaying}
-                      >
-                        <Ionicons
-                          name={isPlaying ? "pause" : "play"}
-                          size={24}
-                          color="#0ea5e9"
-                        />
-                        <Text style={styles.playRecordingText}>
-                          {isPlaying ? "Playing..." : "Play Recording"}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
 
                     {isSubmitting && (
                       <View style={styles.submittingContainer}>

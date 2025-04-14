@@ -12,7 +12,6 @@ import {
   View,
 } from "react-native";
 
-
 const SocialLoginButton = ({
   strategy,
 }: {
@@ -58,14 +57,15 @@ const SocialLoginButton = ({
   };
 
   // Create user in database
+  let data;
   const createUserInDatabase = async (email) => {
     try {
       console.log("Attempting to create user with email:", email);
       const response = await fetch(`https://ai-english-tutor-9ixt.onrender.com/api/auth/create`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-            "ngrok-skip-browser-warning": "true",
-          'Content-Type': 'application/json',
+          "ngrok-skip-browser-warning": "true",
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ email }),
       });
@@ -75,11 +75,11 @@ const SocialLoginButton = ({
         throw new Error(`Failed to create user: ${response.status} - ${errorText}`);
       }
 
-      const data = await response.json();
-      console.log('User created in database:', data.user);
+      data = await response.json();
+      console.log("User created in database:", data.user);
       return data.user;
     } catch (error) {
-      console.error('Error creating user in database:', error);
+      console.error("Error creating user in database:", error);
       Alert.alert(
         "Database Error",
         "Authentication was successful, but we couldn't create your user profile. Please try again."
@@ -97,7 +97,35 @@ const SocialLoginButton = ({
           const email = user.primaryEmailAddress.emailAddress;
           console.log("User email found:", email);
           await createUserInDatabase(email);
-           router.replace("/auth/complete-your-account");
+
+          // Check if all required fields are filled
+          const { fullName, username, unsafeMetadata } = user;
+          const {
+            gender,
+            motherToung,
+            englishLevel,
+            learningGoal,
+            focus,
+            voice,
+          } = unsafeMetadata || {};
+
+          if (
+            data?.user.englishLevel &&
+            data?.user.learningGoal &&
+            data?.user.interests &&
+            data?.user.focus &&
+            data?.user.voice &&
+            data?.user.motherToung
+          )
+            {
+            // All required fields are filled, redirect to /(tabs)
+            console.log("All fields filled, redirecting to /(tabs)");
+            router.replace("/(tabs)");
+          } else {
+            // Not all fields are filled, redirect to complete account
+            console.log("Fields missing, redirecting to /auth/complete-your-account");
+            router.replace("/auth/complete-your-account");
+          }
         } catch (error) {
           console.error("Error handling user data:", error);
         } finally {

@@ -54,16 +54,14 @@ router.post("/ask", async (req, res) => {
       }
     });
 
-    // Reverse to get chronological order
+
     const conversationHistory = previousQuestions.reverse();
 
-    // Format conversation history for context
     let conversationContext = '';
     if (conversationHistory.length > 0) {
       conversationContext = 'Previous conversation history:\n';
       conversationHistory.forEach((item, index) => {
         const timestamp = new Date(item.createdAt).toLocaleString();
-        // Try to parse the LLM response if it's in JSON format
         let formattedResponse = item.llmres;
         try {
           const parsed = JSON.parse(item.llmres);
@@ -74,7 +72,7 @@ router.post("/ask", async (req, res) => {
             }
           }
         } catch (e) {
-          // If parsing fails, use the raw response
+
         }
 
         conversationContext += `[${timestamp}]\n`;

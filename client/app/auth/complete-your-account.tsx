@@ -45,19 +45,25 @@ const CompleteYourAccountScreen = () => {
       learningGoal,
       interests,
       focus,
-      voice
+      voice,
     } = data;
 
     try {
       setIsLoading(true);
 
-      // Update Clerk user profile
+      // Update Clerk user profile with all fields in unsafeMetadata
       await user?.update({
         username: username,
         firstName: full_name.split(" ")[0],
         lastName: full_name.split(" ")[1] || "",
         unsafeMetadata: {
           gender,
+          motherToung,
+          englishLevel,
+          learningGoal,
+          interests,
+          focus,
+          voice,
           onboarding_completed: true,
         },
       });

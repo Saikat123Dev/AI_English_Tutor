@@ -45,7 +45,7 @@ model question {
 model pronunciationAttempt {
   id        String   @id @default(cuid())
   word      String
-  audioPath String
+  audioUrl  String?
   userId    String
   accuracy  Float?   @default(0) // Stores values like 85.50
   feedback  String?  @db.Text
