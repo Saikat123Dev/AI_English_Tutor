@@ -156,8 +156,9 @@ const SocialLoginButton = ({
           ) {
             // All required fields are filled, redirect to /(tabs)
             console.log("All fields filled, redirecting to /(tabs)");
-            stopLoadingAnimation(() => router.replace("/(tabs)"));
+            router.replace("/(tabs)");
           } else {
+            console.log(data?.user);
             // Not all fields are filled, redirect to complete account
             console.log("Fields missing, redirecting to /auth/complete-your-account");
             stopLoadingAnimation(() =>
