@@ -67,22 +67,22 @@ async function getAssemblyAITranscription(audioUrl, targetWord) {
     }
 
     // Create a transcription request using the SDK
-    const transcript = await assemblyClient.transcripts.transcribe({
-      audio_url: audioUrl,
-      word_boost: [targetWord],
-      boost_param: "high",
-      speech_model: "default",
-      language_detection: true,
-      punctuate: true,
-      format_text: true,
-      disfluencies: true,
-      auto_highlights: true,
-      audio_start_from: 0,
-      audio_end_at: null,
-      speech_threshold: 0.2,
-      word_confidence: true
-    });
-
+   // Create a transcription request using the SDK
+const transcript = await assemblyClient.transcripts.transcribe({
+  audio_url: audioUrl,
+  word_boost: [targetWord],
+  boost_param: "high",
+  speech_model: "universal",  // Change from "default" to "universal"
+  language_detection: true,
+  punctuate: true,
+  format_text: true,
+  disfluencies: true,
+  auto_highlights: true,
+  audio_start_from: 0,
+  audio_end_at: null,
+  speech_threshold: 0.2,
+  word_confidence: true
+});
     // The SDK handles polling for completion automatically
     return transcript;
   } catch (error) {
@@ -164,21 +164,18 @@ function analyzeAssemblyResults(transcriptionData, targetWord) {
       analysis.pronunciationSpeed = targetWord.length / analysis.wordAlignment.duration;
     }
   } else {
-    // If the exact word wasn't found, check if it's part of a longer phrase
-    // or if a similar word was detected
     const text = transcriptionData.text ? transcriptionData.text.toLowerCase() : "";
     if (text.includes(lowerCaseTarget)) {
       analysis.wordMatch = true;
-      analysis.confidenceScore = 0.7; // Assign a moderate confidence
+      analysis.confidenceScore = 0.7;
       analysis.note = "Word detected as part of a longer phrase";
     } else if (text) {
-      // Word wasn't found exactly, but some speech was detected
+
       analysis.note = "Target word not clearly detected in transcript";
       analysis.detectedTextInstead = text;
     }
   }
 
-  // Check for disfluencies
   if (transcriptionData.text && /\bum\b|\buh\b|\ber\b|\behm\b/i.test(transcriptionData.text)) {
     analysis.disfluencies = true;
   }
