@@ -1,6 +1,7 @@
 import { useUser } from '@clerk/clerk-expo';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -12,6 +13,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -56,7 +58,7 @@ export default function PronunciationPracticeScreen() {
 
   const userInfo = {
     email: user?.emailAddresses?.[0]?.emailAddress || 'user@example.com',
-    motherTongue: user?.unsafeMetadata?.motherToung  ?? 'Not provided',
+    motherTongue: user?.unsafeMetadata?.motherToung ?? 'Not provided',
     englishLevel: user?.unsafeMetadata?.englishLevel ?? 'Not provided',
   };
 
@@ -72,8 +74,8 @@ export default function PronunciationPracticeScreen() {
           },
           {
             text: 'Continue Anyway',
-            style: 'cancel'
-          }
+            style: 'cancel',
+          },
         ]
       );
     }
@@ -296,7 +298,7 @@ export default function PronunciationPracticeScreen() {
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
         shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false
+        playThroughEarpieceAndroid: false,
       });
 
       if (sound) {
@@ -304,9 +306,15 @@ export default function PronunciationPracticeScreen() {
         setSound(null);
       }
 
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
+      const { recording } = await Audio.Recording.createAsync({
+        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        iosOutputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_MPEG4AAC,
+        androidOutputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_AAC_ADTS,
+        androidAudioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
+        sampleRate: 44100,
+        numberOfChannels: 2,
+        bitRate: 128000,
+      });
       setRecording(recording);
       setIsRecording(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -339,40 +347,96 @@ export default function PronunciationPracticeScreen() {
     }
   };
 
-  const submitPronunciation = async (audioUri, word) => {
+  // Updated: Added retry logic, fallback MIME type, and detailed logging
+  const submitPronunciation = async (audioUri, word, retryCount = 0) => {
     if (!audioUri || !word) {
       Alert.alert('Error', 'Audio recording and word are required');
       return;
     }
 
+    const maxRetries = 2;
     setIsSubmitting(true);
     setPronunciationFeedback(null);
 
     try {
+      // Verify file existence
+      const fileInfo = await FileSystem.getInfoAsync(audioUri);
+      if (!fileInfo.exists) {
+        throw new Error('Audio file not found');
+      }
+
+      // Log file details
+      console.log('File details:', {
+        uri: audioUri,
+        size: fileInfo.size,
+        exists: fileInfo.exists,
+      });
+
+      // Set MIME type and extension
+      let mimeType = 'audio/mpeg'; // Fallback to a backend-supported type
+      let fileExtension = 'mp3';
+      if (retryCount === 0) {
+        // First attempt: use platform-specific formats
+        if (Platform.OS === 'ios') {
+          mimeType = 'audio/mp4';
+          fileExtension = 'm4a';
+        } else if (Platform.OS === 'android') {
+          mimeType = 'audio/aac';
+          fileExtension = 'aac';
+        }
+      }
+
       const formData = new FormData();
-      console.log(audioUri);
       formData.append('audio', {
         uri: audioUri,
-        type: 'audio/wav',
-        name: 'recording.wav'
+        type: mimeType,
+        name: `recording.${fileExtension}`,
       });
       formData.append('email', userInfo.email);
       formData.append('word', word);
+
+      console.log('Submitting pronunciation attempt:', {
+        retryCount,
+        uri: audioUri,
+        mimeType,
+        fileExtension,
+        word,
+        email: userInfo.email,
+      });
 
       const response = await fetch(`${API_BASE_URL}/assess`, {
         method: 'POST',
         body: formData,
         headers: {
-          'Content-Type': 'multipart/form-data',
+          Accept: 'application/json',
         },
+        timeout: 30000, // 30-second timeout
+      });
+
+      const responseText = await response.text();
+      console.log('Server response:', {
+        status: response.status,
+        body: responseText,
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to assess pronunciation');
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          errorData = { error: responseText || 'Unknown server error' };
+        }
+
+        // Retry with fallback MIME type if not last attempt
+        if (retryCount < maxRetries && response.status === 500) {
+          console.log(`Retrying submission (attempt ${retryCount + 2}) with fallback MIME type...`);
+          return submitPronunciation(audioUri, word, retryCount + 1);
+        }
+
+        throw new Error(errorData.error || `Server error: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result = JSON.parse(responseText);
       setPronunciationFeedback(result);
       fetchPronunciationHistory();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -383,10 +447,30 @@ export default function PronunciationPracticeScreen() {
         }, 300);
       }
     } catch (err) {
-      console.error('Error submitting pronunciation:', err);
-      Alert.alert('Submission Error', 'Failed to submit pronunciation. Using simulated feedback.');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      console.error('Error submitting pronunciation:', {
+        message: err.message,
+        retryCount,
+      });
+      Alert.alert(
+        'Submission Error',
+        `Failed to submit pronunciation: ${err.message}. Please try again or check your connection.`,
+        [
+          {
+            text: 'Retry',
+            onPress: () => {
+              if (retryCount < maxRetries) {
+                submitPronunciation(audioUri, word, retryCount + 1);
+              } else {
+                Alert.alert('Error', 'Maximum retries reached. Please try again later.');
+              }
+            },
+          },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
+      Haptics.notificationAsync(Haptics.ImpactFeedbackType.Error);
 
+      // Simulated feedback fallback
       const accuracy = Math.floor(Math.random() * 30) + 70;
       let correctSounds = [];
       let improvementNeeded = [];
@@ -395,28 +479,24 @@ export default function PronunciationPracticeScreen() {
         correctSounds = [
           `Excellent '${word[0]}' sound at the beginning`,
           `Great stress pattern throughout the word`,
-          `Clear pronunciation of the ending sound`
+          `Clear pronunciation of the ending sound`,
         ];
-        improvementNeeded = [
-          `Try to smooth the transition between syllables`
-        ];
+        improvementNeeded = [`Try to smooth the transition between syllables`];
       } else if (accuracy > 75) {
         correctSounds = [
           `Good '${word[0]}' sound at the beginning`,
-          `Clear pronunciation of most sounds`
+          `Clear pronunciation of most sounds`,
         ];
         improvementNeeded = [
-          `Work on the '${word[Math.floor(word.length/2)]}' sound in the middle`,
-          `Pay more attention to the word stress`
+          `Work on the '${word[Math.floor(word.length / 2)]}' sound in the middle`,
+          `Pay more attention to the word stress`,
         ];
       } else {
-        correctSounds = [
-          `Good attempt at the overall word shape`
-        ];
+        correctSounds = [`Good attempt at the overall word shape`];
         improvementNeeded = [
           `Focus on the '${word[0]}' sound at the beginning`,
-          `Work on the '${word[Math.floor(word.length/2)]}' sound in the middle`,
-          `Practice the ending sound more carefully`
+          `Work on the '${word[Math.floor(word.length / 2)]}' sound in the middle`,
+          `Practice the ending sound more carefully`,
         ];
       }
 
@@ -427,13 +507,14 @@ export default function PronunciationPracticeScreen() {
         practiceExercises: [
           `Say the word slowly: ${word.split('').join(' ')}`,
           `Focus on each syllable separately: ${word.match(/[aeiouy]{1,2}/gi)?.join(' - ') || word}`,
-          `Record yourself again and compare with the reference audio`
+          `Record yourself again and compare with the reference audio`,
         ],
-        encouragement: accuracy > 80
-          ? "Excellent work! You're very close to mastering this word."
-          : accuracy > 70
+        encouragement:
+          accuracy > 80
+            ? "Excellent work! You're very close to mastering this word."
+            : accuracy > 70
             ? "Good effort! With some targeted practice, you'll improve quickly."
-            : "Keep practicing! Focus on the specific sounds that need improvement."
+            : "Keep practicing! Focus on the specific sounds that need improvement.",
       });
     } finally {
       setIsSubmitting(false);
@@ -611,7 +692,7 @@ export default function PronunciationPracticeScreen() {
     );
   };
 
-  const renderPronunciationFeedback = () =>	{
+  const renderPronunciationFeedback = () => {
     if (!pronunciationFeedback) return null;
     const rotate = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
@@ -789,7 +870,7 @@ export default function PronunciationPracticeScreen() {
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg']
   });
-console.log(userInfo);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -935,7 +1016,7 @@ console.log(userInfo);
                       <MaterialCommunityIcons name="volume-vibrate" size={18} color="#0ea5e9" />
                       <Text style={styles.tipTitle}>Word Stress:</Text>
                     </View>
-                    <Text style={styles.tipContent}>{wordData.stress || 'TEN syllable'}</Text>
+                    <Text style={styles.tipContent}>{wordData.stress || 'First syllable'}</Text>
                   </View>
 
                   {wordData.soundGuide && (
