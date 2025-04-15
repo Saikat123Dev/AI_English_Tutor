@@ -56,7 +56,7 @@ export default function PronunciationPracticeScreen() {
 
   const userInfo = {
     email: user?.emailAddresses?.[0]?.emailAddress || 'user@example.com',
-    motherTongue: user?.unsafeMetadata?.motherTongue ?? 'Not provided',
+    motherTongue: user?.unsafeMetadata?.motherToung  ?? 'Not provided',
     englishLevel: user?.unsafeMetadata?.englishLevel ?? 'Not provided',
   };
 
@@ -788,7 +788,7 @@ export default function PronunciationPracticeScreen() {
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg']
   });
-
+console.log(userInfo);
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
