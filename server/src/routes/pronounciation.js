@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import AssemblyAI from 'assemblyai';
+import { AssemblyAI } from 'assemblyai';
 import { v2 as cloudinary } from 'cloudinary';
 import express from 'express';
 import fs from 'fs';
