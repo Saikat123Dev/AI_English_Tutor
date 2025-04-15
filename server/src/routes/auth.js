@@ -17,7 +17,15 @@ router.post('/create', async (req, res) => {
 
   try {
     // Check if user already exists
+     const existingUser = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
 
+    if (existingUser) {
+      console.log(`User with email ${email} already exists`);
+      return res.status(200).json({ user: existingUser });
+    }
 
     // Create new user
     const user = await prisma.user.upsert({

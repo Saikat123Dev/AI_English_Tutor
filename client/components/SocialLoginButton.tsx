@@ -2,10 +2,12 @@ import { useOAuth, useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -32,6 +34,8 @@ const SocialLoginButton = ({
   const { user, isLoaded, isSignedIn } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const fadeAnim = useRef(new Animated.Value(0)).current; // Animation for loading overlay
+  const spinAnim = useRef(new Animated.Value(0)).current; // Animation for spinning loader
 
   const buttonText = () => {
     if (isLoading) {
@@ -56,19 +60,52 @@ const SocialLoginButton = ({
     }
   };
 
+  // Start loading animation
+  const startLoadingAnimation = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.loop(
+        Animated.timing(spinAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      ),
+    ]).start();
+  };
+
+  // Stop loading animation
+  const stopLoadingAnimation = (callback?: () => void) => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      spinAnim.setValue(0); // Reset spin
+      if (callback) callback();
+    });
+  };
+
   // Create user in database
   let data;
-  const createUserInDatabase = async (email) => {
+  const createUserInDatabase = async (email: string) => {
     try {
       console.log("Attempting to create user with email:", email);
-      const response = await fetch(`https://ai-english-tutor-9ixt.onrender.com/api/auth/create`, {
-        method: "POST",
-        headers: {
-          "ngrok-skip-browser-warning": "true",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
+      const response = await fetch(
+        `https://ai-english-tutor-9ixt.onrender.com/api/auth/create`,
+        {
+          method: "POST",
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email }),
+        }
+      );
       console.log("Response received:", response.status, response.statusText);
       if (!response.ok) {
         const errorText = await response.text();
@@ -116,20 +153,20 @@ const SocialLoginButton = ({
             data?.user.focus &&
             data?.user.voice &&
             data?.user.motherToung
-          )
-            {
+          ) {
             // All required fields are filled, redirect to /(tabs)
             console.log("All fields filled, redirecting to /(tabs)");
-            router.replace("/(tabs)");
+            stopLoadingAnimation(() => router.replace("/(tabs)"));
           } else {
             // Not all fields are filled, redirect to complete account
             console.log("Fields missing, redirecting to /auth/complete-your-account");
-            router.replace("/auth/complete-your-account");
+            stopLoadingAnimation(() =>
+              router.replace("/auth/complete-your-account")
+            );
           }
         } catch (error) {
           console.error("Error handling user data:", error);
-        } finally {
-          setIsLoading(false);
+          stopLoadingAnimation(() => setIsLoading(false));
         }
       }
     };
@@ -140,8 +177,11 @@ const SocialLoginButton = ({
   const onSocialLoginPress = React.useCallback(async () => {
     try {
       setIsLoading(true);
+      startLoadingAnimation();
       const { createdSessionId, setActive } = await startOAuthFlow({
-        redirectUrl: Linking.createURL("/auth/complete-your-account", { scheme: "myapp" }),
+        redirectUrl: Linking.createURL("/auth/complete-your-account", {
+          scheme: "myapp",
+        }),
       });
 
       // If sign in was successful, set the active session
@@ -152,11 +192,11 @@ const SocialLoginButton = ({
         // after Clerk has updated the user state
       } else {
         // No session created, end loading state
-        setIsLoading(false);
+        stopLoadingAnimation(() => setIsLoading(false));
       }
     } catch (err) {
       console.error("OAuth error:", JSON.stringify(err, null, 2));
-      setIsLoading(false);
+      stopLoadingAnimation(() => setIsLoading(false));
       Alert.alert(
         "Authentication Error",
         "There was a problem with the authentication process. Please try again."
@@ -164,20 +204,54 @@ const SocialLoginButton = ({
     }
   }, []);
 
+  // Interpolate spin animation for rotation
+  const spin = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
   return (
-    <TouchableOpacity
-      style={[styles.container]}
-      onPress={onSocialLoginPress}
-      disabled={isLoading}
-    >
-      {isLoading ? (
-        <ActivityIndicator size="small" color="black" />
-      ) : (
-        buttonIcon()
-      )}
-      <Text style={styles.buttonText}>{buttonText()}</Text>
-      <View />
-    </TouchableOpacity>
+    <>
+      <TouchableOpacity
+        style={[styles.container]}
+        onPress={onSocialLoginPress}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <ActivityIndicator size="small" color="black" />
+        ) : (
+          buttonIcon()
+        )}
+        <Text style={styles.buttonText}>{buttonText()}</Text>
+        <View />
+      </TouchableOpacity>
+
+      {/* Loading Overlay */}
+      <Modal
+        transparent={true}
+        animationType="none"
+        visible={isLoading}
+        onRequestClose={() => {}}
+      >
+        <Animated.View
+          style={[
+            styles.loadingOverlay,
+            {
+              opacity: fadeAnim,
+            },
+          ]}
+        >
+          <Animated.View
+            style={{
+              transform: [{ rotate: spin }],
+            }}
+          >
+            <Ionicons name="refresh-circle" size={60} color="white" />
+          </Animated.View>
+          <Text style={styles.loadingText}>Creating your account...</Text>
+        </Animated.View>
+      </Modal>
+    </>
   );
 };
 
@@ -197,6 +271,18 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 15,
-    fontWeight: "medium",
+    fontWeight: "500", // Updated to string for medium weight
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+  },
+  loadingText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "500",
   },
 });

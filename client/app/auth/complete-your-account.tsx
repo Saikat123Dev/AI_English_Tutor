@@ -116,8 +116,6 @@ const CompleteYourAccountScreen = () => {
     setValue("full_name", user?.fullName || "");
     setValue("username", user?.username || "");
     setValue("gender", String(user?.unsafeMetadata?.gender) || "");
-
-    // Load additional fields from metadata if available
     const metadata = user?.unsafeMetadata;
     if (metadata) {
       setValue("motherToung", metadata.motherToung || "");
