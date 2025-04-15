@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import axios from 'axios';
 import { v2 as cloudinary } from 'cloudinary';
 import express from 'express';
 import fs from 'fs';
@@ -13,6 +14,13 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
+
+// AssemblyAI Configuration
+const ASSEMBLY_AI_API_KEY = process.env.ASSEMBLY_AI_API_KEY;
+const assemblyAIHeaders = {
+  Authorization: ASSEMBLY_AI_API_KEY,
+  'Content-Type': 'application/json',
+};
 
 const router = express.Router();
 
@@ -46,6 +54,136 @@ const upload = multer({
 
 // Initialize the Gemini API client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+/**
+ * Function to submit audio file to AssemblyAI and get transcription with analysis
+ * @param {string} audioUrl - URL of the audio file to transcribe
+ * @param {string} targetWord - The word the user is attempting to pronounce
+ * @returns {Promise<Object>} - Transcription and analysis data
+ */
+async function getAssemblyAITranscription(audioUrl, targetWord) {
+  try {
+    // Step 1: Submit transcription request
+    const transcriptResponse = await axios.post(
+      'https://api.assemblyai.com/v2/transcript',
+      {
+        audio_url: audioUrl,
+        word_boost: [targetWord],
+        boost_param: "high",
+        speech_model: "default",  // Using the default model for general speech recognition
+        language_detection: true, // Automatically detect language
+        punctuate: true,
+        format_text: true,
+        disfluencies: true,       // Capture speech disfluencies like "um", "uh", etc.
+        auto_highlights: true,    // Get highlighted words/phrases
+        audio_start_from: 0,      // Start from the beginning
+        audio_end_at: null,       // Process until the end
+        speech_threshold: 0.2,    // Lower threshold to catch softer pronunciation
+        word_confidence: true,    // Get confidence scores for each word
+      },
+      { headers: assemblyAIHeaders }
+    );
+
+    const transcriptId = transcriptResponse.data.id;
+
+    // Step 2: Poll for completion
+    let transcriptResult;
+    let status = 'processing';
+
+    while (status !== 'completed' && status !== 'error') {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between polling
+
+      const pollingResponse = await axios.get(
+        `https://api.assemblyai.com/v2/transcript/${transcriptId}`,
+        { headers: assemblyAIHeaders }
+      );
+
+      status = pollingResponse.data.status;
+
+      if (status === 'completed') {
+        transcriptResult = pollingResponse.data;
+      } else if (status === 'error') {
+        throw new Error(`AssemblyAI transcription error: ${pollingResponse.data.error}`);
+      }
+    }
+
+    return transcriptResult;
+  } catch (error) {
+    console.error("Error with AssemblyAI transcription:", error);
+    throw error;
+  }
+}
+
+/**
+ * Function to analyze pronunciation match based on AssemblyAI results
+ * @param {Object} transcriptionData - Data from AssemblyAI
+ * @param {string} targetWord - The target word user attempted to pronounce
+ * @returns {Object} - Analysis of the pronunciation
+ */
+function analyzeAssemblyResults(transcriptionData, targetWord) {
+  // Set default values in case we can't extract everything
+  const analysis = {
+    detectedText: transcriptionData.text || "",
+    wordMatch: false,
+    confidenceScore: 0,
+    wordAlignment: [],
+    totalDuration: transcriptionData.audio_duration || 0,
+    disfluencies: false,
+    languageDetected: transcriptionData.language_code || "en",
+    pronunciationSpeed: 0
+  };
+
+  // Check for word match (case insensitive)
+  const lowerCaseTarget = targetWord.toLowerCase();
+  const words = transcriptionData.words || [];
+
+  // Find words that might match the target
+  const matchingWords = words.filter(word =>
+    word.text && word.text.toLowerCase() === lowerCaseTarget
+  );
+
+  if (matchingWords.length > 0) {
+    // Get the best match (highest confidence)
+    const bestMatch = matchingWords.reduce((best, current) =>
+      (current.confidence > best.confidence) ? current : best, matchingWords[0]);
+
+    analysis.wordMatch = true;
+    analysis.confidenceScore = bestMatch.confidence;
+    analysis.wordAlignment = {
+      text: bestMatch.text,
+      start: bestMatch.start,
+      end: bestMatch.end,
+      duration: (bestMatch.end - bestMatch.start) / 1000, // Convert to seconds
+      confidence: bestMatch.confidence
+    };
+
+    // Calculate pronunciation speed (if we have meaningful duration)
+    if (analysis.wordAlignment.duration > 0) {
+      // Word length divided by duration gives characters per second
+      analysis.pronunciationSpeed = targetWord.length / analysis.wordAlignment.duration;
+    }
+  } else {
+    // If the exact word wasn't found, check if it's part of a longer phrase
+    // or if a similar word was detected
+    const text = transcriptionData.text ? transcriptionData.text.toLowerCase() : "";
+    if (text.includes(lowerCaseTarget)) {
+      analysis.wordMatch = true;
+      analysis.confidenceScore = 0.7; // Assign a moderate confidence
+      analysis.note = "Word detected as part of a longer phrase";
+    } else if (text) {
+      // Word wasn't found exactly, but some speech was detected
+      analysis.note = "Target word not clearly detected in transcript";
+      analysis.detectedTextInstead = text;
+    }
+  }
+
+  // Check for disfluencies
+  if (transcriptionData.text && /\bum\b|\buh\b|\ber\b|\behm\b/i.test(transcriptionData.text)) {
+    analysis.disfluencies = true;
+  }
+
+  return analysis;
+}
 
 /**
  * Endpoint to submit a word pronunciation assessment
@@ -87,14 +225,33 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
       public_id: `pronunciation/${uuidv4()}`,
       folder: 'pronunciation_assessments'
     });
-    console.log(uploadResult);
+
     // Clean up temporary file
     fs.unlinkSync(audioFile.path);
 
     // Store Cloudinary URL
     const audioUrl = uploadResult.secure_url;
-    console.log(audioUrl);
-    // Create a more detailed prompt for the pronunciation assessment
+    console.log("Audio uploaded to:", audioUrl);
+
+    // Step 1: Get AssemblyAI transcription and analysis
+    console.log("Submitting to AssemblyAI...");
+    let assemblyResults;
+    let pronunciationAnalysis;
+    try {
+      assemblyResults = await getAssemblyAITranscription(audioUrl, word);
+      pronunciationAnalysis = analyzeAssemblyResults(assemblyResults, word);
+      console.log("AssemblyAI results:", pronunciationAnalysis);
+    } catch (error) {
+      console.error("Error with speech analysis:", error);
+      pronunciationAnalysis = {
+        detectedText: "Analysis failed",
+        wordMatch: false,
+        confidenceScore: 0,
+        error: error.message
+      };
+    }
+
+    // Step 2: Create a prompt for Gemini with the AssemblyAI data
     const prompt = `
       You are an expert English pronunciation coach evaluating a student's pronunciation.
 
@@ -104,10 +261,21 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
 
       The student attempted to pronounce the word: "${word}"
 
-      Based on the audio recording, please evaluate:
-      1. Overall accuracy (percentage from 0-100%)
-      2. Specific sounds that were pronounced correctly
-      3. Specific sounds that need improvement
+      Speech Analysis Data:
+      - Speech-to-text result: "${pronunciationAnalysis.detectedText}"
+      - Word match detected: ${pronunciationAnalysis.wordMatch}
+      - Confidence score: ${pronunciationAnalysis.confidenceScore * 100}%
+      - Pronunciation speed: ${pronunciationAnalysis.pronunciationSpeed.toFixed(2)} characters/second
+      - Speech duration: ${(pronunciationAnalysis.totalDuration || 0).toFixed(2)} seconds
+      - Language detected: ${pronunciationAnalysis.languageDetected}
+      - Contains disfluencies: ${pronunciationAnalysis.disfluencies}
+      ${pronunciationAnalysis.note ? `- Note: ${pronunciationAnalysis.note}` : ''}
+      ${pronunciationAnalysis.detectedTextInstead ? `- Detected instead: "${pronunciationAnalysis.detectedTextInstead}"` : ''}
+
+      Based on this data, please evaluate:
+      1. Overall accuracy (percentage from 0-100%, considering both the transcription match and confidence score)
+      2. Specific sounds that were likely pronounced correctly
+      3. Specific sounds that likely need improvement
       4. Common pronunciation issues for speakers of their native language when saying this word
       5. Practice tips tailored to their specific difficulties
 
@@ -121,7 +289,11 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
         "improvementNeeded": ["specific sounds needing work"],
         "commonIssues": "Brief explanation of typical issues for speakers of their language",
         "practiceExercises": ["2-3 specific practice exercises"],
-        "encouragement": "Positive, encouraging feedback"
+        "encouragement": "Positive, encouraging feedback",
+        "transcriptionDetails": {
+          "detectedText": "${pronunciationAnalysis.detectedText}",
+          "confidenceScore": ${pronunciationAnalysis.confidenceScore * 100}
+        }
       }
     `;
 
@@ -167,7 +339,16 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
         }
       }
 
-      // Save the pronunciation attempt in the database
+      // Add AssemblyAI raw data to the response
+      jsonResponse.assemblyAiData = {
+        wordMatch: pronunciationAnalysis.wordMatch,
+        confidenceScore: pronunciationAnalysis.confidenceScore,
+        detectedText: pronunciationAnalysis.detectedText,
+        languageDetected: pronunciationAnalysis.languageDetected,
+        pronunciationSpeed: pronunciationAnalysis.pronunciationSpeed
+      };
+
+      // Save the pronunciation attempt in the database with enhanced data
       const savedAttempt = await prisma.pronunciationAttempt.create({
         data: {
           userId: user.id,
@@ -175,6 +356,9 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
           audioUrl: audioUrl,
           accuracy: jsonResponse.accuracy || 0,
           feedback: typeof jsonResponse === 'object' ? JSON.stringify(jsonResponse) : cleanedText,
+          transcriptionData: JSON.stringify(pronunciationAnalysis),
+          assemblyConfidence: pronunciationAnalysis.confidenceScore * 100,
+          detectedText: pronunciationAnalysis.detectedText
         }
       });
 
@@ -190,7 +374,8 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
       const fallbackResponse = {
         success: true,
         word: word,
-        accuracy: 75, // Default fallback accuracy
+        accuracy: pronunciationAnalysis.wordMatch ?
+          Math.round(pronunciationAnalysis.confidenceScore * 75) : 40, // Base accuracy on confidence if word matched
         correctSounds: ["General word shape", "Beginning sounds"],
         improvementNeeded: ["Work on specific pronunciation details"],
         commonIssues: "Unable to provide detailed analysis due to processing error",
@@ -199,7 +384,12 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
           "Record yourself and compare with reference pronunciation",
           "Practice each syllable separately"
         ],
-        encouragement: "Keep practicing! You're making good progress."
+        encouragement: "Keep practicing! You're making good progress.",
+        transcriptionDetails: {
+          detectedText: pronunciationAnalysis.detectedText,
+          confidenceScore: pronunciationAnalysis.confidenceScore * 100
+        },
+        assemblyAiData: pronunciationAnalysis
       };
 
       // Save the raw response if parsing fails
@@ -210,6 +400,9 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
           audioUrl: audioUrl,
           accuracy: fallbackResponse.accuracy,
           feedback: JSON.stringify(fallbackResponse),
+          transcriptionData: JSON.stringify(pronunciationAnalysis),
+          assemblyConfidence: pronunciationAnalysis.confidenceScore * 100,
+          detectedText: pronunciationAnalysis.detectedText
         }
       });
 
@@ -272,7 +465,10 @@ router.get("/history", async (req, res) => {
         accuracy: true,
         feedback: true,
         audioUrl: true,
-        createdAt: true
+        createdAt: true,
+        transcriptionData: true,
+        assemblyConfidence: true,
+        detectedText: true
       }
     });
 
@@ -289,13 +485,26 @@ router.get("/history", async (req, res) => {
         };
       }
 
+      // Parse transcription data if available
+      let transcriptionData = {};
+      try {
+        if (attempt.transcriptionData) {
+          transcriptionData = JSON.parse(attempt.transcriptionData);
+        }
+      } catch (error) {
+        console.error("Error parsing transcription data:", error);
+      }
+
       return {
         id: attempt.id,
         word: attempt.word,
         accuracy: attempt.accuracy,
         feedback: feedbackObj,
         audioUrl: attempt.audioUrl,
-        date: attempt.createdAt
+        date: attempt.createdAt,
+        assemblyConfidence: attempt.assemblyConfidence || 0,
+        detectedText: attempt.detectedText || "No transcription available",
+        transcriptionData: transcriptionData
       };
     });
 
@@ -441,7 +650,7 @@ router.get("/tips", async (req, res) => {
 });
 
 /**
- * Helper route to compare two pronunciations
+ * Helper route to compare two pronunciations using AssemblyAI
  * POST /pronunciation/compare
  */
 router.post("/compare", upload.fields([
@@ -479,6 +688,15 @@ router.post("/compare", upload.fields([
     const userAudioUrl = userUpload.secure_url;
     const referenceAudioUrl = referenceUpload.secure_url;
 
+    // Process both audio files with AssemblyAI
+    console.log("Processing user audio with AssemblyAI...");
+    const userTranscription = await getAssemblyAITranscription(userAudioUrl, word);
+    const userAnalysis = analyzeAssemblyResults(userTranscription, word);
+
+    console.log("Processing reference audio with AssemblyAI...");
+    const referenceTranscription = await getAssemblyAITranscription(referenceAudioUrl, word);
+    const referenceAnalysis = analyzeAssemblyResults(referenceTranscription, word);
+
     // Initialize Gemini model
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
@@ -487,7 +705,21 @@ router.post("/compare", upload.fields([
 
       The word being pronounced is: "${word}"
 
-      Based on analysis of both audio files (not actually provided in this simulation), provide feedback on:
+      User Audio Analysis:
+      - Detected text: "${userAnalysis.detectedText}"
+      - Word match: ${userAnalysis.wordMatch}
+      - Confidence score: ${userAnalysis.confidenceScore * 100}%
+      - Duration: ${userAnalysis.totalDuration}s
+      ${userAnalysis.pronunciationSpeed ? `- Speech speed: ${userAnalysis.pronunciationSpeed.toFixed(2)} chars/sec` : ''}
+
+      Reference Audio Analysis:
+      - Detected text: "${referenceAnalysis.detectedText}"
+      - Word match: ${referenceAnalysis.wordMatch}
+      - Confidence score: ${referenceAnalysis.confidenceScore * 100}%
+      - Duration: ${referenceAnalysis.totalDuration}s
+      ${referenceAnalysis.pronunciationSpeed ? `- Speech speed: ${referenceAnalysis.pronunciationSpeed.toFixed(2)} chars/sec` : ''}
+
+      Based on this analysis, provide feedback on:
       1. Overall similarity score (percentage)
       2. Specific sounds that match well
       3. Specific sounds that differ
@@ -503,7 +735,9 @@ router.post("/compare", upload.fields([
         "differences": ["aspects that differ"],
         "improvements": ["specific tips"],
         "userAudioUrl": "${userAudioUrl}",
-        "referenceAudioUrl": "${referenceAudioUrl}"
+        "referenceAudioUrl": "${referenceAudioUrl}",
+        "userTranscription": "${userAnalysis.detectedText}",
+        "referenceTranscription": "${referenceAnalysis.detectedText}"
       }
     `;
 
@@ -518,6 +752,13 @@ router.post("/compare", upload.fields([
       }
 
       const parsedResponse = JSON.parse(cleanedText);
+
+      // Add analysis data to the response
+      parsedResponse.analysisData = {
+        user: userAnalysis,
+        reference: referenceAnalysis
+      };
+
       res.json(parsedResponse);
     } catch (error) {
       console.error("Error parsing JSON response:", error);
@@ -526,7 +767,7 @@ router.post("/compare", upload.fields([
       const fallbackResponse = {
         success: true,
         word: word,
-        similarityScore: 75,
+        similarityScore: Math.round((userAnalysis.confidenceScore / Math.max(0.8, referenceAnalysis.confidenceScore)) * 100),
         matchingAspects: ["Overall word rhythm", "Beginning consonant sounds"],
         differences: ["Vowel pronunciation", "Ending sounds clarity"],
         improvements: [
@@ -536,7 +777,13 @@ router.post("/compare", upload.fields([
         ],
         userAudioUrl: userAudioUrl,
         referenceAudioUrl: referenceAudioUrl,
-        note: "Using simplified comparison due to processing issue"
+        userTranscription: userAnalysis.detectedText,
+        referenceTranscription: referenceAnalysis.detectedText,
+        analysisData: {
+          user: userAnalysis,
+          reference: referenceAnalysis
+        },
+        note: "Using data-based comparison with simplified analysis"
       };
 
       res.json(fallbackResponse);
@@ -550,5 +797,17 @@ router.post("/compare", upload.fields([
     });
   }
 });
+
+// Update your database schema (migration needed)
+/*
+-- In your schema.prisma file, add these fields to the PronunciationAttempt model:
+
+model PronunciationAttempt {
+  // ... existing fields
+  transcriptionData  String?       @db.Text  // Store the full AssemblyAI analysis
+  assemblyConfidence Float?        // Confidence score from AssemblyAI
+  detectedText       String?       // Detected speech text
+}
+*/
 
 export default router;
