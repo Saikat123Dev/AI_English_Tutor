@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import axios from 'axios';
+import AssemblyAI from 'assemblyai';
 import { v2 as cloudinary } from 'cloudinary';
 import express from 'express';
 import fs from 'fs';
@@ -15,12 +15,11 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// AssemblyAI Configuration
+// Configure AssemblyAI SDK
 const ASSEMBLY_AI_API_KEY = process.env.ASSEMBLY_AI_API_KEY;
-const assemblyAIHeaders = {
-  Authorization: ASSEMBLY_AI_API_KEY,
-  'Content-Type': 'application/json',
-};
+const assemblyClient = new AssemblyAI({
+  apiKey: ASSEMBLY_AI_API_KEY
+});
 
 const router = express.Router();
 
@@ -63,51 +62,25 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
  */
 async function getAssemblyAITranscription(audioUrl, targetWord) {
   try {
-    // Step 1: Submit transcription request
-    const transcriptResponse = await axios.post(
-      'https://api.assemblyai.com/v2/transcript',
-      {
-        audio_url: audioUrl,
-        word_boost: [targetWord],
-        boost_param: "high",
-        speech_model: "default",  // Using the default model for general speech recognition
-        language_detection: true, // Automatically detect language
-        punctuate: true,
-        format_text: true,
-        disfluencies: true,       // Capture speech disfluencies like "um", "uh", etc.
-        auto_highlights: true,    // Get highlighted words/phrases
-        audio_start_from: 0,      // Start from the beginning
-        audio_end_at: null,       // Process until the end
-        speech_threshold: 0.2,    // Lower threshold to catch softer pronunciation
-        word_confidence: true,    // Get confidence scores for each word
-      },
-      { headers: assemblyAIHeaders }
-    );
+    // Create a transcription request using the SDK
+    const transcript = await assemblyClient.transcripts.transcribe({
+      audio_url: audioUrl,
+      word_boost: [targetWord],
+      boost_param: "high",
+      speech_model: "default",
+      language_detection: true,
+      punctuate: true,
+      format_text: true,
+      disfluencies: true,
+      auto_highlights: true,
+      audio_start_from: 0,
+      audio_end_at: null,
+      speech_threshold: 0.2,
+      word_confidence: true
+    });
 
-    const transcriptId = transcriptResponse.data.id;
-
-    // Step 2: Poll for completion
-    let transcriptResult;
-    let status = 'processing';
-
-    while (status !== 'completed' && status !== 'error') {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between polling
-
-      const pollingResponse = await axios.get(
-        `https://api.assemblyai.com/v2/transcript/${transcriptId}`,
-        { headers: assemblyAIHeaders }
-      );
-
-      status = pollingResponse.data.status;
-
-      if (status === 'completed') {
-        transcriptResult = pollingResponse.data;
-      } else if (status === 'error') {
-        throw new Error(`AssemblyAI transcription error: ${pollingResponse.data.error}`);
-      }
-    }
-
-    return transcriptResult;
+    // The SDK handles polling for completion automatically
+    return transcript;
   } catch (error) {
     console.error("Error with AssemblyAI transcription:", error);
     throw error;
@@ -797,17 +770,5 @@ router.post("/compare", upload.fields([
     });
   }
 });
-
-// Update your database schema (migration needed)
-/*
--- In your schema.prisma file, add these fields to the PronunciationAttempt model:
-
-model PronunciationAttempt {
-  // ... existing fields
-  transcriptionData  String?       @db.Text  // Store the full AssemblyAI analysis
-  assemblyConfidence Float?        // Confidence score from AssemblyAI
-  detectedText       String?       // Detected speech text
-}
-*/
 
 export default router;
