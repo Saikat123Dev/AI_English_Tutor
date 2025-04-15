@@ -91,7 +91,6 @@ const SocialLoginButton = ({
   };
 
   // Create user in database
-  let data;
   const createUserInDatabase = async (email: string) => {
     try {
       console.log("Attempting to create user with email:", email);
@@ -112,7 +111,7 @@ const SocialLoginButton = ({
         throw new Error(`Failed to create user: ${response.status} - ${errorText}`);
       }
 
-      data = await response.json();
+      const data = await response.json();
       console.log("User created in database:", data.user);
       return data.user;
     } catch (error) {
@@ -125,6 +124,19 @@ const SocialLoginButton = ({
     }
   };
 
+  // Check if profile is complete
+  const isProfileComplete = (userData: any) => {
+    return !!(
+      userData &&
+      userData.englishLevel &&
+      userData.learningGoal &&
+      userData.interests &&
+      userData.focus &&
+      userData.voice &&
+      userData.motherToung
+    );
+  };
+
   // Effect to run when user data is loaded after sign-in
   React.useEffect(() => {
     const handleUserData = async () => {
@@ -133,34 +145,18 @@ const SocialLoginButton = ({
         try {
           const email = user.primaryEmailAddress.emailAddress;
           console.log("User email found:", email);
-          await createUserInDatabase(email);
+
+          // Create user in database
+          const userData = await createUserInDatabase(email);
 
           // Check if all required fields are filled
-          const { fullName, username, unsafeMetadata } = user;
-          const {
-            gender,
-            motherToung,
-            englishLevel,
-            learningGoal,
-            focus,
-            voice,
-          } = unsafeMetadata || {};
-
-          if (
-            data?.user.englishLevel &&
-            data?.user.learningGoal &&
-            data?.user.interests &&
-            data?.user.focus &&
-            data?.user.voice &&
-            data?.user.motherToung
-          ) {
+          if (isProfileComplete(userData)) {
             // All required fields are filled, redirect to /(tabs)
             console.log("All fields filled, redirecting to /(tabs)");
-            router.replace("/(tabs)");
+            stopLoadingAnimation(() => router.replace("/(tabs)"));
           } else {
-            console.log(data?.user);
             // Not all fields are filled, redirect to complete account
-            console.log("Fields missing, redirecting to /auth/complete-your-account");
+            console.log("Fields missing, redirecting to /auth/complete-your-profile");
             stopLoadingAnimation(() =>
               router.replace("/auth/complete-your-account")
             );
@@ -179,8 +175,9 @@ const SocialLoginButton = ({
     try {
       setIsLoading(true);
       startLoadingAnimation();
+
       const { createdSessionId, setActive } = await startOAuthFlow({
-        redirectUrl: Linking.createURL("/auth/complete-your-account", {
+        redirectUrl: Linking.createURL("/", {
           scheme: "myapp",
         }),
       });
@@ -249,7 +246,7 @@ const SocialLoginButton = ({
           >
             <Ionicons name="refresh-circle" size={60} color="white" />
           </Animated.View>
-          <Text style={styles.loadingText}>Creating your account...</Text>
+          <Text style={styles.loadingText}>Signing you in...</Text>
         </Animated.View>
       </Modal>
     </>
