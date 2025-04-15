@@ -87,13 +87,13 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
       public_id: `pronunciation/${uuidv4()}`,
       folder: 'pronunciation_assessments'
     });
-
+    console.log(uploadResult);
     // Clean up temporary file
     fs.unlinkSync(audioFile.path);
 
     // Store Cloudinary URL
     const audioUrl = uploadResult.secure_url;
-
+    console.log(audioUrl);
     // Create a more detailed prompt for the pronunciation assessment
     const prompt = `
       You are an expert English pronunciation coach evaluating a student's pronunciation.

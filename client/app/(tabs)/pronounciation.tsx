@@ -350,6 +350,7 @@ export default function PronunciationPracticeScreen() {
 
     try {
       const formData = new FormData();
+      console.log(audioUri);
       formData.append('audio', {
         uri: audioUri,
         type: 'audio/wav',
