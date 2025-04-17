@@ -3,12 +3,14 @@ import { FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-ico
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
   Easing,
   KeyboardAvoidingView,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   ScrollView,
   StatusBar,
@@ -20,6 +22,7 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScrollContext } from './ScrollContext';
 
 export default function ConversationScreen() {
   const { user } = useUser();
@@ -34,8 +37,8 @@ export default function ConversationScreen() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const scrollViewRef = useRef();
-  const scrollEndTimer = useRef(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollEndTimer = useRef<NodeJS.Timeout | null>(null);
   const [suggestions, setSuggestions] = useState([]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(50)).current;
@@ -54,6 +57,9 @@ export default function ConversationScreen() {
   const successCheckAnimation = useRef(new Animated.Value(0)).current;
   const typingAnimation = useRef(new Animated.Value(0)).current;
   const windowHeight = Dimensions.get('window').height;
+
+  // Get scroll context for tab bar animation
+  const { handleScroll: tabBarScrollHandler, tabBarHeight } = useContext(ScrollContext);
 
   const setFallbackSuggestions = () => {
     setSuggestions([
@@ -151,7 +157,7 @@ export default function ConversationScreen() {
     ]).start();
   };
 
-  const animateFloatingAssistant = (show) => {
+  const animateFloatingAssistant = (show: boolean) => {
     setShowFloatingAssistant(show);
     Animated.spring(floatingAssistantAnim, {
       toValue: show ? 1 : 0,
@@ -259,36 +265,39 @@ export default function ConversationScreen() {
     }
   };
 
- // Add this near your other ref declarations
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const scrollPosition = event.nativeEvent.contentOffset.y;
+    const scrollingUp = scrollPosition < lastScrollPosition;
+    setLastScrollPosition(scrollPosition);
 
-// Update the handleScroll function to use the ref:
-const handleScroll = useCallback((event) => {
-  const scrollPosition = event.nativeEvent.contentOffset.y;
-  const scrollingUp = scrollPosition < lastScrollPosition;
-  setLastScrollPosition(scrollPosition);
+    // Pass scroll event to tab bar handler
+    tabBarScrollHandler(event);
 
-  // Show the scroll up button if user has scrolled down more than 300
-  const shouldShowScrollButton = scrollPosition > 300;
-  Animated.spring(scrollUpButtonAnim, {
-    toValue: shouldShowScrollButton ? 1 : 0,
-    friction: 8,
-    tension: 60,
-    useNativeDriver: true,
-  }).start();
+    // Show the scroll up button if user has scrolled down more than 300
+    const shouldShowScrollButton = scrollPosition > 300;
+    Animated.spring(scrollUpButtonAnim, {
+      toValue: shouldShowScrollButton ? 1 : 0,
+      friction: 8,
+      tension: 60,
+      useNativeDriver: true,
+    }).start();
 
-  // Show floating assistant when scrolling up and not at the top
-  if (scrollingUp && scrollPosition > 200) {
-    animateFloatingAssistant(true);
-  } else {
-    animateFloatingAssistant(false);
-  }
+    // Show floating assistant when scrolling up and not at the top
+    if (scrollingUp && scrollPosition > 200) {
+      animateFloatingAssistant(true);
+    } else {
+      animateFloatingAssistant(false);
+    }
 
-  setIsScrolling(true);
-  clearTimeout(scrollEndTimer.current);
-  scrollEndTimer.current = setTimeout(() => {
-    setIsScrolling(false);
-  }, 150);
-}, [lastScrollPosition]);
+    setIsScrolling(true);
+    if (scrollEndTimer.current) {
+      clearTimeout(scrollEndTimer.current);
+    }
+    scrollEndTimer.current = setTimeout(() => {
+      setIsScrolling(false);
+    }, 150);
+  }, [lastScrollPosition, tabBarScrollHandler]);
+
   const sendMessage = async (text = input) => {
     if (!text.trim()) return;
 
@@ -379,7 +388,7 @@ const handleScroll = useCallback((event) => {
     }
   };
 
-  const formatResponseFromAPI = (data) => {
+  const formatResponseFromAPI = (data: any) => {
     const sections = [];
 
     if (data.answer) {
@@ -426,7 +435,7 @@ const handleScroll = useCallback((event) => {
     };
   };
 
-  const generateSuggestionsFromFollowUp = (followUp) => {
+  const generateSuggestionsFromFollowUp = (followUp: string) => {
     const newSuggestions = [];
 
     if (followUp.includes("aspect of travel")) {
@@ -465,7 +474,7 @@ const handleScroll = useCallback((event) => {
     setSuggestions(newSuggestions);
   };
 
-  const handleSuggestionPress = (suggestion) => {
+  const handleSuggestionPress = (suggestion: string) => {
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -584,7 +593,7 @@ const handleScroll = useCallback((event) => {
     );
   };
 
-  const renderMessageContent = (message) => {
+  const renderMessageContent = (message: any) => {
     if (message.isInitial) {
       return renderWelcomeCard();
     }
@@ -605,7 +614,7 @@ const handleScroll = useCallback((event) => {
     if (message.sections) {
       return (
         <View>
-          {message.sections.map((section, index) => (
+          {message.sections.map((section: any, index: number) => (
             <View key={index} style={styles.messageSection}>
               {section.type === 'answer' && (
                 <Text style={[styles.messageText, styles.assistantMessageText]}>
@@ -827,7 +836,7 @@ const handleScroll = useCallback((event) => {
       {/* Chat Area */}
       <ScrollView
         ref={scrollViewRef}
-        contentContainerStyle={styles.chatContainer}
+        contentContainerStyle={[styles.chatContainer, { paddingBottom: tabBarHeight + 20 }]}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
@@ -1009,7 +1018,7 @@ const handleScroll = useCallback((event) => {
       {/* Input Area */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? tabBarHeight + 20 : 0}
         style={styles.inputContainer}
       >
         <LinearGradient
@@ -1059,45 +1068,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFE',
   },
   chatContainer: {
-    padding: 16,
-    paddingTop: 24,
-    paddingBottom: 100,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
   },
 
   // Header Styles
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
-    backgroundColor: '#6C63FF',
-    elevation: 6,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     zIndex: 10,
   },
   headerLeft: {
     flex: 1,
-    justifyContent: 'center',
   },
   headerCenter: {
     flex: 3,
-    justifyContent: 'center',
     alignItems: 'center',
   },
   headerRight: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'flex-end',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#FFF',
-    letterSpacing: 0.5,
   },
   onlineIndicator: {
     flexDirection: 'row',
@@ -1105,137 +1110,139 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   onlineDot: {
-    width: 10,
-    height: 10,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: '#4CAF50',
-    borderRadius: 5,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    marginRight: 6,
   },
   onlineText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '500',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  backButton: {
+    padding: 8,
+  },
+  infoButton: {
+    padding: 8,
   },
 
   // Topic Badge
   topicBadgeContainer: {
     position: 'absolute',
-    top: 64,
-    alignSelf: 'center',
-    zIndex: 20,
+    top: 70,
+    right: 16,
+    zIndex: 11,
   },
   topicBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    paddingHorizontal: 14,
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    elevation: 3,
-    shadowColor: '#6C63FF',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-  },
-  topicText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#6C63FF',
-    marginLeft: 8,
-  },
-
-  // Message Bubbles
-  messageRow: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    maxWidth: '100%',
-  },
-  userRow: {
-    justifyContent: 'flex-end',
-  },
-  assistantRow: {
-    justifyContent: 'flex-start',
-  },
-  messageBubble: {
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    maxWidth: '80%',
     elevation: 2,
   },
-  assistantBubble: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 4,
-    marginLeft: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(108, 99, 255, 0.1)',
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 2 },
+  topicText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+
+  // Message Styles
+  messageRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    alignItems: 'flex-end',
+  },
+  userRow: {
+    flexDirection: 'row-reverse',
+    marginLeft: 40,
+  },
+  assistantRow: {
+    marginRight: 40,
+  },
+  messageBubble: {
+    padding: 12,
+    borderRadius: 18,
+    maxWidth: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowRadius: 2,
+    elevation: 1,
   },
   userBubble: {
     backgroundColor: '#6C63FF',
-    borderTopRightRadius: 4,
-    marginRight: 8,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    borderBottomRightRadius: 4,
+  },
+  assistantBubble: {
+    backgroundColor: '#FFF',
+    borderBottomLeftRadius: 4,
   },
   initialMessageBubble: {
     backgroundColor: 'transparent',
-    elevation: 0,
-    shadowOpacity: 0,
+    shadowColor: 'transparent',
     padding: 0,
-    maxWidth: '90%',
+    maxWidth: '100%',
   },
-
-  // Message Content
   messageText: {
     fontSize: 16,
-    lineHeight: 24,
-    letterSpacing: 0.2,
+    lineHeight: 22,
+    color: '#333',
   },
   userMessageText: {
-    color: '#FFFFFF',
+    color: '#FFF',
   },
   assistantMessageText: {
-    color: '#333333',
-  },
-  timestampContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
+    color: '#333',
   },
   timestamp: {
-    fontSize: 11,
+    fontSize: 10,
+    color: '#888',
+    marginTop: 4,
+    alignSelf: 'flex-end',
   },
   userTimestamp: {
-    textAlign: 'right',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   assistantTimestamp: {
-    textAlign: 'left',
-    color: '#999',
+    color: '#888',
+  },
+
+  // Avatar Styles
+  avatarContainer: {
+    marginHorizontal: 8,
+    marginBottom: 4,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userAvatar: {
+    backgroundColor: '#E91E63',
   },
 
   // Welcome Card
   welcomeCard: {
-    width: '100%',
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   welcomeGradient: {
     padding: 20,
-    backgroundColor: '#6C63FF',
   },
   welcomeHeader: {
     flexDirection: 'row',
@@ -1246,76 +1253,72 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: '#FFF',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
   welcomeAvatarInner: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
   },
   welcomeTitleContainer: {
-    marginLeft: 16,
+    flex: 1,
   },
   welcomeTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#FFF',
+    marginBottom: 4,
   },
   welcomeSubtitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
   },
   welcomeSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '500',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   welcomeText: {
     fontSize: 16,
-    lineHeight: 24,
-    color: '#FFF',
+    color: 'rgba(255, 255, 255, 0.95)',
+    lineHeight: 22,
     marginBottom: 16,
   },
   welcomeDivider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginVertical: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 16,
   },
   welcomeTips: {
-    marginTop: 8,
+    gap: 12,
   },
   tipItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    alignItems: 'center',
   },
   tipIconContainer: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 2,
+    marginRight: 12,
   },
   tipText: {
-    fontSize: 15,
-    color: '#FFF',
-    marginLeft: 12,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.95)',
     flex: 1,
-    lineHeight: 22,
   },
 
   // Message Sections
   messageSection: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1323,179 +1326,78 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionIconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 8,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  explanationSection: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 12,
+    padding: 12,
   },
   explanationIcon: {
     backgroundColor: '#4CAF50',
   },
+  explanationTitle: {
+    color: '#2E7D32',
+  },
+  feedbackSection: {
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    borderRadius: 12,
+    padding: 12,
+  },
   feedbackIcon: {
     backgroundColor: '#FF9800',
   },
-  followUpIcon: {
-    backgroundColor: '#2196F3',
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  explanationTitle: {
-    color: '#4CAF50',
-  },
   feedbackTitle: {
-    color: '#FF9800',
-  },
-  followUpTitle: {
-    color: '#2196F3',
-  },
-  explanationSection: {
-    backgroundColor: 'rgba(76, 175, 80, 0.05)',
-    borderRadius: 12,
-    padding: 14,
-    borderLeftWidth: 3,
-    borderLeftColor: '#4CAF50',
-  },
-  feedbackSection: {
-    backgroundColor: 'rgba(255, 152, 0, 0.05)',
-    borderRadius: 12,
-    padding: 14,
-    borderLeftWidth: 3,
-    borderLeftColor: '#FF9800',
-  },
-  followUpSection: {
-    backgroundColor: 'rgba(33, 150, 243, 0.05)',
-    borderRadius: 12,
-    padding: 14,
-    borderLeftWidth: 3,
-    borderLeftColor: '#2196F3',
+    color: '#E65100',
   },
   feedbackText: {
-    fontStyle: 'italic',
-    color: '#FF9800',
+    color: '#333',
+  },
+  followUpSection: {
+    backgroundColor: 'rgba(156, 39, 176, 0.1)',
+    borderRadius: 12,
+    padding: 12,
+  },
+  followUpIcon: {
+    backgroundColor: '#9C27B0',
+  },
+  followUpTitle: {
+    color: '#7B1FA2',
   },
 
   // Typing Indicator
-  typingBubble: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
   typingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 8,
   },
   typingDotsContainer: {
     flexDirection: 'row',
-    marginRight: 10,
+    alignItems: 'center',
+    marginRight: 8,
   },
   typingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#6C63FF',
-    marginHorizontal: 3,
+    marginHorizontal: 2,
   },
   typingText: {
-    fontSize: 15,
-    color: '#666',
-    marginLeft: 8,
+    fontSize: 12,
+    color: '#888',
   },
-
-  // Input Area
-  inputContainer: {
-    position: 'relative',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(108, 99, 255, 0.1)',
-    backgroundColor: '#FFFFFF',
-  },
-  inputGradient: {
-    position: 'absolute',
-    top: -40,
-    left: 0,
-    right: 0,
-    height: 40,
-    backgroundColor: 'transparent',
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F7FA',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    maxHeight: 120,
-    color: '#333333',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    lineHeight: 22,
-  },
-  sendButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#6C63FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-    elevation: 2,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#E0E0E0',
-    shadowColor: '#999',
-  },
-
-  // Suggestions
-  suggestionsContainer: {
-    marginTop: 16,
-    marginBottom: 12,
-  },
-  suggestionsTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#6C63FF',
-    marginBottom: 10,
-    marginLeft: 8,
-  },
-  suggestionsScrollView: {
-    paddingHorizontal: 8,
-    paddingBottom: 4,
-  },
-  suggestionBubble: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 10,
-    elevation: 2,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(108, 99, 255, 0.1)',
-  },
-  suggestionText: {
-    fontSize: 14,
-    color: '#6C63FF',
-    fontWeight: '600',
+  typingBubble: {
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
 
   // Success Animation
@@ -1507,124 +1409,169 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    zIndex: 100,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    zIndex: 1000,
   },
   successCheckContainer: {
-    width: 120,
-    height: 120,
+    width: 80,
+    height: 80,
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
   },
   successCheckBackground: {
     position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    elevation: 6,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-  },
-  successCheck: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  successCheck: {
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+  },
+
+  // Suggestions
+  suggestionsContainer: {
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  suggestionsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  suggestionsScrollView: {
+    paddingVertical: 4,
+  },
+  suggestionBubble: {
+    backgroundColor: 'rgba(108, 99, 255, 0.1)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(108, 99, 255, 0.2)',
+  },
+  suggestionText: {
+    fontSize: 14,
+    color: '#6C63FF',
   },
 
   // Scroll Up Button
   scrollUpButtonContainer: {
     position: 'absolute',
     bottom: 100,
-    right: 20,
-    zIndex: 10,
+    right: 16,
+    zIndex: 100,
   },
   scrollUpButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-  },
-  scrollUpButtonGradient: {
-    width: '100%',
-    height: '100%',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  scrollUpButtonGradient: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
 
   // Floating Assistant
   floatingAssistantContainer: {
     position: 'absolute',
-    top: 90,
-    left: 20,
+    bottom: 160,
+    right: 16,
     zIndex: 100,
   },
   floatingAssistantBlur: {
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
   },
   floatingAssistantContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
   floatingAssistantAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    overflow: 'hidden',
-    marginRight: 10,
-    backgroundColor: '#6C63FF',
+    marginRight: 8,
+  },
+  floatingAssistantAvatarGradient: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   floatingAssistantText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#6C63FF',
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
   },
 
-  // Avatars
-  avatarContainer: {
+  // Input Area
+  inputContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'transparent',
+  },
+  inputGradient: {
+    position: 'absolute',
+    top: -20,
+    left: 0,
+    right: 0,
+    height: 40,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 12,
+    paddingRight: 8,
+    color: '#333',
+    maxHeight: 100,
+  },
+  sendButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#6C63FF',
-    elevation: 2,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
-  userAvatar: {
-    borderColor: '#E91E63',
+  sendButtonDisabled: {
+    opacity: 0.5,
   },
-  avatarIcon: {
-    color: '#6C63FF',
-  },
-  userAvatarIcon: {
-    color: '#E91E63',
+  sendButtonGradient: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
