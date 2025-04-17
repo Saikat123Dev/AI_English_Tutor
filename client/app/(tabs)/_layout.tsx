@@ -1,9 +1,10 @@
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
-import { Redirect, Tabs } from "expo-router";
+import { Redirect, Tabs, useNavigation } from "expo-router";
 import React, { useRef } from "react";
-import { Animated, StyleSheet, View } from "react-native";
+import { Animated, NativeScrollEvent, NativeSyntheticEvent, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ScrollContext } from "./ScrollContext"; // Import from the separate file
 
 // Custom dimensions
 const TAB_BAR_WIDTH = "98%";
@@ -15,6 +16,15 @@ export default function TabLayout() {
   const { user } = useUser();
   const { isSignedIn } = useAuth();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+
+  // Animation value for tab bar slide in/out
+  const tabBarTranslateY = useRef(new Animated.Value(0)).current;
+
+  // Track scroll direction
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const lastScrollY = useRef(0);
+  const isScrollingDown = useRef(false);
 
   const tabs = [
     { name: "index", label: "Home" },
@@ -40,6 +50,36 @@ export default function TabLayout() {
   ).current;
   const previousTab = useRef<string>("index");
 
+  // Total height of the tab bar including safe area
+  const totalTabBarHeight = TAB_BAR_HEIGHT + insets.bottom;
+
+  // Handle scroll events to show/hide tab bar
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const currentScrollY = event.nativeEvent.contentOffset.y;
+
+    // Determine scroll direction
+    if (currentScrollY > lastScrollY.current && !isScrollingDown.current && currentScrollY > 10) {
+      // Scrolling down - hide the tab bar
+      isScrollingDown.current = true;
+      Animated.spring(tabBarTranslateY, {
+        toValue: totalTabBarHeight,
+        useNativeDriver: true,
+        friction: 8,
+      }).start();
+    } else if (currentScrollY < lastScrollY.current && isScrollingDown.current) {
+      // Scrolling up - show the tab bar
+      isScrollingDown.current = false;
+      Animated.spring(tabBarTranslateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        friction: 8,
+      }).start();
+    }
+
+    lastScrollY.current = currentScrollY;
+    scrollY.setValue(currentScrollY);
+  };
+
   if (!isSignedIn) return <Redirect href="/auth" />;
   if (isSignedIn && user?.unsafeMetadata?.onboarding_completed !== true) {
     return <Redirect href="/auth/complete-your-account" />;
@@ -48,6 +88,14 @@ export default function TabLayout() {
   const handleTabPress = (tabName: string) => {
     const prevTab = previousTab.current;
     previousTab.current = tabName;
+
+    // Always show the tab bar when changing tabs
+    isScrollingDown.current = false;
+    Animated.spring(tabBarTranslateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      friction: 8,
+    }).start();
 
     // Reset previous tab animations
     Animated.parallel([
@@ -183,40 +231,46 @@ export default function TabLayout() {
   };
 
   return (
-    <View style={styles.container}>
-      <Tabs
-        screenOptions={{
-          tabBarShowLabel: false,
-          headerShown: false,
-          tabBarStyle: [
-            styles.tabBar,
-            {
-              height: TAB_BAR_HEIGHT + insets.bottom,
-              paddingBottom: insets.bottom + 4,
-              width: TAB_BAR_WIDTH,
-              alignSelf: 'center',
-            },
-          ],
-        }}
-      >
-        {tabs.map((tab) => (
-          <Tabs.Screen
-            key={tab.name}
-            name={tab.name}
-            listeners={{ tabPress: () => handleTabPress(tab.name) }}
-            options={{
-              tabBarIcon: ({ focused }) => (
-                <CustomTabBarIcon
-                  name={getIconName(tab.name, focused)}
-                  focused={focused}
-                  tabName={tab.name}
-                />
-              ),
-            }}
-          />
-        ))}
-      </Tabs>
-    </View>
+    <ScrollContext.Provider value={{
+      handleScroll,
+      tabBarHeight: totalTabBarHeight
+    }}>
+      <View style={styles.container}>
+        <Tabs
+          screenOptions={{
+            tabBarShowLabel: false,
+            headerShown: false,
+            tabBarStyle: [
+              styles.tabBar,
+              {
+                height: totalTabBarHeight,
+                paddingBottom: insets.bottom + 4,
+                width: TAB_BAR_WIDTH,
+                alignSelf: 'center',
+                transform: [{ translateY: tabBarTranslateY }],
+              },
+            ],
+          }}
+        >
+          {tabs.map((tab) => (
+            <Tabs.Screen
+              key={tab.name}
+              name={tab.name}
+              listeners={{ tabPress: () => handleTabPress(tab.name) }}
+              options={{
+                tabBarIcon: ({ focused }) => (
+                  <CustomTabBarIcon
+                    name={getIconName(tab.name, focused)}
+                    focused={focused}
+                    tabName={tab.name}
+                  />
+                ),
+              }}
+            />
+          ))}
+        </Tabs>
+      </View>
+    </ScrollContext.Provider>
   );
 }
 
@@ -238,6 +292,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   tabBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     borderRadius: 24,
     flexDirection: 'row',
     alignItems: 'center',
