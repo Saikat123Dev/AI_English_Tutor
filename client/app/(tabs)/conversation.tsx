@@ -791,35 +791,32 @@ const handleScroll = useCallback((event) => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar backgroundColor="#6C63FF" barStyle="light-content" />
+      <StatusBar backgroundColor="#1E1E2E" barStyle="light-content" />
 
       {/* Header */}
-      <LinearGradient
-        colors={['#6C63FF', '#8A63FF']}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-      >
-        <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.backButton}>
-            <Ionicons name="chevron-back" size={24} color="#FFF" />
-          </TouchableOpacity>
-        </View>
+      <BlurView intensity={90} tint="dark" style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity style={styles.backButton}>
+              <Ionicons name="chevron-back" size={24} color="#FFF" />
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Language Partner</Text>
-          <View style={styles.onlineIndicator}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.onlineText}>Active now</Text>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Lingua AI</Text>
+            <View style={styles.onlineIndicator}>
+              <View style={styles.onlineDot} />
+              <Text style={styles.onlineText}>Active</Text>
+            </View>
+          </View>
+
+          <View style={styles.headerRight}>
+            <TouchableOpacity style={styles.infoButton}>
+              <Ionicons name="settings-outline" size={22} color="#FFF" />
+            </TouchableOpacity>
           </View>
         </View>
-
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.infoButton}>
-            <Ionicons name="information-circle-outline" size={24} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+      </BlurView>
 
       {/* Topic Badge */}
       {renderTopicBadge()}
@@ -938,7 +935,7 @@ const handleScroll = useCallback((event) => {
         )}
 
         {/* Empty space at bottom to allow scrolling past the last message */}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
 
       {/* Scroll Up Button */}
@@ -961,14 +958,9 @@ const handleScroll = useCallback((event) => {
           onPress={scrollToTop}
           activeOpacity={0.8}
         >
-          <LinearGradient
-            colors={['rgba(108, 99, 255, 0.9)', 'rgba(138, 99, 255, 0.9)']}
-            style={styles.scrollUpButtonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Ionicons name="chevron-up" size={24} color="#FFF" />
-          </LinearGradient>
+          <BlurView intensity={90} tint="dark" style={styles.scrollUpButtonBlur}>
+            <Ionicons name="chevron-up" size={20} color="#FFF" />
+          </BlurView>
         </TouchableOpacity>
       </Animated.View>
 
@@ -988,19 +980,12 @@ const handleScroll = useCallback((event) => {
             }
           ]}
         >
-          <BlurView intensity={80} tint="light" style={styles.floatingAssistantBlur}>
+          <BlurView intensity={90} tint="dark" style={styles.floatingAssistantBlur}>
             <View style={styles.floatingAssistantContent}>
               <View style={styles.floatingAssistantAvatar}>
-                <LinearGradient
-                  colors={['#6C63FF', '#8A63FF']}
-                  style={styles.floatingAssistantAvatarGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <MaterialCommunityIcons name="robot-happy" size={24} color="#FFF" />
-                </LinearGradient>
+                <MaterialCommunityIcons name="robot-happy" size={20} color="#FFF" />
               </View>
-              <Text style={styles.floatingAssistantText}>Need any help?</Text>
+              <Text style={styles.floatingAssistantText}>Need help?</Text>
             </View>
           </BlurView>
         </Animated.View>
@@ -1012,38 +997,34 @@ const handleScroll = useCallback((event) => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         style={styles.inputContainer}
       >
-        <LinearGradient
-          colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0.95)']}
-          style={styles.inputGradient}
-          locations={[0, 0.3, 0.5]}
-        />
-
-        <View style={styles.inputWrapper}>
-          <TextInput
-            style={styles.input}
-            placeholder="Type your message..."
-            value={input}
-            onChangeText={setInput}
-            multiline={true}
-            maxHeight={100}
-            placeholderTextColor="#9E9E9E"
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
-            onPress={() => sendMessage()}
-            disabled={!input.trim()}
-            activeOpacity={0.7}
-          >
-            <LinearGradient
-              colors={input.trim() ? ['#6C63FF', '#8A63FF'] : ['#D1D1D1', '#C7C7C7']}
-              style={styles.sendButtonGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+        <BlurView intensity={90} tint="dark" style={styles.inputBlur}>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.input}
+              placeholder="Type your message..."
+              placeholderTextColor="#A0A0C0"
+              value={input}
+              onChangeText={setInput}
+              multiline={true}
+              maxHeight={100}
+            />
+            <TouchableOpacity
+              style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
+              onPress={() => sendMessage()}
+              disabled={!input.trim()}
+              activeOpacity={0.7}
             >
-              <Ionicons name="send" size={20} color="#FFF" />
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+              <LinearGradient
+                colors={input.trim() ? ['#7F5AF0', '#6C56E0'] : ['#3A3A5A', '#3A3A5A']}
+                style={styles.sendButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Ionicons name="send" size={18} color="#FFF" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </BlurView>
       </KeyboardAvoidingView>
 
       {/* Styles */}
@@ -1056,7 +1037,6 @@ const styles = StyleSheet.create({
   // Container & Main Layout
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFE',
   },
   chatContainer: {
     padding: 16,
@@ -1066,18 +1046,14 @@ const styles = StyleSheet.create({
 
   // Header Styles
   header: {
+    paddingTop: 50,
+    paddingBottom: 14,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  headerContent: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    backgroundColor: '#6C63FF',
-    elevation: 6,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    zIndex: 10,
   },
   headerLeft: {
     flex: 1,
@@ -1105,24 +1081,22 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   onlineDot: {
-    width: 10,
-    height: 10,
-    backgroundColor: '#4CAF50',
+    width: 8,
+    height: 8,
+    backgroundColor: '#2CB67D',
     borderRadius: 5,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    marginRight: 6,
   },
   onlineText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
     fontWeight: '500',
   },
 
   // Topic Badge
   topicBadgeContainer: {
     position: 'absolute',
-    top: 64,
+    top: 70,
     alignSelf: 'center',
     zIndex: 20,
   },
@@ -1132,24 +1106,21 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    elevation: 3,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    backgroundColor: 'rgba(127, 90, 240, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(127, 90, 240, 0.5)',
   },
   topicText: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#6C63FF',
+    fontWeight: '600',
+    color: '#7F5AF0',
     marginLeft: 8,
   },
 
   // Message Bubbles
   messageRow: {
     flexDirection: 'row',
-    marginBottom: 20,
+    marginBottom: 16,
     maxWidth: '100%',
   },
   userRow: {
@@ -1163,32 +1134,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     maxWidth: '80%',
-    elevation: 2,
   },
   assistantBubble: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(30, 11, 75, 0.6)',
     borderTopLeftRadius: 4,
     marginLeft: 8,
     borderWidth: 1,
-    borderColor: 'rgba(108, 99, 255, 0.1)',
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    borderColor: 'rgba(127, 90, 240, 0.2)',
   },
   userBubble: {
-    backgroundColor: '#6C63FF',
+    backgroundColor: 'rgba(127, 90, 240, 0.8)',
     borderTopRightRadius: 4,
     marginRight: 8,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
   },
   initialMessageBubble: {
     backgroundColor: 'transparent',
-    elevation: 0,
-    shadowOpacity: 0,
     padding: 0,
     maxWidth: '90%',
   },
@@ -1203,23 +1163,19 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   assistantMessageText: {
-    color: '#333333',
-  },
-  timestampContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
+    color: '#E2E2FF',
   },
   timestamp: {
     fontSize: 11,
+    marginTop: 4,
   },
   userTimestamp: {
     textAlign: 'right',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.5)',
   },
   assistantTimestamp: {
     textAlign: 'left',
-    color: '#999',
+    color: 'rgba(226, 226, 255, 0.5)',
   },
 
   // Welcome Card
@@ -1227,15 +1183,9 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 20,
     overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  welcomeGradient: {
-    padding: 20,
-    backgroundColor: '#6C63FF',
+    backgroundColor: 'rgba(30, 11, 75, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(127, 90, 240, 0.3)',
   },
   welcomeHeader: {
     flexDirection: 'row',
@@ -1246,7 +1196,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(127, 90, 240, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1254,7 +1204,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#7F5AF0',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -1274,18 +1224,18 @@ const styles = StyleSheet.create({
   },
   welcomeSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
+    color: 'rgba(255,255,255,0.7)',
     fontWeight: '500',
   },
   welcomeText: {
     fontSize: 16,
     lineHeight: 24,
-    color: '#FFF',
+    color: '#E2E2FF',
     marginBottom: 16,
   },
   welcomeDivider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(127, 90, 240, 0.3)',
     marginVertical: 16,
   },
   welcomeTips: {
@@ -1300,14 +1250,14 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(127, 90, 240, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 2,
   },
   tipText: {
     fontSize: 15,
-    color: '#FFF',
+    color: '#E2E2FF',
     marginLeft: 12,
     flex: 1,
     lineHeight: 22,
@@ -1329,22 +1279,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
+    backgroundColor: 'rgba(127, 90, 240, 0.3)',
   },
   explanationIcon: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: 'rgba(44, 182, 125, 0.3)',
   },
   feedbackIcon: {
-    backgroundColor: '#FF9800',
+    backgroundColor: 'rgba(255, 152, 0, 0.3)',
   },
   followUpIcon: {
-    backgroundColor: '#2196F3',
+    backgroundColor: 'rgba(33, 150, 243, 0.3)',
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
   },
   explanationTitle: {
-    color: '#4CAF50',
+    color: '#2CB67D',
   },
   feedbackTitle: {
     color: '#FF9800',
@@ -1353,21 +1304,21 @@ const styles = StyleSheet.create({
     color: '#2196F3',
   },
   explanationSection: {
-    backgroundColor: 'rgba(76, 175, 80, 0.05)',
+    backgroundColor: 'rgba(44, 182, 125, 0.1)',
     borderRadius: 12,
     padding: 14,
     borderLeftWidth: 3,
-    borderLeftColor: '#4CAF50',
+    borderLeftColor: '#2CB67D',
   },
   feedbackSection: {
-    backgroundColor: 'rgba(255, 152, 0, 0.05)',
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
     borderRadius: 12,
     padding: 14,
     borderLeftWidth: 3,
     borderLeftColor: '#FF9800',
   },
   followUpSection: {
-    backgroundColor: 'rgba(33, 150, 243, 0.05)',
+    backgroundColor: 'rgba(33, 150, 243, 0.1)',
     borderRadius: 12,
     padding: 14,
     borderLeftWidth: 3,
@@ -1375,7 +1326,7 @@ const styles = StyleSheet.create({
   },
   feedbackText: {
     fontStyle: 'italic',
-    color: '#FF9800',
+    color: '#FFC46B',
   },
 
   // Typing Indicator
@@ -1395,71 +1346,59 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#6C63FF',
+    backgroundColor: '#7F5AF0',
     marginHorizontal: 3,
   },
   typingText: {
     fontSize: 15,
-    color: '#666',
+    color: '#A0A0C0',
     marginLeft: 8,
   },
 
   // Input Area
   inputContainer: {
     position: 'relative',
+    paddingBottom: 20,
+  },
+  inputBlur: {
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(108, 99, 255, 0.1)',
-    backgroundColor: '#FFFFFF',
-  },
-  inputGradient: {
-    position: 'absolute',
-    top: -40,
-    left: 0,
-    right: 0,
-    height: 40,
-    backgroundColor: 'transparent',
+    borderTopColor: 'rgba(127, 90, 240, 0.2)',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F7FA',
+    backgroundColor: 'rgba(30, 11, 75, 0.5)',
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(127, 90, 240, 0.3)',
   },
   input: {
     flex: 1,
     fontSize: 16,
     maxHeight: 120,
-    color: '#333333',
+    color: '#FFFFFF',
     paddingVertical: 8,
     paddingHorizontal: 4,
     lineHeight: 22,
   },
   sendButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#6C63FF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
-    elevation: 2,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
   },
-  sendButtonDisabled: {
-    backgroundColor: '#E0E0E0',
-    shadowColor: '#999',
+  sendButtonGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Suggestions
@@ -1470,7 +1409,7 @@ const styles = StyleSheet.create({
   suggestionsTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#6C63FF',
+    color: '#7F5AF0',
     marginBottom: 10,
     marginLeft: 8,
   },
@@ -1479,68 +1418,18 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   suggestionBubble: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(30, 11, 75, 0.7)',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
     marginRight: 10,
-    elevation: 2,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(108, 99, 255, 0.1)',
+    borderColor: 'rgba(127, 90, 240, 0.3)',
   },
   suggestionText: {
     fontSize: 14,
-    color: '#6C63FF',
+    color: '#7F5AF0',
     fontWeight: '600',
-  },
-
-  // Success Animation
-  successAnimationContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    zIndex: 100,
-  },
-  successCheckContainer: {
-    width: 120,
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  successCheckBackground: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    elevation: 6,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-  },
-  successCheck: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
 
   // Scroll Up Button
@@ -1551,17 +1440,12 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   scrollUpButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
   },
-  scrollUpButtonGradient: {
+  scrollUpButtonBlur: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
@@ -1578,7 +1462,6 @@ const styles = StyleSheet.create({
   floatingAssistantBlur: {
     borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
   },
   floatingAssistantContent: {
     flexDirection: 'row',
@@ -1587,44 +1470,33 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   floatingAssistantAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    overflow: 'hidden',
-    marginRight: 10,
-    backgroundColor: '#6C63FF',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(127, 90, 240, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 10,
   },
   floatingAssistantText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#6C63FF',
+    color: '#FFF',
   },
 
   // Avatars
   avatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(30, 11, 75, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#6C63FF',
-    elevation: 2,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(127, 90, 240, 0.5)',
   },
   userAvatar: {
-    borderColor: '#E91E63',
-  },
-  avatarIcon: {
-    color: '#6C63FF',
-  },
-  userAvatarIcon: {
-    color: '#E91E63',
+    backgroundColor: 'rgba(127, 90, 240, 0.7)',
+    borderColor: 'rgba(127, 90, 240, 0.8)',
   },
 });
