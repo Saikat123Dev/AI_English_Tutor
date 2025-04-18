@@ -2,11 +2,12 @@ import { useAuth, useUser } from '@clerk/clerk-expo';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image, Animated } from 'react-native';
+import { router } from 'expo-router';
+import React, { useContext, useState } from 'react';
+import { ActivityIndicator, Alert, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../utils/theme/ThemeProvider';
-import { router } from 'expo-router';
+import { ScrollContext } from './ScrollContext';
 
 interface ProfileOptionProps {
   title: string;
@@ -53,22 +54,17 @@ function ProfileOption({ title, icon, onPress, showChevron = true, isLast = fals
   );
 }
 
-
-
-
-
-// Achievement Badge Component
 function AchievementBadge({ title, icon, unlocked, progress, total, colors }) {
   return (
-    <View style={[styles.achievementContainer, { 
+    <View style={[styles.achievementContainer, {
       backgroundColor: colors.card,
       opacity: unlocked ? 1 : 0.7
     }]}>
       <View style={[
-        styles.achievementIconContainer, 
-        { 
+        styles.achievementIconContainer,
+        {
           backgroundColor: unlocked ? colors.accent + '30' : colors.border + '50',
-          borderColor: unlocked ? colors.accent : colors.border 
+          borderColor: unlocked ? colors.accent : colors.border
         }
       ]}>
         {icon}
@@ -77,12 +73,12 @@ function AchievementBadge({ title, icon, unlocked, progress, total, colors }) {
       {!unlocked && (
         <View style={styles.achievementProgress}>
           <View style={[styles.achievementProgressBar, { backgroundColor: colors.border }]}>
-            <View 
+            <View
               style={[
-                styles.achievementProgressFill, 
-                { 
-                  width: `${Math.min(100, (progress / total) * 100)}%`, 
-                  backgroundColor: colors.accent 
+                styles.achievementProgressFill,
+                {
+                  width: `${Math.min(100, (progress / total) * 100)}%`,
+                  backgroundColor: colors.accent
                 }
               ]}
             />
@@ -103,8 +99,8 @@ export function ProfileScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [showAllAchievements, setShowAllAchievements] = useState(false);
+  const { handleScroll, tabBarHeight } = useContext(ScrollContext);
 
-  // Mock data for English learning statistics
   const learningStats = {
     streak: 7,
     vocabulary: 320,
@@ -120,7 +116,6 @@ export function ProfileScreen() {
     }
   };
 
-  // Mock achievements data
   const achievements = [
     {
       id: 1,
@@ -179,6 +174,10 @@ export function ProfileScreen() {
     );
   };
 
+  const handleScrollEvent = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    handleScroll(event);
+  };
+
   if (!isUserLoaded) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -190,8 +189,10 @@ export function ProfileScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarHeight + 40 }]}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={handleScrollEvent}
       >
         {/* Header with gradient */}
         <LinearGradient
@@ -216,11 +217,11 @@ export function ProfileScreen() {
           <Text style={[styles.email, { color: colors.text }]}>
             {user?.emailAddresses[0]?.emailAddress || ''}
           </Text>
-          
+
           <View style={styles.levelBadge}>
             <Text style={styles.levelText}>{learningStats.level}</Text>
           </View>
-          
+
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{learningStats.streak}</Text>
@@ -239,7 +240,7 @@ export function ProfileScreen() {
           </View>
         </LinearGradient>
 
-
+        {/* Rest of your content remains the same */}
         {/* Achievements Section */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderRow}>
@@ -250,7 +251,7 @@ export function ProfileScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.achievementsGrid}>
             {achievements.slice(0, showAllAchievements ? achievements.length : 2).map(achievement => (
               <AchievementBadge
@@ -287,13 +288,13 @@ export function ProfileScreen() {
         {/* Recommended Courses */}
         <View style={styles.sectionContainer}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>RECOMMENDED FOR YOU</Text>
-          
-          <ScrollView 
-            horizontal 
+
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.coursesScrollContainer}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.courseCard, { backgroundColor: colors.card }]}
               activeOpacity={0.7}
               onPress={() => navigation.navigate('CourseDetails' as never)}
@@ -304,8 +305,8 @@ export function ProfileScreen() {
               <Text style={[styles.courseTitle, { color: colors.text }]}>Business English</Text>
               <Text style={[styles.courseSubtitle, { color: colors.textSecondary }]}>12 lessons</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[styles.courseCard, { backgroundColor: colors.card }]}
               activeOpacity={0.7}
               onPress={() => navigation.navigate('CourseDetails' as never)}
@@ -316,8 +317,8 @@ export function ProfileScreen() {
               <Text style={[styles.courseTitle, { color: colors.text }]}>Pronunciation</Text>
               <Text style={[styles.courseSubtitle, { color: colors.textSecondary }]}>8 lessons</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[styles.courseCard, { backgroundColor: colors.card }]}
               activeOpacity={0.7}
               onPress={() => navigation.navigate('CourseDetails' as never)}
@@ -335,13 +336,11 @@ export function ProfileScreen() {
         <View style={styles.sectionContainer}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>ACCOUNT</Text>
 
-
           <ProfileOption
             title="Settings"
             icon={<Ionicons name="settings-outline" size={20} color={colors.primary} />}
             onPress={() =>  router.push('/settings')}
           />
-
         </View>
 
         {/* Support Section */}
@@ -397,7 +396,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 40,
-    marginTop:-20
   },
   headerGradient: {
     paddingVertical: 40,
@@ -475,8 +473,6 @@ const styles = StyleSheet.create({
     height: '80%',
     alignSelf: 'center',
   },
-  
-  // Achievements
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -538,7 +534,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: 'center',
   },
-  // Courses
   coursesScrollContainer: {
     paddingLeft: -2,
     paddingRight: 16,
@@ -571,7 +566,6 @@ const styles = StyleSheet.create({
   courseSubtitle: {
     fontSize: 12,
   },
-  // Section containers
   sectionContainer: {
     marginBottom: 24,
     marginHorizontal: 16,
@@ -584,8 +578,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  // Profile options
-
   option: {
     flexDirection: 'row',
     alignItems: 'center',
