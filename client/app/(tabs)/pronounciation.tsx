@@ -116,20 +116,15 @@ export default function PronunciationPracticeScreen() {
 
   useEffect(() => {
     const fetchWords = async () => {
-      try {
-        const response = await fetch(RANDOM_WORD_API);
-        if (!response.ok) throw new Error('Failed to fetch random words');
-        const data = await response.json();
-        setAllWords(data);
-      } catch (err) {
-        console.error('Error fetching words:', err);
+
+
         setAllWords([
           'Technology', 'Innovation', 'Creativity',
           'Success', 'Motivation', 'Inspiration', 'Knowledge', 'Wisdom',
           'Experience', 'Opportunity', 'Challenge', 'Solution', 'Progress',
           'Development', 'Achievement', 'Happiness', 'Gratitude', 'Kindness'
         ]);
-      }
+
     };
     fetchWords();
     fetchPronunciationHistory();

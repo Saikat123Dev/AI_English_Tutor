@@ -1,5 +1,4 @@
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { Ionicons } from "@expo/vector-icons";
 import { Redirect, Tabs, useNavigation } from "expo-router";
 import React, { useRef } from "react";
 import { Animated, NativeScrollEvent, NativeSyntheticEvent, StyleSheet, View } from "react-native";
@@ -85,186 +84,172 @@ export default function TabLayout() {
     return <Redirect href="/auth/complete-your-account" />;
   }
 
-  const handleTabPress = (tabName: string) => {
-    const prevTab = previousTab.current;
-    previousTab.current = tabName;
+  // const handleTabPress = (tabName: string) => {
+  //   const prevTab = previousTab.current;
+  //   previousTab.current = tabName;
 
-    // Always show the tab bar when changing tabs
-    isScrollingDown.current = false;
-    Animated.spring(tabBarTranslateY, {
-      toValue: 0,
-      useNativeDriver: true,
-      friction: 8,
-    }).start();
+  //   // Always show the tab bar when changing tabs
+  //   isScrollingDown.current = false;
+  //   Animated.spring(tabBarTranslateY, {
+  //     toValue: 0,
+  //     useNativeDriver: true,
+  //     friction: 8,
+  //   }).start();
 
-    // Reset previous tab animations
-    Animated.parallel([
-      Animated.timing(opacityValues[prevTab], {
-        toValue: 0.7,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateYValues[prevTab], {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  //   // Reset previous tab animations
+  //   Animated.parallel([
+  //     Animated.timing(opacityValues[prevTab], {
+  //       toValue: 0.7,
+  //       duration: 200,
+  //       useNativeDriver: true,
+  //     }),
+  //     Animated.timing(translateYValues[prevTab], {
+  //       toValue: 0,
+  //       duration: 200,
+  //       useNativeDriver: true,
+  //     }),
+  //   ]).start();
 
-    // Animate new tab
-    Animated.parallel([
-      Animated.timing(opacityValues[tabName], {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.sequence([
-        Animated.spring(translateYValues[tabName], {
-          toValue: -12,
-          tension: 60,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-        Animated.spring(translateYValues[tabName], {
-          toValue: -5,
-          friction: 6,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.sequence([
-        Animated.timing(glowValues[tabName], {
-          toValue: 1,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowValues[tabName], {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.sequence([
-        Animated.timing(animationValues[tabName], {
-          toValue: 0.9,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.spring(animationValues[tabName], {
-          toValue: 1.1,
-          tension: 80,
-          friction: 5,
-          useNativeDriver: true,
-        }),
-        Animated.spring(animationValues[tabName], {
-          toValue: 1,
-          friction: 6,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-  };
+  //   // Animate new tab
+  //   Animated.parallel([
+  //     Animated.timing(opacityValues[tabName], {
+  //       toValue: 1,
+  //       duration: 200,
+  //       useNativeDriver: true,
+  //     }),
+  //     Animated.sequence([
+  //       Animated.spring(translateYValues[tabName], {
+  //         toValue: -12,
+  //         tension: 60,
+  //         friction: 7,
+  //         useNativeDriver: true,
+  //       }),
+  //       Animated.spring(translateYValues[tabName], {
+  //         toValue: -5,
+  //         friction: 6,
+  //         useNativeDriver: true,
+  //       }),
+  //     ]),
+  //     Animated.sequence([
+  //       Animated.timing(glowValues[tabName], {
+  //         toValue: 1,
+  //         duration: 150,
+  //         useNativeDriver: true,
+  //       }),
+  //       Animated.timing(glowValues[tabName], {
+  //         toValue: 0,
+  //         duration: 300,
+  //         useNativeDriver: true,
+  //       }),
+  //     ]),
+  //     Animated.sequence([
+  //       Animated.timing(animationValues[tabName], {
+  //         toValue: 0.9,
+  //         duration: 100,
+  //         useNativeDriver: true,
+  //       }),
+  //       Animated.spring(animationValues[tabName], {
+  //         toValue: 1.1,
+  //         tension: 80,
+  //         friction: 5,
+  //         useNativeDriver: true,
+  //       }),
+  //       Animated.spring(animationValues[tabName], {
+  //         toValue: 1,
+  //         friction: 6,
+  //         useNativeDriver: true,
+  //       }),
+  //     ]),
+  //   ]).start();
+  // };
 
-  const CustomTabBarIcon = ({ name, focused, tabName }: {
-    name: React.ComponentProps<typeof Ionicons>['name'];
-    focused: boolean;
-    tabName: string;
-  }) => {
-    const scale = animationValues[tabName];
-    const translateY = translateYValues[tabName];
-    const opacity = opacityValues[tabName];
-    const glow = glowValues[tabName];
+  // const CustomTabBarIcon = ({ name, focused, tabName }: {
+  //   name: React.ComponentProps<typeof Ionicons>['name'];
+  //   focused: boolean;
+  //   tabName: string;
+  // }) => {
+  //   const scale = animationValues[tabName];
+  //   const translateY = translateYValues[tabName];
+  //   const opacity = opacityValues[tabName];
+  //   const glow = glowValues[tabName];
 
-    return (
-      <Animated.View
-        style={{
-          transform: [{ scale }, { translateY }],
-          opacity,
-          alignItems: 'center',
-          justifyContent: 'center',
-          flex: 1,
-          paddingVertical: 8,
-        }}
-      >
-        <Animated.View
-          style={{
-            position: 'absolute',
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: 'rgba(124, 58, 237, 0.2)',
-            opacity: glow.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, 0.6],
-            }),
-          }}
-        />
-        <View
-          style={[
-            styles.iconContainer,
-            focused && styles.activeIconContainer,
-          ]}
-        >
-          <Ionicons
-            size={TAB_ICON_SIZE}
-            name={name}
-            color={focused ? '#FFF' : 'rgba(255,255,255,0.7)'}
-          />
-        </View>
+  //   return (
+  //     <Animated.View
+  //       style={{
+  //         transform: [{ scale }, { translateY }],
+  //         opacity,
+  //         alignItems: 'center',
+  //         justifyContent: 'center',
+  //         flex: 1,
+  //         paddingVertical: 8,
+  //       }}
+  //     >
+  //       <Animated.View
+  //         style={{
+  //           position: 'absolute',
+  //           width: 44,
+  //           height: 44,
+  //           borderRadius: 22,
+  //           backgroundColor: 'rgba(124, 58, 237, 0.2)',
+  //           opacity: glow.interpolate({
+  //             inputRange: [0, 1],
+  //             outputRange: [0, 0.6],
+  //           }),
+  //         }}
+  //       />
+  //       <View
+  //         style={[
+  //           styles.iconContainer,
+  //           focused && styles.activeIconContainer,
+  //         ]}
+  //       >
+  //         <Ionicons
+  //           size={TAB_ICON_SIZE}
+  //           name={name}
+  //           color={focused ? '#FFF' : 'rgba(255,255,255,0.7)'}
+  //         />
+  //       </View>
 
-        {focused && (
-          <Animated.View
-            style={[
-              styles.activeIndicator,
-              {
-                transform: [{
-                  scaleX: glow.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [1, 1.2],
-                  })
-                }]
-              }
-            ]}
-          />
-        )}
-      </Animated.View>
-    );
-  };
+  //       {focused && (
+  //         <Animated.View
+  //           style={[
+  //             styles.activeIndicator,
+  //             {
+  //               transform: [{
+  //                 scaleX: glow.interpolate({
+  //                   inputRange: [0, 1],
+  //                   outputRange: [1, 1.2],
+  //                 })
+  //               }]
+  //             }
+  //           ]}
+  //         />
+  //       )}
+  //     </Animated.View>
+  //   );
+  // };
 
   return (
     <ScrollContext.Provider value={{
       handleScroll,
-      tabBarHeight: totalTabBarHeight
+      tabBarHeight: 0
     }}>
       <View style={styles.container}>
         <Tabs
           screenOptions={{
             tabBarShowLabel: false,
             headerShown: false,
-            tabBarStyle: [
-              styles.tabBar,
-              {
-                height: totalTabBarHeight,
-                paddingBottom: insets.bottom + 4,
-                width: TAB_BAR_WIDTH,
-                alignSelf: 'center',
-                transform: [{ translateY: tabBarTranslateY }],
-              },
-            ],
+            tabBarStyle: {
+              display: 'none', // This hides the tab bar
+            },
           }}
         >
           {tabs.map((tab) => (
             <Tabs.Screen
               key={tab.name}
               name={tab.name}
-              listeners={{ tabPress: () => handleTabPress(tab.name) }}
               options={{
-                tabBarIcon: ({ focused }) => (
-                  <CustomTabBarIcon
-                    name={getIconName(tab.name, focused)}
-                    focused={focused}
-                    tabName={tab.name}
-                  />
-                ),
+                tabBarIcon: ({ focused }) => null, // No need for icons
               }}
             />
           ))}
@@ -274,17 +259,17 @@ export default function TabLayout() {
   );
 }
 
-function getIconName(tab: string, focused: boolean) {
-  const icons = {
-    index: { active: "home", inactive: "home-outline" },
-    conversation: { active: "chatbubble-ellipses", inactive: "chatbubble-ellipses-outline" },
-    grammer: { active: "book", inactive: "book-outline" },
-    pronounciation: { active: "mic", inactive: "mic-outline" },
-    vocubulary: { active: "library", inactive: "library-outline" },
-    profile: { active: "person-circle", inactive: "person-circle-outline" },
-  };
-  return focused ? icons[tab].active : icons[tab].inactive;
-}
+// function getIconName(tab: string, focused: boolean) {
+//   const icons = {
+//     index: { active: "home", inactive: "home-outline" },
+//     conversation: { active: "chatbubble-ellipses", inactive: "chatbubble-ellipses-outline" },
+//     grammer: { active: "book", inactive: "book-outline" },
+//     pronounciation: { active: "mic", inactive: "mic-outline" },
+//     vocubulary: { active: "library", inactive: "library-outline" },
+//     profile: { active: "person-circle", inactive: "person-circle-outline" },
+//   };
+//   return focused ? icons[tab].active : icons[tab].inactive;
+// }
 
 const styles = StyleSheet.create({
   container: {
