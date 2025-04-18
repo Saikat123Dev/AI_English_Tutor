@@ -3,6 +3,7 @@ import { FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-ico
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Speech from 'expo-speech';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -37,6 +38,7 @@ export default function ConversationScreen() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollEndTimer = useRef<NodeJS.Timeout | null>(null);
   const [suggestions, setSuggestions] = useState([]);
@@ -56,7 +58,6 @@ export default function ConversationScreen() {
   const typingAnimation = useRef(new Animated.Value(0)).current;
   const windowHeight = Dimensions.get('window').height;
 
-  // Get scroll context for tab bar animation
   const { handleScroll: tabBarScrollHandler, tabBarHeight } = useContext(ScrollContext);
 
   const setFallbackSuggestions = () => {
@@ -66,6 +67,22 @@ export default function ConversationScreen() {
       "What's your favorite hobby?",
       "How do I improve my vocabulary?"
     ]);
+  };
+
+  const speakText = (text: string) => {
+    if (isSpeaking) {
+      Speech.stop();
+      setIsSpeaking(false);
+      return;
+    }
+
+    setIsSpeaking(true);
+    Speech.speak(text, {
+      language: 'en',
+      onDone: () => setIsSpeaking(false),
+      onStopped: () => setIsSpeaking(false),
+      onError: () => setIsSpeaking(false)
+    });
   };
 
   const startTypingAnimation = () => {
@@ -138,7 +155,6 @@ export default function ConversationScreen() {
       ])
     ).start();
   };
-
 
   const animateFloatingAssistant = (show: boolean) => {
     setShowFloatingAssistant(show);
@@ -214,6 +230,11 @@ export default function ConversationScreen() {
     };
 
     fetchInitialQuestions();
+
+    // Clean up speech on unmount
+    return () => {
+      Speech.stop();
+    };
   }, []);
 
   useEffect(() => {
@@ -232,8 +253,6 @@ export default function ConversationScreen() {
       typingAnimation.setValue(0);
     }
   }, [isLoading]);
-
-
 
   const scrollToTop = () => {
     if (scrollViewRef.current) {
@@ -316,7 +335,6 @@ export default function ConversationScreen() {
 
       if (data.success) {
         const formattedResponse = formatResponseFromAPI(data);
-
 
         setTimeout(() => {
           setMessages(prev => [...prev, {
@@ -591,9 +609,21 @@ export default function ConversationScreen() {
           {message.sections.map((section: any, index: number) => (
             <View key={index} style={styles.messageSection}>
               {section.type === 'answer' && (
-                <Text style={[styles.messageText, styles.assistantMessageText]}>
-                  {section.content}
-                </Text>
+                <>
+                  <Text style={[styles.messageText, styles.assistantMessageText]}>
+                    {section.content}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.speakButton}
+                    onPress={() => speakText(section.content)}
+                  >
+                    <Ionicons
+                      name={isSpeaking ? "volume-mute" : "volume-high"}
+                      size={20}
+                      color={isSpeaking ? "#FF5722" : "#23cc96"}
+                    />
+                  </TouchableOpacity>
+                </>
               )}
 
               {section.type === 'explanation' && (
@@ -663,6 +693,16 @@ export default function ConversationScreen() {
         <Text style={[styles.messageText, styles.assistantMessageText]}>
           {message.content}
         </Text>
+        <TouchableOpacity
+          style={styles.speakButton}
+          onPress={() => speakText(message.content)}
+        >
+          <Ionicons
+            name={isSpeaking ? "volume-mute" : "volume-high"}
+            size={20}
+            color={isSpeaking ? "#FF5722" : "#23cc96"}
+          />
+        </TouchableOpacity>
         <Text style={[styles.timestamp, styles.assistantTimestamp]}>
           {message.timestamp}
         </Text>
@@ -725,13 +765,9 @@ export default function ConversationScreen() {
     );
   };
 
-
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar backgroundColor="#1E1E2E" barStyle="light-content" />
-
-
 
       {/* Topic Badge */}
       {renderTopicBadge()}
@@ -756,8 +792,6 @@ export default function ConversationScreen() {
               }
             ]}
           >
-
-
             <View style={[
               styles.messageBubble,
               message.role === 'user' ? styles.userBubble : styles.assistantBubble,
@@ -765,8 +799,6 @@ export default function ConversationScreen() {
             ]}>
               {renderMessageContent(message)}
             </View>
-
-
           </Animated.View>
         ))}
 
@@ -787,8 +819,6 @@ export default function ConversationScreen() {
             </View>
           </View>
         )}
-
-
 
         {/* Suggestions */}
         {!isLoading && suggestions.length > 0 && (
@@ -856,8 +886,6 @@ export default function ConversationScreen() {
         </TouchableOpacity>
       </Animated.View>
 
-
-
       {/* Input Area */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -893,8 +921,6 @@ export default function ConversationScreen() {
           </View>
         </BlurView>
       </KeyboardAvoidingView>
-
-
     </View>
   );
 }
@@ -989,7 +1015,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   assistantMessageText: {
-    color: '#f2f0f0', 
+    color: '#f2f0f0',
   },
   timestamp: {
     fontSize: 12,
@@ -1000,14 +1026,26 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
   },
   assistantTimestamp: {
-    color: 'rgba(220, 221, 222, 0.8)', 
+    color: 'rgba(220, 221, 222, 0.8)',
+  },
+
+  // Speak Button
+  speakButton: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    padding: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(35, 204, 150, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(35, 204, 150, 0.3)',
   },
 
   // Welcome Card
   welcomeCard: {
     borderRadius: 20,
     overflow: 'hidden',
-    marginBottom: 24, // More space
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
@@ -1015,11 +1053,11 @@ const styles = StyleSheet.create({
     elevation: 5,
     backgroundColor: '#23cc96',
     borderWidth: 1,
-    borderColor: '#202225', // Discord dark border
+    borderColor: '#202225',
   },
   welcomeGradient: {
     padding: 20,
-    backgroundColor: '#23cc96', // Fallback if gradient not used
+    backgroundColor: '#23cc96',
   },
   welcomeHeader: {
     flexDirection: 'row',
@@ -1030,12 +1068,12 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#5865F2', // Discord blue
+    backgroundColor: '#5865F2',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
     borderWidth: 1,
-    borderColor: '#4752C4', // Slightly darker blue border
+    borderColor: '#4752C4',
   },
   welcomeAvatarInner: {
     width: 46,
@@ -1060,42 +1098,42 @@ const styles = StyleSheet.create({
   },
   welcomeSubtitle: {
     fontSize: 12,
-    color: '#B9BBBE', // Discord subtitle color
+    color: '#B9BBBE',
   },
   welcomeText: {
     fontSize: 16,
-    color: '#DCDDDE', // Discord text color
-    lineHeight: 24, // Increased line height
+    color: '#DCDDDE',
+    lineHeight: 24,
     marginBottom: 16,
   },
   welcomeDivider: {
     height: 1,
-    backgroundColor: '#40444B', // Discord separator color
+    backgroundColor: '#40444B',
     marginBottom: 16,
   },
   welcomeTips: {
-    gap: 14, // Increased spacing between tips
+    gap: 14,
   },
   tipItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   tipIconContainer: {
-    width: 32, // Slightly larger
+    width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(88, 101, 242, 0.15)', // Discord blue tint
+    backgroundColor: 'rgba(88, 101, 242, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
     borderWidth: 1,
-    borderColor: 'rgba(88, 101, 242, 0.3)', // Subtle border
+    borderColor: 'rgba(88, 101, 242, 0.3)',
   },
   tipText: {
     fontSize: 14,
-    color: '#DCDDDE', // Discord text color
+    color: '#DCDDDE',
     flex: 1,
-    lineHeight: 20, // Better readability
+    lineHeight: 20,
   },
 
   // Message Sections
@@ -1178,7 +1216,7 @@ typingDotsContainer: {
   flexDirection: 'row',
   alignItems: 'center',
   marginRight: 8,
-  backgroundColor: 'rgba(42, 57, 66, 0.9)', 
+  backgroundColor: 'rgba(42, 57, 66, 0.9)',
   paddingHorizontal: 12,
   paddingVertical: 8,
   borderRadius: 16,
@@ -1187,7 +1225,7 @@ typingDot: {
   width: 8,
   height: 8,
   borderRadius: 4,
-  backgroundColor: '#23cc96', 
+  backgroundColor: '#23cc96',
   marginHorizontal: 2,
 },
 typingText: {
@@ -1196,11 +1234,11 @@ typingText: {
   marginLeft: 4,
 },
 typingBubble: {
-  backgroundColor: 'rgba(42, 57, 66, 0.9)', 
+  backgroundColor: 'rgba(42, 57, 66, 0.9)',
   borderRadius: 16,
   paddingHorizontal: 12,
   paddingVertical: 8,
-  borderWidth: 2, 
+  borderWidth: 2,
 },
 
 
@@ -1243,7 +1281,7 @@ typingBubble: {
   scrollUpButton: {
     width: 45,
     height: 45,
-    backgroundColor: 'rgba(0, 128, 128, 0.3)',  
+    backgroundColor: 'rgba(0, 128, 128, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1254,7 +1292,7 @@ typingBubble: {
     paddingBottom: 20,
     backgroundColor: '#03302c',
   },
-  
+
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1262,9 +1300,9 @@ typingBubble: {
     paddingHorizontal: 10,
     backgroundColor: '#2a3942',
     borderWidth: 2,
-    borderColor: '#1f2a30', 
+    borderColor: '#1f2a30',
   },
-  
+
   input: {
     flex: 1,
     fontSize: 16,
@@ -1274,11 +1312,11 @@ typingBubble: {
     maxHeight: 100,
     backgroundColor: '03302c',
   },
-  
+
 sendButton: {
   width: 35,
   height: 35,
-  borderRadius: 20, 
+  borderRadius: 20,
   justifyContent: 'center',
   alignItems: 'center',
   backgroundColor: '#064739',
@@ -1286,7 +1324,7 @@ sendButton: {
 },
 sendButtonDisabled: {
   opacity: 0.7,
-  backgroundColor: '#062e25', 
+  backgroundColor: '#062e25',
 },
 sendButtonGradient: {
   width: 35,
@@ -1294,6 +1332,6 @@ sendButtonGradient: {
   borderRadius: 20,
   justifyContent: 'center',
   alignItems: 'center',
-  backgroundColor: '#00a884', 
+  backgroundColor: '#00a884',
 },
 });
