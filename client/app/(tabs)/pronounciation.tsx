@@ -28,7 +28,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollContext } from './ScrollContext';
 
 const API_BASE_URL = 'https://ai-english-tutor-9ixt.onrender.com/api/pronounciation';
-const RANDOM_WORD_API = 'https://random-word-api.herokuapp.com/word?number=50';
+
 const DICTIONARY_API = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
