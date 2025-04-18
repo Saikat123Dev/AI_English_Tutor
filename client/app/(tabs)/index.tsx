@@ -7,7 +7,7 @@ import { Animated, Dimensions, Easing, Pressable, ScrollView, StyleSheet, Text, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
-const nodeCount = 16;
+const nodeCount = 10;
 
 export default function HomeScreen() {
   const [activeTab] = useState('home');
@@ -30,7 +30,7 @@ export default function HomeScreen() {
       return {
         x: centerX + Math.cos(angle) * distance,
         y: centerY + Math.sin(angle) * distance,
-        size: Math.random() * 70 + 30,
+        size: Math.random() * 110 + 70,
         delay: Math.random() * 3000,
         duration: Math.random() * 2000 + 2000,
         color: `rgba(${Math.floor(Math.random() * 100 + 155)}, ${Math.floor(Math.random() * 100 + 155)}, 255, 0.9)`
@@ -176,7 +176,7 @@ export default function HomeScreen() {
       {/* Enhanced Background with Animated Nodes and Connections */}
       <View style={styles.backgroundContainer}>
         <LinearGradient
-          colors = {['#041b1a', '#03302c', '#041b1a']}
+          colors = {['#041b1a', '#06403a', '#041b1a']}
 
           style={styles.backgroundGradient}
           start={{ x: 0.5, y: 0 }}
@@ -247,7 +247,7 @@ export default function HomeScreen() {
         <View style={styles.goalContainer}>
           <View style={[styles.goalCard, { 
             backgroundColor: '#07403b',
-            borderWidth: 1,
+            borderWidth: 2,
             borderColor: theme.cardBorder,
           }]}>
             <View style={styles.blurOverlay} />
