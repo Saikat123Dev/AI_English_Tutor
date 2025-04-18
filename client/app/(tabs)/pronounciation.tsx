@@ -669,7 +669,7 @@ export default function PronunciationPracticeScreen() {
         }}
       >
         <LinearGradient
-  colors={['#2a1a5e', '#1a0d3a', '#0f0825']}
+  colors={['#06403a', '#032420', '#06403a']}
   style={styles.gradientCard}
   start={{ x: 0, y: 0 }}
   end={{ x: 1, y: 1 }}
@@ -876,7 +876,11 @@ export default function PronunciationPracticeScreen() {
   });
 
   return (
+
+    
+    
     <SafeAreaView style={styles.container}>
+      
     <ScrollView
       ref={scrollViewRef}
       style={styles.scrollView}
@@ -884,6 +888,7 @@ export default function PronunciationPracticeScreen() {
       onScroll={combinedScrollHandler}
       scrollEventThrottle={16}
     >
+      
         <View style={styles.header}>
           <Text style={styles.title}>Pronunciation Practice</Text>
           <View style={styles.userInfoContainer}>
@@ -916,6 +921,7 @@ export default function PronunciationPracticeScreen() {
           </View>
           {showSearchResults && searchResults.length > 0 && (
             <View style={styles.searchResultsContainer}>
+              
               <ScrollView
                 style={styles.searchResultsScroll}
                 keyboardShouldPersistTaps="handled"
@@ -935,6 +941,7 @@ export default function PronunciationPracticeScreen() {
           )}
         </Animated.View>
 
+        
         <Animated.View style={[styles.wordsListContainer, { opacity: fadeAnim }]}>
           <Text style={styles.sectionTitle}>Practice Words</Text>
           <ScrollView
@@ -1129,6 +1136,7 @@ export default function PronunciationPracticeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#02201c',
   },
   scrollView: {
     flex: 1,
@@ -1147,6 +1155,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: {width: 1, height: 1},
+    textShadowRadius: 2,
   },
   userInfoContainer: {
     flexDirection: 'row',
@@ -1166,17 +1177,17 @@ const styles = StyleSheet.create({
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(30, 11, 75, 0.7)',
+    backgroundColor: 'rgba(6, 64, 58, 0.7)',
     borderRadius: 12,
     padding: 10,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#0a7e6e',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 5,
+    elevation: 4,
   },
   searchIcon: {
     marginRight: 10,
@@ -1196,16 +1207,16 @@ const styles = StyleSheet.create({
     top: 60,
     left: 0,
     right: 0,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#06403a',
     borderRadius: 12,
     maxHeight: 200,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#0a7e6e',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 6,
     zIndex: 20,
   },
   searchResultsScroll: {
@@ -1214,7 +1225,7 @@ const styles = StyleSheet.create({
   searchResultItem: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: '#0a7e6e',
   },
   searchResultText: {
     fontSize: 16,
@@ -1238,18 +1249,22 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     marginRight: 12,
+    backgroundColor: '#06403a',
+    borderWidth: 1,
+    borderColor: '#0a7e6e',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 5,
+    elevation: 4,
   },
   selectedWordCard: {
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowColor: '#0a7e6e',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 8,
+    borderColor: '#10b981',
   },
   gradientCard: {
     flex: 1,
@@ -1274,32 +1289,32 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   easyBadge: {
-    backgroundColor: 'rgba(74, 222, 128, 0.2)',
+    backgroundColor: 'rgba(16, 185, 129, 0.3)',
   },
   mediumBadge: {
-    backgroundColor: 'rgba(251, 191, 36, 0.2)',
+    backgroundColor: 'rgba(245, 158, 11, 0.3)',
   },
   hardBadge: {
-    backgroundColor: 'rgba(248, 113, 113, 0.2)',
+    backgroundColor: 'rgba(239, 68, 68, 0.3)',
   },
   difficultyText: {
     fontSize: 12,
     fontWeight: '500',
     marginLeft: 4,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.9)',
   },
   selectedWordContainer: {
-    backgroundColor: 'rgba(30, 11, 75, 0.7)',
+    backgroundColor: '#06403a',
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#0a7e6e',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
   },
   selectedWordHeader: {
     flexDirection: 'row',
@@ -1314,7 +1329,7 @@ const styles = StyleSheet.create({
   selectedWordValue: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#7C3AED',
+    color: '#10b981',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -1341,8 +1356,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#7C3AED',
+    backgroundColor: '#10b981',
     borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
   },
   retryButtonText: {
     color: '#FFFFFF',
@@ -1365,23 +1385,33 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   playButton: {
-    backgroundColor: '#7C3AED',
+    backgroundColor: '#10b981',
     padding: 10,
     borderRadius: 50,
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
   },
   playingButton: {
-    backgroundColor: '#5B21B6',
+    backgroundColor: '#059669',
   },
   definitionContainer: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#06403a',
     padding: 12,
     borderRadius: 8,
     borderLeftWidth: 4,
-    borderLeftColor: '#7C3AED',
+    borderLeftColor: '#10b981',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   partOfSpeech: {
     fontSize: 14,
@@ -1400,10 +1430,17 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
   },
   pronunciationTipsContainer: {
-    backgroundColor: 'rgba(30, 11, 75, 0.7)',
+    backgroundColor: '#06403a',
     borderRadius: 12,
     padding: 16,
     gap: 12,
+    borderWidth: 1,
+    borderColor: '#0a7e6e',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 4,
   },
   tipsTitle: {
     fontSize: 16,
@@ -1438,9 +1475,9 @@ const styles = StyleSheet.create({
   soundHighlight: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#7C3AED',
+    color: '#10b981',
     marginRight: 8,
-    backgroundColor: 'rgba(124, 58, 237, 0.2)',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
     padding: 4,
     borderRadius: 4,
     overflow: 'hidden',
@@ -1465,12 +1502,17 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
   },
   recordingContainer: {
-    backgroundColor: 'rgba(30, 11, 75, 0.7)',
+    backgroundColor: '#06403a',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#0a7e6e',
     gap: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 4,
   },
   recordingTitle: {
     fontSize: 16,
@@ -1494,18 +1536,18 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#7C3AED',
+    backgroundColor: '#10b981',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#7C3AED',
+    shadowColor: '#10b981',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 6,
   },
   recordingInProgress: {
-    backgroundColor: '#DC2626',
-    shadowColor: '#DC2626',
+    backgroundColor: '#dc2626',
+    shadowColor: '#dc2626',
   },
   recordButtonText: {
     color: '#FFFFFF',
@@ -1518,12 +1560,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: 'rgba(124, 58, 237, 0.2)',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
     borderRadius: 8,
     gap: 8,
+    borderWidth: 1,
+    borderColor: '#10b981',
   },
   playRecordingText: {
-    color: '#7C3AED',
+    color: '#10b981',
     fontSize: 16,
     fontWeight: '500',
   },
@@ -1534,21 +1578,21 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   submittingText: {
-    color: '#7C3AED',
+    color: '#10b981',
     fontSize: 16,
   },
   feedbackContainer: {
-    backgroundColor: 'rgba(30, 11, 75, 0.7)',
+    backgroundColor: '#06403a',
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#0a7e6e',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
   feedbackTitle: {
     fontSize: 18,
@@ -1565,15 +1609,15 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#10B981',
+    backgroundColor: '#10b981',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 6,
   },
   accuracyText: {
     fontSize: 28,
@@ -1615,34 +1659,41 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   encouragementContainer: {
-    backgroundColor: 'rgba(236, 72, 153, 0.2)',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#10b981',
   },
   encouragementIcon: {
     marginRight: 12,
-    color: '#EC4899',
+    color: '#10b981',
   },
   encouragementText: {
     flex: 1,
     fontSize: 15,
-    color: '#EC4899',
+    color: '#10b981',
     lineHeight: 20,
   },
   rerecordButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#7C3AED',
+    backgroundColor: '#10b981',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
     gap: 8,
     marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 4,
   },
   rerecordButtonText: {
     color: 'white',
@@ -1653,17 +1704,17 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   historyItem: {
-    backgroundColor: 'rgba(30, 11, 75, 0.7)',
+    backgroundColor: '#06403a',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#0a7e6e',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   historyHeader: {
     flexDirection: 'row',
@@ -1680,16 +1731,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: 'rgba(74, 222, 128, 0.2)',
   },
   highAccuracy: {
-    backgroundColor: 'rgba(74, 222, 128, 0.2)',
+    backgroundColor: 'rgba(16, 185, 129, 0.3)',
   },
   mediumAccuracy: {
-    backgroundColor: 'rgba(251, 191, 36, 0.2)',
+    backgroundColor: 'rgba(245, 158, 11, 0.3)',
   },
   lowAccuracy: {
-    backgroundColor: 'rgba(248, 113, 113, 0.2)',
+    backgroundColor: 'rgba(239, 68, 68, 0.3)',
   },
   historyAccuracyText: {
     fontSize: 14,
@@ -1710,9 +1760,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
     paddingHorizontal: 10,
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#02201c',
     borderRadius: 8,
     gap: 6,
+    borderWidth: 1,
+    borderColor: '#0a7e6e',
   },
   historyActionText: {
     fontSize: 14,
@@ -1723,14 +1775,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#02201c',
     borderRadius: 8,
     marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#0a7e6e',
   },
   viewMoreText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#7C3AED',
+    color: '#10b981',
     marginRight: 4,
   },
 });

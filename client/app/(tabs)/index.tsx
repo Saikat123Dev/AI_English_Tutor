@@ -369,7 +369,7 @@ export default function HomeScreen() {
           <View style={styles.quickActions}>
             <Pressable
               style={[styles.quickAction, { 
-                backgroundColor: 'rgba(124, 58, 237, 0.2)',
+                backgroundColor: '#07403b',
                 borderWidth: 2,
                 borderColor: theme.cardBorder,
               }]}
@@ -390,7 +390,7 @@ export default function HomeScreen() {
 
             <Pressable
               style={[styles.quickAction, { 
-                backgroundColor: 'rgba(124, 58, 237, 0.2)',
+                backgroundColor: '#07403b',
                 borderWidth: 2,
                 borderColor: theme.cardBorder,
               }]}
