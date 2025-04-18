@@ -319,7 +319,7 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
       select: {
         id: true,
         name: true,
-        motherToung: true,
+        motherToung: true, // Note: This should probably be "motherTongue" but keeping as is
         englishLevel: true
       },
     }).catch(err => {
@@ -334,45 +334,47 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
       });
     }
 
-  // Step 1: Get AssemblyAI transcription and analysis
-console.log("Submitting to AssemblyAI...");
-let assemblyResults;
-let pronunciationAnalysis;
-try {
-  // Pass the audioFile directly (before uploading to Cloudinary)
-  assemblyResults = await getAssemblyAITranscription(audioFile, word);
-  pronunciationAnalysis = analyzeAssemblyResults(assemblyResults, word);
-  console.log("AssemblyAI results:", pronunciationAnalysis);
-} catch (error) {
-  console.error("Error with speech analysis:", error);
-  pronunciationAnalysis = {
-    detectedText: "Analysis failed",
-    wordMatch: false,
-    confidenceScore: 0,
-    accuracyScore: 0,
-    error: error.message
-  };
-}
+    // Step 1: Get AssemblyAI transcription and analysis
+    console.log("Submitting to AssemblyAI...");
+    let assemblyResults;
+    let pronunciationAnalysis;
+    try {
+      // Pass the audioFile directly (before uploading to Cloudinary)
+      assemblyResults = await getAssemblyAITranscription(audioFile, word);
+      console.log("AssemblyAI results 1:", assemblyResults);
+      pronunciationAnalysis = analyzeAssemblyResults(assemblyResults, word);
+      console.log("AssemblyAI results:", pronunciationAnalysis);
+    } catch (error) {
+      console.error("Error with speech analysis:", error);
+      pronunciationAnalysis = {
+        detectedText: "Analysis failed",
+        wordMatch: false,
+        confidenceScore: 0,
+        accuracyScore: 0,
+        error: error.message
+      };
+    }
 
-// After AssemblyAI processing, continue with Cloudinary upload as before
-// Upload audio to Cloudinary
-let audioUrl = '';
-try {
-  const uploadResult = await cloudinary.uploader.upload(audioFile.path, {
-    resource_type: "video", // Audio files are handled as video in Cloudinary
-    public_id: `pronunciation/${uuidv4()}`,
-    folder: 'pronunciation_assessments'
-  });
-  audioUrl = uploadResult.secure_url;
-  console.log("Audio uploaded to:", audioUrl);
-} catch (uploadError) {
-  console.error("Cloudinary upload error:", uploadError);
-  return res.status(500).json({
-    success: false,
-    error: "Failed to upload audio file",
-    message: uploadError.message
-  });
-}
+    // After AssemblyAI processing, continue with Cloudinary upload
+    // Upload audio to Cloudinary
+    let audioUrl = '';
+    try {
+      const uploadResult = await cloudinary.uploader.upload(audioFile.path, {
+        resource_type: "video", // Audio files are handled as video in Cloudinary
+        public_id: `pronunciation/${uuidv4()}`,
+        folder: 'pronunciation_assessments'
+      });
+      audioUrl = uploadResult.secure_url;
+      console.log("Audio uploaded to:", audioUrl);
+    } catch (uploadError) {
+      console.error("Cloudinary upload error:", uploadError);
+      return res.status(500).json({
+        success: false,
+        error: "Failed to upload audio file",
+        message: uploadError.message
+      });
+    }
+
     // Step 2: Create a prompt for Gemini with the AssemblyAI data
     const prompt = `
       You are an expert English pronunciation coach evaluating a student's pronunciation.
@@ -420,35 +422,35 @@ try {
       }
     `;
 
+    // Create fallback response using the calculated accuracy
+    const fallbackResponse = {
+      success: true,
+      word: word,
+      accuracy: pronunciationAnalysis.accuracyScore ||
+        (pronunciationAnalysis.wordMatch ?
+          Math.round((pronunciationAnalysis.confidenceScore || 0.5) * 80) : 40),
+      correctSounds: ["General word shape", "Beginning sounds"],
+      improvementNeeded: ["Work on specific pronunciation details"],
+      commonIssues: "Unable to provide detailed analysis due to processing error",
+      practiceExercises: [
+        `Say the word slowly: ${word.split('').join('-')}`,
+        "Record yourself and compare with reference pronunciation",
+        "Practice each syllable separately"
+      ],
+      encouragement: "Keep practicing! You're making good progress.",
+      transcriptionDetails: {
+        detectedText: pronunciationAnalysis.detectedText || "",
+        confidenceScore: (pronunciationAnalysis.confidenceScore || 0) * 100
+      },
+      assemblyAiData: pronunciationAnalysis
+    };
+
     // Get the model
     try {
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
-
-      // Create fallback response using the calculated accuracy
-      const fallbackResponse = {
-        success: true,
-        word: word,
-        accuracy: pronunciationAnalysis.accuracyScore ||
-          (pronunciationAnalysis.wordMatch ?
-            Math.round((pronunciationAnalysis.confidenceScore || 0.5) * 80) : 40),
-        correctSounds: ["General word shape", "Beginning sounds"],
-        improvementNeeded: ["Work on specific pronunciation details"],
-        commonIssues: "Unable to provide detailed analysis due to processing error",
-        practiceExercises: [
-          `Say the word slowly: ${word.split('').join('-')}`,
-          "Record yourself and compare with reference pronunciation",
-          "Practice each syllable separately"
-        ],
-        encouragement: "Keep practicing! You're making good progress.",
-        transcriptionDetails: {
-          detectedText: pronunciationAnalysis.detectedText || "",
-          confidenceScore: (pronunciationAnalysis.confidenceScore || 0) * 100
-        },
-        assemblyAiData: pronunciationAnalysis
-      };
 
       // Parse the text response to JSON
       const jsonResponse = safeJsonParse(text, fallbackResponse);
@@ -502,28 +504,8 @@ try {
       console.error("AI processing error:", aiError);
 
       // Use fallback with calculated accuracy if AI fails
-      const fallbackResponse = {
-        success: true,
-        word: word,
-        accuracy: pronunciationAnalysis.accuracyScore ||
-          (pronunciationAnalysis.wordMatch ?
-            Math.round((pronunciationAnalysis.confidenceScore || 0.5) * 80) : 40),
-        correctSounds: ["General word shape", "Beginning sounds"],
-        improvementNeeded: ["Work on specific pronunciation details"],
-        commonIssues: "Unable to provide detailed analysis due to processing error",
-        practiceExercises: [
-          `Say the word slowly: ${word.split('').join('-')}`,
-          "Record yourself and compare with reference pronunciation",
-          "Practice each syllable separately"
-        ],
-        encouragement: "Keep practicing! You're making good progress.",
-        transcriptionDetails: {
-          detectedText: pronunciationAnalysis.detectedText || "",
-          confidenceScore: (pronunciationAnalysis.confidenceScore || 0) * 100
-        },
-        assemblyAiData: pronunciationAnalysis,
-        aiError: "AI processing failed: " + aiError.message
-      };
+      fallbackResponse.audioUrl = audioUrl;
+      fallbackResponse.aiError = "AI processing failed: " + aiError.message;
 
       try {
         // Save fallback response
@@ -541,11 +523,9 @@ try {
         });
 
         fallbackResponse.attemptId = savedAttempt.id;
-        fallbackResponse.audioUrl = audioUrl;
       } catch (dbError) {
         console.error("Database error saving fallback:", dbError);
         fallbackResponse.attemptId = "temporary-" + Date.now();
-        fallbackResponse.audioUrl = audioUrl;
         fallbackResponse.dbError = "Failed to save attempt";
       }
 
@@ -571,7 +551,6 @@ try {
     });
   }
 });
-
 // Rest of the router code remains the same
 // Including: /history, /tips, /compare, /recommendations, and /attempt/:id endpoints
 
