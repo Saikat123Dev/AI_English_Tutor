@@ -1,12 +1,14 @@
 import { useUser } from '@clerk/clerk-expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNetInfo } from '@react-native-community/netinfo';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   StyleSheet,
   Text,
   TextInput,
@@ -15,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { ScrollContext } from './ScrollContext';
 
 const API_BASE_URL = 'https://ai-english-tutor-9ixt.onrender.com/api'; // Replace with your actual API base URL
 
@@ -36,6 +39,16 @@ export default function VocabularyScreen() {
   const [lastOpened, setLastOpened] = useState(null);
   const [flashcardMode, setFlashcardMode] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState(null);
+  const { handleScroll, tabBarHeight } = useContext(ScrollContext);
+  const flatListRef = useRef(null);
+
+
+
+  // Combined scroll handler for both content scrolling and navbar animation
+  const combinedScrollHandler = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    handleScroll(event); // This handles the navbar animation
+    // Add any additional scroll handling logic here if needed
+  };
 
   const netInfo = useNetInfo();
 
@@ -1007,17 +1020,19 @@ export default function VocabularyScreen() {
             </View>
           )}
 
-          <FlatList
+<FlatList
             data={selectedWord.meanings}
             renderItem={({ item }) => renderMeaning(item)}
             keyExtractor={(item, index) => index.toString()}
-            contentContainerStyle={styles.meaningsList}
+            contentContainerStyle={[styles.meaningsList, { paddingBottom: tabBarHeight + 20 }]}
             ListHeaderComponent={() => (
               <TouchableOpacity style={styles.backButton} onPress={() => setSelectedWord(null)}>
                 <Icon name='arrow-back' size={20} color='#4A90E2' />
                 <Text style={styles.backButtonText}>Back to list</Text>
               </TouchableOpacity>
             )}
+            onScroll={combinedScrollHandler}
+            scrollEventThrottle={16}
           />
         </View>
       ) : !studyMode && !flashcardMode ? (

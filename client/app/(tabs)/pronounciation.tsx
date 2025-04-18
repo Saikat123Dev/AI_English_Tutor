@@ -6,13 +6,15 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
   Easing,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -23,6 +25,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScrollContext } from './ScrollContext';
 
 const API_BASE_URL = 'https://ai-english-tutor-9ixt.onrender.com/api/pronounciation';
 const RANDOM_WORD_API = 'https://random-word-api.herokuapp.com/word?number=50';
@@ -56,12 +59,18 @@ export default function PronunciationPracticeScreen() {
   const [pronunciationHistory, setPronunciationHistory] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Get scroll context for navbar animation
+  const { handleScroll, tabBarHeight } = useContext(ScrollContext);
+
   const userInfo = {
     email: user?.emailAddresses?.[0]?.emailAddress || 'user@example.com',
     motherTongue: user?.unsafeMetadata?.motherToung ?? 'Not provided',
     englishLevel: user?.unsafeMetadata?.englishLevel ?? 'Not provided',
   };
-
+  const combinedScrollHandler = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    handleScroll(event); // This handles the navbar animation
+    // Add any additional scroll handling logic here if needed
+  };
   useEffect(() => {
     if (!userInfo.motherTongue || !userInfo.englishLevel) {
       Alert.alert(
@@ -696,6 +705,7 @@ export default function PronunciationPracticeScreen() {
     const rotate = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
     return (
+
       <Animated.View style={[styles.feedbackContainer, { opacity: fadeAnim }]}>
         <Text style={styles.feedbackTitle}>Your Pronunciation Assessment</Text>
 
@@ -872,11 +882,13 @@ export default function PronunciationPracticeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.scrollView}
-        contentContainerStyle={styles.contentContainer}
-      >
+    <ScrollView
+      ref={scrollViewRef}
+      style={styles.scrollView}
+      contentContainerStyle={[styles.contentContainer, { paddingBottom: tabBarHeight + 20 }]}
+      onScroll={combinedScrollHandler}
+      scrollEventThrottle={16}
+    >
         <View style={styles.header}>
           <Text style={styles.title}>Pronunciation Practice</Text>
           <View style={styles.userInfoContainer}>
@@ -1115,6 +1127,7 @@ export default function PronunciationPracticeScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+
   );
 }
 
@@ -1124,12 +1137,12 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    backgroundColor: 'transparent', // Add this
+    backgroundColor: 'transparent',
   },
   contentContainer: {
     padding: 16,
     paddingBottom: 40,
-    backgroundColor: 'transparent', // Add this
+    backgroundColor: 'transparent',
   },
   header: {
     marginBottom: 20,
@@ -1457,7 +1470,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
   },
   recordingContainer: {
-    backgroundColor: 'rgba(30, 11, 75, 0.7)', 
+    backgroundColor: 'rgba(30, 11, 75, 0.7)',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
