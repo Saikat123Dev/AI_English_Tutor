@@ -69,12 +69,17 @@ async function getAssemblyAITranscription(audioUrl, targetWord) {
       throw new Error("Audio URL is required for transcription");
     }
 
+    // Validate audio URL format
+    if (!audioUrl.startsWith('http')) {
+      throw new Error("Invalid audio URL format");
+    }
+
     // Create a transcription request using the SDK
     const transcript = await assemblyClient.transcripts.transcribe({
       audio_url: audioUrl,
       word_boost: [targetWord],
       boost_param: "high",
-      speech_model: "universal",  // Using universal model for better accuracy
+      speech_model: "nano", // Changed to 'nano' for faster processing; use 'best' for higher accuracy if needed
       language_detection: true,
       punctuate: true,
       format_text: true,
@@ -86,18 +91,29 @@ async function getAssemblyAITranscription(audioUrl, targetWord) {
       word_confidence: true
     });
 
-    // The SDK handles polling for completion automatically
-    return transcript;
+    console.log("AssemblyAI transcription response:", transcript);
+
+    // Return structured response
+    return {
+      error: false,
+      message: "Transcription successful",
+      text: transcript.text || "",
+      words: transcript.words || [],
+      audio_duration: transcript.audio_duration || 0,
+      language_code: transcript.language_code || "en",
+      confidence: transcript.confidence || 0
+    };
   } catch (error) {
     console.error("Error with AssemblyAI transcription:", error);
-    // Return a structured error response instead of throwing
+    // Return a structured error response
     return {
       error: true,
       message: error.message || "Transcription failed",
       text: "",
       words: [],
       audio_duration: 0,
-      language_code: "en"
+      language_code: "en",
+      confidence: 0
     };
   }
 }
