@@ -59,7 +59,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 /**
  * Function to submit audio file to AssemblyAI and get transcription with analysis
- * @param {string} audioUrl - URL of the audio file to transcribe
+ * @param {Object} audioFile - The audio file object from multer
  * @param {string} targetWord - The word the user is attempting to pronounce
  * @returns {Promise<Object>} - Transcription and analysis data
  */
@@ -69,14 +69,15 @@ async function getAssemblyAITranscription(audioFile, targetWord) {
       throw new Error("Audio File is required for transcription");
     }
 
-    // Validate audio URL format
-    if (!audioUrl.startsWith('http')) {
-      throw new Error("Invalid audio URL format");
+    // Validate that the file exists
+    if (!audioFile.path || !fs.existsSync(audioFile.path)) {
+      throw new Error("Audio file path is invalid or file does not exist");
     }
 
-    // Create a transcription request using the SDK
+    // Create a transcription request using the SDK with the local file
+    // Use the path property from the file object provided by multer
     const transcript = await assemblyClient.transcripts.transcribe({
-      audio_url: audioUrl,
+      audio: fs.createReadStream(audioFile.path), // Use local file stream instead of URL
       word_boost: [targetWord],
       boost_param: "high",
       speech_model: "nano", // Changed to 'nano' for faster processing; use 'best' for higher accuracy if needed
@@ -333,54 +334,45 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
       });
     }
 
-    // Upload audio to Cloudinary
-    let audioUrl = '';
-    try {
-      const uploadResult = await cloudinary.uploader.upload(audioFile.path, {
-        resource_type: "video", // Audio files are handled as video in Cloudinary
-        public_id: `pronunciation/${uuidv4()}`,
-        folder: 'pronunciation_assessments'
-      });
-      audioUrl = uploadResult.secure_url;
-      console.log("Audio uploaded to:", audioUrl);
-    } catch (uploadError) {
-      console.error("Cloudinary upload error:", uploadError);
-      return res.status(500).json({
-        success: false,
-        error: "Failed to upload audio file",
-        message: uploadError.message
-      });
-    }
+  // Step 1: Get AssemblyAI transcription and analysis
+console.log("Submitting to AssemblyAI...");
+let assemblyResults;
+let pronunciationAnalysis;
+try {
+  // Pass the audioFile directly (before uploading to Cloudinary)
+  assemblyResults = await getAssemblyAITranscription(audioFile, word);
+  pronunciationAnalysis = analyzeAssemblyResults(assemblyResults, word);
+  console.log("AssemblyAI results:", pronunciationAnalysis);
+} catch (error) {
+  console.error("Error with speech analysis:", error);
+  pronunciationAnalysis = {
+    detectedText: "Analysis failed",
+    wordMatch: false,
+    confidenceScore: 0,
+    accuracyScore: 0,
+    error: error.message
+  };
+}
 
-    // Clean up temporary file regardless of success
-    try {
-      if (fs.existsSync(audioFile.path)) {
-        fs.unlinkSync(audioFile.path);
-      }
-    } catch (fsError) {
-      console.error("Error cleaning up temp file:", fsError);
-      // Continue processing even if cleanup fails
-    }
-
-    // Step 1: Get AssemblyAI transcription and analysis
-    console.log("Submitting to AssemblyAI...");
-    let assemblyResults;
-    let pronunciationAnalysis;
-    try {
-      assemblyResults = await getAssemblyAITranscription(audioFile, word);
-      pronunciationAnalysis = analyzeAssemblyResults(assemblyResults, word);
-      console.log("AssemblyAI results:", pronunciationAnalysis);
-    } catch (error) {
-      console.error("Error with speech analysis:", error);
-      pronunciationAnalysis = {
-        detectedText: "Analysis failed",
-        wordMatch: false,
-        confidenceScore: 0,
-        accuracyScore: 0,
-        error: error.message
-      };
-    }
-
+// After AssemblyAI processing, continue with Cloudinary upload as before
+// Upload audio to Cloudinary
+let audioUrl = '';
+try {
+  const uploadResult = await cloudinary.uploader.upload(audioFile.path, {
+    resource_type: "video", // Audio files are handled as video in Cloudinary
+    public_id: `pronunciation/${uuidv4()}`,
+    folder: 'pronunciation_assessments'
+  });
+  audioUrl = uploadResult.secure_url;
+  console.log("Audio uploaded to:", audioUrl);
+} catch (uploadError) {
+  console.error("Cloudinary upload error:", uploadError);
+  return res.status(500).json({
+    success: false,
+    error: "Failed to upload audio file",
+    message: uploadError.message
+  });
+}
     // Step 2: Create a prompt for Gemini with the AssemblyAI data
     const prompt = `
       You are an expert English pronunciation coach evaluating a student's pronunciation.
