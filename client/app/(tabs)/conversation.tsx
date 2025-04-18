@@ -45,7 +45,6 @@ export default function ConversationScreen() {
   const typingDot1 = useRef(new Animated.Value(0)).current;
   const typingDot2 = useRef(new Animated.Value(0)).current;
   const typingDot3 = useRef(new Animated.Value(0)).current;
-  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [isScrolling, setIsScrolling] = useState(false);
   const scrollUpButtonAnim = useRef(new Animated.Value(0)).current;
@@ -54,7 +53,6 @@ export default function ConversationScreen() {
   const [lastScrollPosition, setLastScrollPosition] = useState(0);
   const suggestionsEntrance = useRef(new Animated.Value(0)).current;
   const waveAnimation = useRef(new Animated.Value(0)).current;
-  const successCheckAnimation = useRef(new Animated.Value(0)).current;
   const typingAnimation = useRef(new Animated.Value(0)).current;
   const windowHeight = Dimensions.get('window').height;
 
@@ -141,21 +139,6 @@ export default function ConversationScreen() {
     ).start();
   };
 
-  const animateSuccessCheck = () => {
-    Animated.sequence([
-      Animated.timing(successCheckAnimation, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(successCheckAnimation, {
-        toValue: 0,
-        duration: 300,
-        delay: 1000,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
 
   const animateFloatingAssistant = (show: boolean) => {
     setShowFloatingAssistant(show);
@@ -250,14 +233,7 @@ export default function ConversationScreen() {
     }
   }, [isLoading]);
 
-  useEffect(() => {
-    if (showSuccessAnimation) {
-      animateSuccessCheck();
-      setTimeout(() => {
-        setShowSuccessAnimation(false);
-      }, 2000);
-    }
-  }, [showSuccessAnimation]);
+
 
   const scrollToTop = () => {
     if (scrollViewRef.current) {
@@ -341,8 +317,6 @@ export default function ConversationScreen() {
       if (data.success) {
         const formattedResponse = formatResponseFromAPI(data);
 
-        // Show success animation briefly
-        setShowSuccessAnimation(true);
 
         setTimeout(() => {
           setMessages(prev => [...prev, {
@@ -751,52 +725,7 @@ export default function ConversationScreen() {
     );
   };
 
-  const renderSuccessAnimation = () => {
-    return (
-      <Animated.View style={[
-        styles.successAnimationContainer,
-        {
-          opacity: successCheckAnimation,
-          transform: [{
-            scale: successCheckAnimation.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.8, 1]
-            })
-          }]
-        }
-      ]}>
-        <View style={styles.successCheckContainer}>
-          <Animated.View style={[
-            styles.successCheckBackground,
-            {
-              transform: [{
-                scale: successCheckAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, 1]
-                })
-              }]
-            }
-          ]} />
-          <Animated.View style={[
-            styles.successCheck,
-            {
-              opacity: successCheckAnimation,
-              transform: [
-                {
-                  scale: successCheckAnimation.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0.5, 1.1, 1]
-                  })
-                }
-              ]
-            }
-          ]}>
-            <MaterialCommunityIcons name="check" size={48} color="#4CAF50" />
-          </Animated.View>
-        </View>
-      </Animated.View>
-    );
-  };
+
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -859,8 +788,7 @@ export default function ConversationScreen() {
           </View>
         )}
 
-        {/* Success Animation Overlay */}
-        {showSuccessAnimation && renderSuccessAnimation()}
+
 
         {/* Suggestions */}
         {!isLoading && suggestions.length > 0 && (
@@ -1035,7 +963,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   userBubble: {
-    backgroundColor: '#12284d',
+    backgroundColor: '#1a3666',
     borderBottomRightRadius: 4,
     borderWidth: 1,
     borderColor: '#4752C4',
@@ -1061,18 +989,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   assistantMessageText: {
-    color: '#DCDDDE', // Discord text color
+    color: '#f2f0f0', 
   },
   timestamp: {
-    fontSize: 10,
+    fontSize: 12,
     marginTop: 4,
     alignSelf: 'flex-end',
   },
   userTimestamp: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   assistantTimestamp: {
-    color: 'rgba(220, 221, 222, 0.7)', // Match Discord text
+    color: 'rgba(220, 221, 222, 0.8)', 
   },
 
   // Welcome Card
@@ -1239,70 +1167,42 @@ const styles = StyleSheet.create({
     color: '#23cc96',
   },
 
-  // Typing Indicator
-  typingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  typingDotsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  typingDot: {
-    width: 7, // Slightly larger
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#23cc96',
-    marginHorizontal: 2,
-  },
-  typingText: {
-    fontSize: 12,
-    color: '#23cc96',
-  },
-  typingBubble: {
-    backgroundColor: '#23cc96',
-    borderWidth: 1,
-    borderColor: '#23cc96',
-  },
+// Typing Indicator
+typingContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 8,
+  paddingHorizontal: 16,
+},
+typingDotsContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginRight: 8,
+  backgroundColor: 'rgba(42, 57, 66, 0.9)', 
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 16,
+},
+typingDot: {
+  width: 8,
+  height: 8,
+  borderRadius: 4,
+  backgroundColor: '#23cc96', 
+  marginHorizontal: 2,
+},
+typingText: {
+  fontSize: 13,
+  color: '#23cc96',
+  marginLeft: 4,
+},
+typingBubble: {
+  backgroundColor: 'rgba(42, 57, 66, 0.9)', 
+  borderRadius: 16,
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderWidth: 2, 
+},
 
-  // Success Animation
-  successAnimationContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(30, 33, 36, 0.85)',
-    zIndex: 1000,
-  },
-  successCheckContainer: {
-    width: 84,
-    height: 84,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  successCheckBackground: {
-    position: 'absolute',
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: '#23cc96',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: '#23cc96',
-  },
-  successCheck: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
 
   // Suggestions
   suggestionsContainer: {
@@ -1328,69 +1228,72 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(88, 101, 242, 0.7)',
   },
   suggestionText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#23cc96',
     fontWeight: '500',
   },
 
-  // Scroll Up Button
   scrollUpButtonContainer: {
     position: 'absolute',
     bottom: 100,
     right: 16,
+    backgroundColor: 'rgba(0, 128, 128, 0.3)',
     zIndex: 100,
   },
   scrollUpButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 45,
+    height: 45,
+    backgroundColor: 'rgba(0, 128, 128, 0.3)',  
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-
-  // Input Area
   inputContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 20,
+    backgroundColor: '#03302c',
   },
-
+  
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#2a3942',
+    borderWidth: 2,
+    borderColor: '#1f2a30', 
   },
+  
   input: {
     flex: 1,
     fontSize: 16,
-    paddingVertical: 12,
-    paddingRight: 12,
-    color: '#FFF',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    color: '#FFFFFF',
     maxHeight: 100,
+    backgroundColor: '03302c',
   },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#5865F2',
-    borderWidth: 1,
-    borderColor: '#4752C4',
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-    backgroundColor: '#4752C4', // Slightly darker when disabled
-  },
-  sendButtonGradient: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#5865F2', // Fallback if gradient not used
-  },
+  
+sendButton: {
+  width: 35,
+  height: 35,
+  borderRadius: 20, 
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: '#064739',
+  borderWidth: 0,
+},
+sendButtonDisabled: {
+  opacity: 0.7,
+  backgroundColor: '#062e25', 
+},
+sendButtonGradient: {
+  width: 35,
+  height: 35,
+  borderRadius: 20,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: '#00a884', 
+},
 });

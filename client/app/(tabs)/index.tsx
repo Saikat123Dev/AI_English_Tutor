@@ -1,14 +1,13 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import { useContext, useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Dimensions, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScrollContext } from './ScrollContext'; // Import the scroll context
 
 const { width, height } = Dimensions.get('window');
-const nodeCount = 25;
+const nodeCount = 16;
 
 export default function HomeScreen() {
   const [activeTab] = useState('home');
@@ -20,13 +19,6 @@ export default function HomeScreen() {
   }))).current;
   const connectionOpacity = useRef(new Animated.Value(0)).current;
 
-  // Get the scroll handler from context
-  const { handleScroll, tabBarHeight } = useContext(ScrollContext);
-
-  // Track scroll position for local effects
-  const lastScrollY = useRef(0);
-  const scrollY = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     const initialNodePositions = Array(nodeCount).fill().map(() => {
       const centerX = Math.random() > 0.5 ? width * 0.3 : width * 0.7;
@@ -34,14 +26,14 @@ export default function HomeScreen() {
       const radius = Math.min(width, height) * 0.25;
       const angle = Math.random() * Math.PI * 2;
       const distance = Math.random() * radius;
-
+      
       return {
         x: centerX + Math.cos(angle) * distance,
         y: centerY + Math.sin(angle) * distance,
-        size: Math.random() * 15 + 5,
+        size: Math.random() * 70 + 30,
         delay: Math.random() * 3000,
         duration: Math.random() * 2000 + 2000,
-        color: `rgba(${Math.floor(Math.random() * 100 + 155)}, ${Math.floor(Math.random() * 100 + 155)}, 255, 0.5)`
+        color: `rgba(${Math.floor(Math.random() * 100 + 155)}, ${Math.floor(Math.random() * 100 + 155)}, 255, 0.9)`
       };
     });
     setNodePositions(initialNodePositions);
@@ -50,9 +42,9 @@ export default function HomeScreen() {
       const { x, y, delay, duration } = initialNodePositions[index];
       const destX = x + (Math.random() - 0.5) * width * 0.2;
       const destY = y + (Math.random() - 0.5) * height * 0.2;
-
+      
       anim.position.setValue({ x, y });
-
+      
       Animated.sequence([
         Animated.delay(delay),
         Animated.parallel([
@@ -86,13 +78,6 @@ export default function HomeScreen() {
       ]).start();
     });
 
-    // Add connection opacity animation
-    Animated.timing(connectionOpacity, {
-      toValue: 0.5,
-      duration: 2000,
-      useNativeDriver: true
-    }).start();
-
     return () => nodeAnimations.forEach(anim => {
       anim.opacity.stopAnimation();
       anim.scale.stopAnimation();
@@ -100,36 +85,23 @@ export default function HomeScreen() {
     });
   }, []);
 
-  // Combined scroll handler to handle both navbar hiding and local effects
-  const handleCombinedScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    // First call the context handler to manage navbar visibility
-    handleScroll(event);
-
-    // Then handle any local scroll effects
-    const currentScrollY = event.nativeEvent.contentOffset.y;
-    scrollY.setValue(currentScrollY);
-    lastScrollY.current = currentScrollY;
-  };
-
   const renderConnections = () => {
     const connectionDistance = Math.min(width, height) * 0.2;
-    return nodePositions.flatMap((nodeA, i) =>
+    return nodePositions.flatMap((nodeA, i) => 
       nodePositions.slice(i + 1).map((nodeB, j) => {
         const dx = nodeA.x - nodeB.x;
         const dy = nodeA.y - nodeB.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-
+        
         return distance < connectionDistance ? (
           <Animated.View
             key={`connection-${i}-${j}`}
             style={{
-              position: 'absolute',
-              left: (nodeA.x + nodeB.x) / 2,
-              top: (nodeA.y + nodeB.y) / 2,
+
               width: distance,
               height: 1,
               backgroundColor: 'rgba(255, 255, 255, 0.5)',
-              opacity: Animated.multiply(connectionOpacity,
+              opacity: Animated.multiply(connectionOpacity, 
                 Animated.subtract(1, Animated.divide(distance, connectionDistance))),
               transform: [
                 { translateX: -distance / 2 },
@@ -143,6 +115,7 @@ export default function HomeScreen() {
       })
     ).filter(Boolean);
   };
+
 
   const features = [
     {
@@ -190,7 +163,7 @@ export default function HomeScreen() {
 
   const theme = {
     text: '#FFFFFF',
-    accent: '#7C3AED',
+    accent: '#098f5e',
     secondaryText: 'rgba(255,255,255,0.7)',
     progressBackground: 'rgba(124,58,237,0.15)',
     cardBorder: 'rgba(255,255,255,0.2)',
@@ -198,33 +171,21 @@ export default function HomeScreen() {
     background: '#121212'
   };
 
-  // Animation for header elements based on scroll position
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [1, 0.8],
-    extrapolate: 'clamp'
-  });
-
-  const headerTranslateY = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [0, -10],
-    extrapolate: 'clamp'
-  });
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Enhanced Background with Animated Nodes and Connections */}
       <View style={styles.backgroundContainer}>
         <LinearGradient
-          colors={['#1E0B4B', '#0F0824', '#0A061D']}
+          colors = {['#041b1a', '#03302c', '#041b1a']}
+
           style={styles.backgroundGradient}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
         />
-
+        
         {/* Render connections */}
         {nodePositions.length > 0 && renderConnections()}
-
+        
         {/* Render nodes */}
         {nodePositions.map((node, index) => (
           <Animated.View
@@ -248,30 +209,19 @@ export default function HomeScreen() {
             }}
           />
         ))}
+        
+      
       </View>
 
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.scrollViewContent,
-          { paddingBottom: tabBarHeight + 20 } // Add padding for the tab bar
-        ]}
-        onScroll={handleCombinedScroll}
-        scrollEventThrottle={16} // Important for smooth animation
+        contentContainerStyle={styles.scrollViewContent}
       >
         {/* Header Section */}
-        <Animated.View
-          style={[
-            styles.header,
-            {
-              opacity: headerOpacity,
-              transform: [{ translateY: headerTranslateY }]
-            }
-          ]}
-        >
+        <View style={styles.header}>
           <View style={styles.profileSection}>
-            <Pressable
+            <Pressable 
               style={styles.profileButton}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -279,7 +229,7 @@ export default function HomeScreen() {
               }}
             >
               <LinearGradient
-                colors={['#6C63FF', '#A78AFF']}
+                colors={['#07403b', '#1f8079']}
                 style={styles.profileGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -291,12 +241,12 @@ export default function HomeScreen() {
 
           <Text style={[styles.welcomeText, { color: theme.text }]}>Welcome back!</Text>
           <Text style={[styles.subtitle, { color: theme.secondaryText }]}>What would you like to learn today?</Text>
-        </Animated.View>
+        </View>
 
         {/* Daily Goal Progress */}
         <View style={styles.goalContainer}>
-          <View style={[styles.goalCard, {
-            backgroundColor: 'rgba(124, 58, 237, 0.01)',
+          <View style={[styles.goalCard, { 
+            backgroundColor: '#07403b',
             borderWidth: 1,
             borderColor: theme.cardBorder,
           }]}>
@@ -326,7 +276,7 @@ export default function HomeScreen() {
               <View style={styles.progressContainer}>
                 <View style={[styles.progressBar, { backgroundColor: theme.progressBackground }]}>
                   <LinearGradient
-                    colors={['#6C63FF', '#A78AFF']}
+                    colors={['#07403b', '#A78AFF']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={[styles.progress, { width: '70%' }]}
@@ -381,8 +331,8 @@ export default function HomeScreen() {
                 styles.featureCard,
                 {
                   transform: [{ scale: pressed ? 0.95 : 1 }],
-                  backgroundColor: 'rgba(124, 58, 237, 0.2)',
-                  borderWidth: 1,
+                  backgroundColor: '#07403b',
+                  borderWidth: 2,
                   borderColor: theme.cardBorder,
                 }
               ]}
@@ -394,7 +344,7 @@ export default function HomeScreen() {
                 </View>
                 <Text style={[styles.featureTitle, { color: theme.text }]}>{feature.title}</Text>
                 <Text style={[styles.featureDescription, { color: theme.secondaryText }]}>{feature.description}</Text>
-
+                
                 <View style={styles.progressMiniContainer}>
                   <View style={[styles.progressMiniBar, { backgroundColor: theme.progressBackground }]}>
                     <LinearGradient
@@ -406,7 +356,7 @@ export default function HomeScreen() {
                   </View>
                   <Text style={[styles.progressMiniText, { color: theme.secondaryText }]}>40%</Text>
                 </View>
-
+                
               </View>
             </Pressable>
           ))}
@@ -418,9 +368,9 @@ export default function HomeScreen() {
 
           <View style={styles.quickActions}>
             <Pressable
-              style={[styles.quickAction, {
+              style={[styles.quickAction, { 
                 backgroundColor: 'rgba(124, 58, 237, 0.2)',
-                borderWidth: 1,
+                borderWidth: 2,
                 borderColor: theme.cardBorder,
               }]}
               onPress={() => {
@@ -439,9 +389,9 @@ export default function HomeScreen() {
             </Pressable>
 
             <Pressable
-              style={[styles.quickAction, {
+              style={[styles.quickAction, { 
                 backgroundColor: 'rgba(124, 58, 237, 0.2)',
-                borderWidth: 1,
+                borderWidth: 2,
                 borderColor: theme.cardBorder,
               }]}
               onPress={() => {
@@ -478,9 +428,9 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View style={[styles.activityCard, {
-            backgroundColor: 'rgba(124, 58, 237, 0.2)',
-            borderWidth: 1,
+          <View style={[styles.activityCard, { 
+            backgroundColor: '#07403b',
+            borderWidth: 2,
             borderColor: theme.cardBorder,
           }]}>
             <View style={styles.activityItem}>
@@ -523,10 +473,13 @@ export default function HomeScreen() {
               </View>
               <View style={[styles.activityBadge, { backgroundColor: 'rgba(76,217,100,0.1)' }]}>
                 <Text style={[styles.activityBadgeText, { color: '#4CD964' }]}>+50 XP</Text>
-              </View>
+                </View>
             </View>
           </View>
         </View>
+
+        {/* Bottom Spacer */}
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -553,11 +506,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollViewContent: {
-    paddingBottom: 20,
+    paddingBottom: 0,
   },
   header: {
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 10,
     paddingBottom: 8,
   },
   profileSection: {
@@ -569,7 +522,7 @@ const styles = StyleSheet.create({
   profileButton: {
     width: 50,
     height: 50,
-    borderRadius: 20,
+    borderRadius: 15,
     overflow: 'hidden',
   },
   profileGradient: {
@@ -579,12 +532,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   welcomeText: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '700',
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
   },
   goalContainer: {
@@ -593,9 +546,6 @@ const styles = StyleSheet.create({
   },
   goalCard: {
     borderRadius: 20,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    overflow: 'hidden',
-    shadowColor: '#fff',
   },
   blurOverlay: {
     position: 'absolute',
@@ -603,7 +553,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(124, 58, 237, 0.2)',
+
   },
   goalContent: {
     padding: 20,
@@ -678,8 +628,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
+  
   featuresGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -814,7 +765,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 4,
   },
-
   activityTime: {
     fontSize: 12,
     fontWeight: '500',
