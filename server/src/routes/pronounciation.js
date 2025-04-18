@@ -74,22 +74,8 @@ async function getAssemblyAITranscription(audioFile, targetWord) {
       throw new Error("Audio file path is invalid or file does not exist");
     }
 
-    // Create a transcription request using the SDK with the local file
-    // Use the path property from the file object provided by multer
     const transcript = await assemblyClient.transcripts.transcribe({
-      audio: fs.createReadStream(audioFile.path), // Use local file stream instead of URL
-      word_boost: [targetWord],
-      boost_param: "high",
-      speech_model: "nano", // Changed to 'nano' for faster processing; use 'best' for higher accuracy if needed
-      language_detection: true,
-      punctuate: true,
-      format_text: true,
-      disfluencies: true,
-      auto_highlights: true,
-      audio_start_from: 0,
-      audio_end_at: null,
-      speech_threshold: 0.2,
-      word_confidence: true
+      audio: fs.createReadStream(audioFile.path)
     });
 
     console.log("AssemblyAI transcription response:", transcript);
@@ -257,7 +243,8 @@ function analyzeAssemblyResults(transcriptionData, targetWord) {
     } else {
       analysis.note = "Target word not clearly detected in transcript";
       analysis.detectedTextInstead = detectedTextLower;
-      baseAccuracy = Math.max(20, similarity); // Minimum 20% if anything was detected
+      console.log(similarity);
+      baseAccuracy = Math.max(0, similarity); // Minimum 20% if anything was detected
     }
   }
 
@@ -377,50 +364,59 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
 
     // Step 2: Create a prompt for Gemini with the AssemblyAI data
     const prompt = `
-      You are an expert English pronunciation coach evaluating a student's pronunciation.
+    You are an expert English pronunciation coach evaluating a student's spoken word based on an uploaded **audio file**, not just transcribed text.
 
-      Student Profile:
-      - Native language: ${user.motherToung || "Unknown"}
-      - Current English level: ${user.englishLevel || "Intermediate"}
+    Your evaluation should prioritize **acoustic and phonetic accuracy**, and you should compare the student's pronunciation directly with native pronunciation standards of the word.
 
-      The student attempted to pronounce the word: "${word}"
+    ### Student Profile:
+    - Native language: ${user.motherToung || "Unknown"}
+    - Current English level: ${user.englishLevel || "Intermediate"}
 
-      Speech Analysis Data:
-      - Speech-to-text result: "${pronunciationAnalysis.detectedText}"
-      - Word match detected: ${pronunciationAnalysis.wordMatch}
-      - Confidence score: ${(pronunciationAnalysis.confidenceScore || 0) * 100}%
-      - Calculated accuracy score: ${pronunciationAnalysis.accuracyScore || 0}%
-      - Pronunciation speed: ${(pronunciationAnalysis.pronunciationSpeed || 0).toFixed(2)} characters/second
-      - Speech duration: ${(pronunciationAnalysis.totalDuration || 0).toFixed(2)} seconds
-      - Language detected: ${pronunciationAnalysis.languageDetected || "en"}
-      - Contains disfluencies: ${pronunciationAnalysis.disfluencies || false}
-      ${pronunciationAnalysis.note ? `- Note: ${pronunciationAnalysis.note}` : ''}
-      ${pronunciationAnalysis.detectedTextInstead ? `- Detected instead: "${pronunciationAnalysis.detectedTextInstead}"` : ''}
+    ### Word to Pronounce:
+    - Target Word: "${word}"
 
-      Based on this data, please evaluate:
-      1. Overall accuracy (percentage from 0-100%, considering both the transcription match and confidence score, use the calculated accuracy score provided as a guide but you can adjust it if warranted)
-      2. Specific sounds that were likely pronounced correctly
-      3. Specific sounds that likely need improvement
-      4. Common pronunciation issues for speakers of their native language when saying this word
-      5. Practice tips tailored to their specific difficulties
+    ### Audio Analysis:
+    You are provided with:
+    - The student's audio recording of the word ${audioFile}
+    - System-generated speech-to-text result: "${pronunciationAnalysis.detectedText}"
+    - Word match detected: ${pronunciationAnalysis.wordMatch}
+    - Confidence score: ${(pronunciationAnalysis.confidenceScore || 0) * 100}%
+    - Calculated accuracy score: ${pronunciationAnalysis.accuracyScore || 0}%
+    - Pronunciation speed: ${(pronunciationAnalysis.pronunciationSpeed || 0).toFixed(2)} characters/second
+    - Speech duration: ${(pronunciationAnalysis.totalDuration || 0).toFixed(2)} seconds
+    - Language detected in audio: ${pronunciationAnalysis.languageDetected || "en"}
+    - Contains disfluencies: ${pronunciationAnalysis.disfluencies || false}
+    ${pronunciationAnalysis.note ? `- Note: ${pronunciationAnalysis.note}` : ''}
+    ${pronunciationAnalysis.detectedTextInstead ? `- Detected instead: "${pronunciationAnalysis.detectedTextInstead}"` : ''}
 
-      IMPORTANT: Ensure your response is valid JSON with no trailing commas or syntax errors.
-      Format your response exactly like this:
-      {
-        "success": true,
-        "word": "${word}",
-        "accuracy": 85,
-        "correctSounds": ["specific sounds pronounced well"],
-        "improvementNeeded": ["specific sounds needing work"],
-        "commonIssues": "Brief explanation of typical issues for speakers of their language",
-        "practiceExercises": ["2-3 specific practice exercises"],
-        "encouragement": "Positive, encouraging feedback",
-        "transcriptionDetails": {
-          "detectedText": "${pronunciationAnalysis.detectedText || ""}",
-          "confidenceScore": ${(pronunciationAnalysis.confidenceScore || 0) * 100}
-        }
+    ### Your Task:
+    1. Analyze the **audio** to evaluate actual pronunciation vs native pronunciation.
+    2. Use the provided speech-to-text and confidence score as supplementary data.
+    3. Focus more on **phoneme-level precision**, intonation, stress, and clarity.
+
+    ### Output:
+    Please return your evaluation in valid JSON format (strictly no trailing commas) like this:
+
+    {
+      "success": true,
+      "word": "${word}",
+      "accuracy": 85,
+      "correctSounds": ["specific phonemes or syllables pronounced well"],
+      "improvementNeeded": ["specific phonemes or syllables needing improvement"],
+      "commonIssues": "Brief explanation of typical pronunciation challenges for speakers of ${user.motherToung || "this language"} when saying '${word}'",
+      "practiceExercises": [
+        "Practice breaking '${word}' into syllables and pronounce each slowly.",
+        "Record yourself saying the word and compare it with native audio (e.g., Oxford Learner Dictionary).",
+        "Use minimal pairs practice if similar sounds are getting mixed up."
+      ],
+      "encouragement": "You're doing great! With a little focused practice, your pronunciation will become even more clear and native-like. Keep it up!",
+      "transcriptionDetails": {
+        "detectedText": "${pronunciationAnalysis.detectedText || ""}",
+        "confidenceScore": ${(pronunciationAnalysis.confidenceScore || 0) * 100}
       }
+    }
     `;
+
 
     // Create fallback response using the calculated accuracy
     const fallbackResponse = {
@@ -451,7 +447,7 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
-
+     console.log(text);
       // Parse the text response to JSON
       const jsonResponse = safeJsonParse(text, fallbackResponse);
 
