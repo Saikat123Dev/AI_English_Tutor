@@ -63,10 +63,10 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
  * @param {string} targetWord - The word the user is attempting to pronounce
  * @returns {Promise<Object>} - Transcription and analysis data
  */
-async function getAssemblyAITranscription(audioUrl, targetWord) {
+async function getAssemblyAITranscription(audioFile, targetWord) {
   try {
-    if (!audioUrl) {
-      throw new Error("Audio URL is required for transcription");
+    if (!audioFile) {
+      throw new Error("Audio File is required for transcription");
     }
 
     // Validate audio URL format
@@ -367,7 +367,7 @@ router.post("/assess", upload.single('audio'), async (req, res) => {
     let assemblyResults;
     let pronunciationAnalysis;
     try {
-      assemblyResults = await getAssemblyAITranscription(audioUrl, word);
+      assemblyResults = await getAssemblyAITranscription(audioFile, word);
       pronunciationAnalysis = analyzeAssemblyResults(assemblyResults, word);
       console.log("AssemblyAI results:", pronunciationAnalysis);
     } catch (error) {

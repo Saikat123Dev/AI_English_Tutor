@@ -827,7 +827,7 @@ export default function ConversationScreen() {
               }
             ]}
           >
-            
+
 
             <View style={[
               styles.messageBubble,
@@ -837,7 +837,7 @@ export default function ConversationScreen() {
               {renderMessageContent(message)}
             </View>
 
-            
+
           </Animated.View>
         ))}
 
@@ -928,7 +928,7 @@ export default function ConversationScreen() {
         </TouchableOpacity>
       </Animated.View>
 
-    
+
 
       {/* Input Area */}
       <KeyboardAvoidingView
@@ -966,7 +966,7 @@ export default function ConversationScreen() {
         </BlurView>
       </KeyboardAvoidingView>
 
-      
+
     </View>
   );
 }
@@ -980,7 +980,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 20,
-    backgroundColor: '#03302c', 
+    backgroundColor: '#03302c',
   },
 
   // Topic Badge
@@ -1001,7 +1001,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 2,
-    backgroundColor: '#1a4499', 
+    backgroundColor: '#1a4499',
     borderWidth: 1,
     borderColor: '#4752C4',
   },
@@ -1015,7 +1015,7 @@ const styles = StyleSheet.create({
   // Message Styles
   messageRow: {
     flexDirection: 'row',
-    marginBottom: 10, 
+    marginBottom: 10,
     alignItems: 'flex-end',
   },
   userRow: {
@@ -1027,7 +1027,7 @@ const styles = StyleSheet.create({
   messageBubble: {
     padding: 12,
     borderRadius: 18,
-    maxWidth: '90%', 
+    maxWidth: '90%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
@@ -1035,16 +1035,16 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   userBubble: {
-    backgroundColor: '#12284d', 
+    backgroundColor: '#12284d',
     borderBottomRightRadius: 4,
     borderWidth: 1,
-    borderColor: '#4752C4', 
+    borderColor: '#4752C4',
   },
   assistantBubble: {
-    backgroundColor: '#1b2638', 
+    backgroundColor: '#1b2638',
     borderBottomLeftRadius: 4,
-    borderWidth: 1, 
-    borderColor: '#1a4499', 
+    borderWidth: 1,
+    borderColor: '#1a4499',
   },
   initialMessageBubble: {
     backgroundColor: 'transparent',
@@ -1172,7 +1172,7 @@ const styles = StyleSheet.create({
 
   // Message Sections
   messageSection: {
-    marginBottom: 12, 
+    marginBottom: 12,
     marginTop: 4,
   },
   sectionHeader: {
@@ -1181,20 +1181,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionIconContainer: {
-    width: 26, 
+    width: 26,
     height: 26,
     borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
-    borderWidth: 1, 
+    borderWidth: 1,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
   },
   explanationSection: {
-    backgroundColor: 'rgba(87, 242, 135, 0.1)', 
+    backgroundColor: 'rgba(87, 242, 135, 0.1)',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
@@ -1205,14 +1205,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(87, 242, 135, 0.3)',
   },
   explanationTitle: {
-    color: '#23cc96', 
+    color: '#23cc96',
   },
   feedbackSection: {
     backgroundColor: 'rgba(255, 177, 66, 0.18)',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 177, 66, 0.4)', 
+    borderColor: 'rgba(255, 177, 66, 0.4)',
   },
   feedbackIcon: {
     backgroundColor: 'rgba(255, 177, 66, 0.15)',
@@ -1225,7 +1225,7 @@ const styles = StyleSheet.create({
     color: '#DCDDDE', // Discord text color
   },
   followUpSection: {
-    backgroundColor: 'rgba(235, 69, 158, 0.2)', 
+    backgroundColor: 'rgba(235, 69, 158, 0.2)',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
@@ -1236,7 +1236,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(235, 69, 158, 0.3)',
   },
   followUpTitle: {
-    color: '#23cc96', 
+    color: '#23cc96',
   },
 
   // Typing Indicator
@@ -1262,9 +1262,9 @@ const styles = StyleSheet.create({
     color: '#23cc96',
   },
   typingBubble: {
-    backgroundColor: '#23cc96', 
+    backgroundColor: '#23cc96',
     borderWidth: 1,
-    borderColor: '#23cc96', 
+    borderColor: '#23cc96',
   },
 
   // Success Animation
@@ -1276,11 +1276,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(30, 33, 36, 0.85)', 
+    backgroundColor: 'rgba(30, 33, 36, 0.85)',
     zIndex: 1000,
   },
   successCheckContainer: {
-    width: 84, 
+    width: 84,
     height: 84,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1290,14 +1290,14 @@ const styles = StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 42,
-    backgroundColor: '#23cc96', 
+    backgroundColor: '#23cc96',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 10,
     borderWidth: 1,
-    borderColor: '#23cc96', 
+    borderColor: '#23cc96',
   },
   successCheck: {
     justifyContent: 'center',
@@ -1312,7 +1312,7 @@ const styles = StyleSheet.create({
   suggestionsTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#B9BBBE', 
+    color: '#B9BBBE',
     marginBottom: 10,
   },
   suggestionsScrollView: {
@@ -1329,7 +1329,7 @@ const styles = StyleSheet.create({
   },
   suggestionText: {
     fontSize: 14,
-    color: '#23cc96', 
+    color: '#23cc96',
     fontWeight: '500',
   },
 
@@ -1368,7 +1368,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: 12,
     paddingRight: 12,
-    color: '#FFF', 
+    color: '#FFF',
     maxHeight: 100,
   },
   sendButton: {
@@ -1377,9 +1377,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#5865F2', 
+    backgroundColor: '#5865F2',
     borderWidth: 1,
-    borderColor: '#4752C4', 
+    borderColor: '#4752C4',
   },
   sendButtonDisabled: {
     opacity: 0.5,
