@@ -6,6 +6,7 @@ import chatHistory from './routes/chatHistory.js';
 import conversationRoutes from './routes/conversation.js';
 import initialQuestionsRoutes from './routes/initialQuestions.js';
 import pronounciationRoutes from './routes/pronounciation.js';
+import transcript from "./routes/transcript.cjs";
 import vocabularyRoutes from './routes/vocabulary.js';
 const app = express();
 
@@ -17,6 +18,7 @@ app.use('/api/initialQuestions', initialQuestionsRoutes);
 app.use('/api/conversation', conversationRoutes);
 app.use('/api/pronounciation', pronounciationRoutes);
 app.use('/api/chat', chatHistory);
+app.use('/api',transcript)
 app.use('/api',vocabularyRoutes)
 app.get('/', (req, res) => {
   res.send('Hello World!');
