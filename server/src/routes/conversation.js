@@ -46,7 +46,6 @@ router.post("/ask", async (req, res) => {
       orderBy: {
         createdAt: 'desc'
       },
-      take: 5, // Retrieve last 5 conversations
       select: {
         userres: true,
         llmres: true,

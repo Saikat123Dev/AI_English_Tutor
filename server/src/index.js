@@ -2,6 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import { prisma } from "./lib/db.js";
 import authRoutes from './routes/auth.js';
+import chatHistory from './routes/chatHistory.js';
 import conversationRoutes from './routes/conversation.js';
 import initialQuestionsRoutes from './routes/initialQuestions.js';
 import pronounciationRoutes from './routes/pronounciation.js';
@@ -15,6 +16,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/initialQuestions', initialQuestionsRoutes);
 app.use('/api/conversation', conversationRoutes);
 app.use('/api/pronounciation', pronounciationRoutes);
+app.use('/api/chat', chatHistory);
 app.use('/api',vocabularyRoutes)
 app.get('/', (req, res) => {
   res.send('Hello World!');

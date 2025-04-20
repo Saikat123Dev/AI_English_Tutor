@@ -198,27 +198,87 @@ export default function ConversationScreen() {
     animateWave();
     startTypingAnimation();
 
+    const formatHistoryMessage = (message: any) => {
+      try {
+        const parsed = JSON.parse(message.llmres);
+        return formatResponseFromAPI(parsed);
+      } catch (error) {
+        return {
+          content: message.llmres,
+          sections: null
+        };
+      }
+    };
+
     const fetchInitialQuestions = async () => {
       try {
-        if (!user?.primaryEmailAddress?.emailAddress) return false;
+        if (!user?.primaryEmailAddress?.emailAddress) {
+          setFallbackSuggestions();
+          return;
+        }
 
-        const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/initialQuestions', {
-          method: 'POST',
+        const response = await fetch('https://ce5a-2409-40e1-30d2-f886-5a2c-4c06-dccc-df6.ngrok-free.app/api/chat/getHistory?email=' + user.primaryEmailAddress.emailAddress, {
+          method: 'GET',
           headers: {
             "ngrok-skip-browser-warning": "true",
-            'Accept':'application/json',
-            'Content-Type':'application/json',
-          },
-          body: JSON.stringify({
-            email: user.primaryEmailAddress.emailAddress
-          }),
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          }
         });
 
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
           const data = await response.json();
-          if (data.success && data.questions) {
-            setSuggestions(data.questions);
+
+          if (data.success && data.history) {
+            // Process history messages
+            const historyMessages = data.history.map((item: any) => {
+              const userMessage = {
+                role: 'user',
+                content: item.userres,
+                timestamp: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              };
+
+              const formattedResponse = formatHistoryMessage(item);
+              const assistantMessage = {
+                role: 'assistant',
+                content: formattedResponse.content,
+                sections: formattedResponse.sections,
+                timestamp: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              };
+
+              return [userMessage, assistantMessage];
+            }).flat();
+
+            // Add the initial greeting if no history exists
+            if (historyMessages.length === 0) {
+              setMessages([
+                {
+                  role: 'assistant',
+                  content: `Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your language learning assistant. Let's practice conversation! What would you like to talk about?`,
+                  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  isInitial: true
+                }
+              ]);
+            } else {
+              setMessages(historyMessages);
+            }
+
+            // Generate suggestions from the last follow-up if available
+            if (data.history.length > 0) {
+              const lastItem = data.history[data.history.length - 1];
+              try {
+                const parsed = JSON.parse(lastItem.llmres);
+                if (parsed.followUp) {
+                  generateSuggestionsFromFollowUp(parsed.followUp);
+                  return;
+                }
+              } catch (error) {
+                console.error('Error parsing last message:', error);
+              }
+            }
+
+            setFallbackSuggestions();
             return;
           }
         }
@@ -228,6 +288,7 @@ export default function ConversationScreen() {
         setFallbackSuggestions();
       }
     };
+
 
     fetchInitialQuestions();
 
@@ -1035,7 +1096,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(35, 204, 150, 0.3)',
     width: 40,            // Fixed width
     height: 40,           // Fixed height
-    justifyContent: 'center', 
+    justifyContent: 'center',
 
 },
   welcomeCard: {

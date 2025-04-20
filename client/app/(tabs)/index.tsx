@@ -85,37 +85,6 @@ export default function HomeScreen() {
     });
   }, []);
 
-  const renderConnections = () => {
-    const connectionDistance = Math.min(width, height) * 0.2;
-    return nodePositions.flatMap((nodeA, i) =>
-      nodePositions.slice(i + 1).map((nodeB, j) => {
-        const dx = nodeA.x - nodeB.x;
-        const dy = nodeA.y - nodeB.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        return distance < connectionDistance ? (
-          <Animated.View
-            key={`connection-${i}-${j}`}
-            style={{
-
-              width: distance,
-              height: 1,
-              backgroundColor: 'rgba(255, 255, 255, 0.5)',
-              opacity: Animated.multiply(connectionOpacity,
-                Animated.subtract(1, Animated.divide(distance, connectionDistance))),
-              transform: [
-                { translateX: -distance / 2 },
-                { translateY: 0 },
-                { rotate: `${Math.atan2(dy, dx)}rad` },
-                { translateX: distance / 2 },
-              ]
-            }}
-          />
-        ) : null;
-      })
-    ).filter(Boolean);
-  };
-
 
   const features = [
     {
@@ -183,8 +152,7 @@ export default function HomeScreen() {
           end={{ x: 0.5, y: 1 }}
         />
 
-        {/* Render connections */}
-        {nodePositions.length > 0 && renderConnections()}
+
 
         {/* Render nodes */}
         {nodePositions.map((node, index) => (
@@ -247,7 +215,7 @@ export default function HomeScreen() {
 
         <View style={styles.goalContainer}>
           <View style={[styles.goalCard, {
-            backgroundColor: '#07403b',
+            backgroundColor: '#08332f',
             borderWidth: 2,
             borderColor: theme.cardBorder,
           }]}>
@@ -319,7 +287,6 @@ export default function HomeScreen() {
                 ])}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  router.push('/dailygoalscreen');
                   // Handle continue action
                 }}
               >
@@ -335,92 +302,49 @@ export default function HomeScreen() {
         {/* Features Grid */}
 
         <View style={styles.featuresGrid}>
-          {features.map((feature) => (
-            <Pressable
-              key={feature.id}
-              style={({ pressed }) => [
-                styles.featureCard,
-                {
-                  transform: [{ scale: pressed ? 0.95 : 1 }],
-                  backgroundColor: '#07403b',
-                  borderWidth: 2,
-                  borderColor: theme.cardBorder,
-                }
-              ]}
-              onPress={() => handleFeaturePress(feature.route)}
-            >
-              <View style={styles.featureContent}>
-                <View style={[styles.featureIconContainer, { backgroundColor: feature.color + '20' }]}>
-                  <MaterialCommunityIcons name={feature.icon} size={24} color={feature.color} />
-                </View>
-                <Text style={[styles.featureTitle, { color: theme.text }]}>{feature.title}</Text>
-                <Text style={[styles.featureDescription, { color: theme.secondaryText }]}>{feature.description}</Text>
+  {features.map((feature) => (
+    <Pressable
+      key={feature.id}
+      style={({ pressed }) => [
+        styles.featureCard,
+        {
+          transform: [{ scale: pressed ? 0.95 : 1 }],
+          borderWidth: 2,
+          borderColor: theme.cardBorder,
+          overflow: 'hidden' // Add this to contain the gradient
+        }
+      ]}
+      onPress={() => handleFeaturePress(feature.route)}
+    >
+      <LinearGradient
+        colors={['#06403a', '#032420', '#06403a']}
+        style={styles.gradientCard}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.featureContent}>
+          <View style={[styles.featureIconContainer, { backgroundColor: feature.color + '20' }]}>
+            <MaterialCommunityIcons name={feature.icon} size={24} color={feature.color} />
+          </View>
+          <Text style={[styles.featureTitle, { color: theme.text }]}>{feature.title}</Text>
+          <Text style={[styles.featureDescription, { color: theme.secondaryText }]}>{feature.description}</Text>
 
-                <View style={styles.progressMiniContainer}>
-                  <View style={[styles.progressMiniBar, { backgroundColor: theme.progressBackground }]}>
-                    <LinearGradient
-                      colors={feature.gradientColors}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={[styles.progressMini, { width: '40%' }]}
-                    />
-                  </View>
-                  <Text style={[styles.progressMiniText, { color: theme.secondaryText }]}>40%</Text>
-                </View>
-
-              </View>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.quickActionsContainer}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
-
-          <View style={styles.quickActions}>
-            <Pressable
-              style={[styles.quickAction, {
-                backgroundColor: '#07403b',
-                borderWidth: 2,
-                borderColor: theme.cardBorder,
-              }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/leaderboard');
-              }}
-            >
-              <View style={styles.quickActionContent}>
-                <View style={[styles.quickActionIcon, {
-                  backgroundColor: theme.progressBackground
-                }]}>
-                  <MaterialCommunityIcons name="podium" size={24} color={theme.accent} />
-                </View>
-                <Text style={[styles.quickActionText, { color: theme.text }]}>Rank</Text>
-              </View>
-            </Pressable>
-
-            <Pressable
-              style={[styles.quickAction, {
-                backgroundColor: '#07403b',
-                borderWidth: 2,
-                borderColor: theme.cardBorder,
-              }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/practice');
-              }}
-            >
-              <View style={styles.quickActionContent}>
-                <View style={[styles.quickActionIcon, {
-                  backgroundColor: theme.progressBackground
-                }]}>
-                  <MaterialCommunityIcons name="repeat" size={24} color={theme.accent} />
-                </View>
-                <Text style={[styles.quickActionText, { color: theme.text }]}>Repeat</Text>
-              </View>
-            </Pressable>
+          <View style={styles.progressMiniContainer}>
+            <View style={[styles.progressMiniBar, { backgroundColor: theme.progressBackground }]}>
+              <LinearGradient
+                colors={feature.gradientColors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.progressMini, { width: '40%' }]}
+              />
+            </View>
+            <Text style={[styles.progressMiniText, { color: theme.secondaryText }]}>40%</Text>
           </View>
         </View>
+      </LinearGradient>
+    </Pressable>
+  ))}
+</View>
 
         {/* Recent Activity */}
 <View style={styles.recentActivityContainer}>
@@ -439,23 +363,39 @@ export default function HomeScreen() {
     </Pressable>
   </View>
 
-          <View style={[styles.activityCard, {
-            backgroundColor: '#07403b',
-            borderWidth: 2,
-            borderColor: theme.cardBorder,
-          }]}>
-            <View style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: 'rgba(255,107,107,0.1)' }]}>
-                <MaterialCommunityIcons name="chat-processing" size={20} color="#FF6B6B" />
-              </View>
-              <View style={styles.activityTextContainer}>
-                <Text style={[styles.activityTitle, { color: theme.text }]}>Conversation Practice</Text>
-                <Text style={[styles.activityTime, { color: theme.secondaryText }]}>30 minutes ago</Text>
-              </View>
-              <View style={[styles.activityBadge, { backgroundColor: 'rgba(76,217,100,0.1)' }]}>
-                <Text style={[styles.activityBadgeText, { color: '#4CD964' }]}>+15 XP</Text>
-              </View>
-            </View>
+  <Pressable
+    style={({ pressed }) => [
+      styles.activityCard,
+      {
+        transform: [{ scale: pressed ? 0.98 : 1 }],
+        borderWidth: 2,
+        borderColor: theme.cardBorder,
+        overflow: 'hidden'
+      }
+    ]}
+    onPress={() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // Add your onPress action here if needed
+    }}
+  >
+    <LinearGradient
+      colors={['#06403a', '#032420', '#06403a']}
+      style={styles.gradientCard}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <View style={styles.activityItem}>
+        <View style={[styles.activityIcon, { backgroundColor: 'rgba(255,107,107,0.1)' }]}>
+          <MaterialCommunityIcons name="chat-processing" size={20} color="#FF6B6B" />
+        </View>
+        <View style={styles.activityTextContainer}>
+          <Text style={[styles.activityTitle, { color: theme.text }]}>Conversation Practice</Text>
+          <Text style={[styles.activityTime, { color: theme.secondaryText }]}>30 minutes ago</Text>
+        </View>
+        <View style={[styles.activityBadge, { backgroundColor: 'rgba(76,217,100,0.1)' }]}>
+          <Text style={[styles.activityBadgeText, { color: '#4CD964' }]}>+15 XP</Text>
+        </View>
+      </View>
 
       <View style={[styles.divider, { backgroundColor: theme.cardBorder }]} />
 
@@ -688,6 +628,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  gradientCard: {
+    justifyContent: 'space-between',
+    borderRadius: 18,
   },
 
   featuresGrid: {
