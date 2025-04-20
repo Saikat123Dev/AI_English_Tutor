@@ -198,18 +198,6 @@ export default function ConversationScreen() {
     animateWave();
     startTypingAnimation();
 
-    const formatHistoryMessage = (message: any) => {
-      try {
-        const parsed = JSON.parse(message.llmres);
-        return formatResponseFromAPI(parsed);
-      } catch (error) {
-        return {
-          content: message.llmres,
-          sections: null
-        };
-      }
-    };
-
     const fetchInitialQuestions = async () => {
       try {
         if (!user?.primaryEmailAddress?.emailAddress) {
@@ -217,7 +205,7 @@ export default function ConversationScreen() {
           return;
         }
 
-        const response = await fetch('https://ce5a-2409-40e1-30d2-f886-5a2c-4c06-dccc-df6.ngrok-free.app/api/chat/getHistory?email=' + user.primaryEmailAddress.emailAddress, {
+        const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/chat/getHistory?email=' + user.primaryEmailAddress.emailAddress, {
           method: 'GET',
           headers: {
             "ngrok-skip-browser-warning": "true",
@@ -229,21 +217,80 @@ export default function ConversationScreen() {
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
           const data = await response.json();
-
-          if (data.success && data.history) {
+         console.log(data);
+          if (data.success && data.history && data.history.length > 0) {
             // Process history messages
-            const historyMessages = data.history.map((item: any) => {
+            const historyMessages = data.history.map((item) => {
               const userMessage = {
                 role: 'user',
                 content: item.userres,
                 timestamp: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               };
 
-              const formattedResponse = formatHistoryMessage(item);
+              // Parse the LLM response from JSON string
+              let assistantContent = "Sorry, I couldn't process this message.";
+              let sections = null;
+
+              try {
+                const parsedLLM = JSON.parse(item.llmres);
+
+                // Extract sections from the parsed response
+                if (parsedLLM.success) {
+                  sections = [];
+
+                  if (parsedLLM.answer) {
+                    sections.push({
+                      type: 'answer',
+                      content: parsedLLM.answer
+                    });
+                  }
+
+                  if (parsedLLM.explanation) {
+                    sections.push({
+                      type: 'explanation',
+                      content: parsedLLM.explanation,
+                      icon: 'lightbulb-outline'
+                    });
+                  }
+
+                  if (parsedLLM.feedback) {
+                    sections.push({
+                      type: 'feedback',
+                      content: parsedLLM.feedback,
+                      icon: 'message-alert-outline'
+                    });
+                  }
+
+                  if (parsedLLM.followUp) {
+                    sections.push({
+                      type: 'followUp',
+                      content: parsedLLM.followUp,
+                      icon: 'chat-question-outline'
+                    });
+                  }
+
+                  // Create combined content
+                  assistantContent = [
+                    parsedLLM.answer,
+                    parsedLLM.explanation,
+                    parsedLLM.feedback,
+                    parsedLLM.followUp
+                  ].filter(Boolean).join('\n\n');
+
+                  // Generate suggestions from followUp if it exists
+                  if (parsedLLM.followUp) {
+                    generateSuggestionsFromFollowUp(parsedLLM.followUp);
+                  }
+                }
+              } catch (error) {
+                console.error('Error parsing LLM response:', error);
+                assistantContent = "Error parsing response.";
+              }
+
               const assistantMessage = {
                 role: 'assistant',
-                content: formattedResponse.content,
-                sections: formattedResponse.sections,
+                content: assistantContent,
+                sections: sections,
                 timestamp: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               };
 
@@ -264,31 +311,51 @@ export default function ConversationScreen() {
               setMessages(historyMessages);
             }
 
-            // Generate suggestions from the last follow-up if available
+            // Set suggestions based on the last message's followUp
             if (data.history.length > 0) {
               const lastItem = data.history[data.history.length - 1];
               try {
-                const parsed = JSON.parse(lastItem.llmres);
-                if (parsed.followUp) {
-                  generateSuggestionsFromFollowUp(parsed.followUp);
+                const parsedLLM = JSON.parse(lastItem.llmres);
+                if (parsedLLM.followUp) {
+                  generateSuggestionsFromFollowUp(parsedLLM.followUp);
                   return;
                 }
               } catch (error) {
-                console.error('Error parsing last message:', error);
+                console.error('Error parsing last message for suggestions:', error);
               }
             }
-
-            setFallbackSuggestions();
-            return;
+          } else {
+            // Set initial message if no history
+            setMessages([
+              {
+                role: 'assistant',
+                content: `Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your language learning assistant. Let's practice conversation! What would you like to talk about?`,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isInitial: true
+              }
+            ]);
           }
+
+          setFallbackSuggestions();
+        } else {
+          console.error('Invalid content type from API');
+          setFallbackSuggestions();
         }
-        setFallbackSuggestions();
       } catch (error) {
-        console.error('Error fetching initial questions:', error);
+        console.error('Error fetching chat history:', error);
         setFallbackSuggestions();
+
+        // Set initial message if fetch fails
+        setMessages([
+          {
+            role: 'assistant',
+            content: `Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your language learning assistant. Let's practice conversation! What would you like to talk about?`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isInitial: true
+          }
+        ]);
       }
     };
-
 
     fetchInitialQuestions();
 
