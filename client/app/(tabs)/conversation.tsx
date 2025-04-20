@@ -1025,15 +1025,19 @@ const styles = StyleSheet.create({
     color: 'rgba(220, 221, 222, 0.8)',
   },
   replayButton: {
-    position: 'absolute',
     right: 8,
     top: 8,
-    padding: 6,
-    borderRadius: 12,
+    left:2 ,
+    padding: 10,           // Reduced from 12 to make it smaller
+    borderRadius: 8,      // Slightly smaller border radius
     backgroundColor: 'rgba(35, 204, 150, 0.1)',
-    borderWidth: 1,
+    borderWidth: 1,       // Thinner border
     borderColor: 'rgba(35, 204, 150, 0.3)',
-  },
+    width: 40,            // Fixed width
+    height: 40,           // Fixed height
+    justifyContent: 'center', 
+
+},
   welcomeCard: {
     borderRadius: 20,
     overflow: 'hidden',

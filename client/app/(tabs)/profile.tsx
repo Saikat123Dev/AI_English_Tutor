@@ -8,20 +8,46 @@ import { ActivityIndicator, Alert, NativeScrollEvent, NativeSyntheticEvent, Scro
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollContext } from './ScrollContext';
 
-// Define color constants based on your styles
 const COLORS = {
-  primary: '#06403a',           // Deep teal green
-  primaryDark: '#032420',       // Darker shade for emphasis
-  accent: '#0f766e',            // A more vibrant accent green
-  background: '#2c786b',        // Light, soft greenish background
-  card: '#89c4b6',              // Pure white for card contrast
-  text: '#032420',              // Deep readable text color
-  textSecondary: 'rgba(3, 36, 32, 0.7)', // Slightly muted for secondary
-  border: 'rgba(3, 36, 32, 0.9)',       // Very light border for subtle separation
-  error: '#db1225',             // Standard red for errors
-  white: '#ffffff',            // Keep white consistent
+  // Primary colors
+  primary: '#0d9488',           // More vibrant teal (improves accessibility)
+  primaryDark: '#115e59',       // Darker shade for better contrast
+  primaryLight: '#ccfbf1',      // Soft light teal for backgrounds
+  
+  // Accent colors
+  accent: '#0f766e',            // Kept original accent
+  accentLight: '#5eead4',       // Bright teal for interactive elements
+  
+  // Background colors
+  background: '#f0fdfa',        // Very light teal (easier on eyes)
+  backgroundDark: '#e6f5f3',    // Slightly darker for cards/sections
+  
+  // Card colors
+  card: '#ffffff',             // Pure white for better content legibility
+  cardDark: '#ecfdf5',          // Alternative card color
+  
+  // Text colors
+  text: '#042f2e',             // Darker for better readability
+  textSecondary: '#3f706d',     // Softer teal-gray for secondary text
+  textTertiary: '#64748b',      // Neutral gray for less important text
+  
+  // Border colors
+  border: '#cbd5e1',           // Lighter, neutral border
+  borderDark: '#94a3b8',       // For stronger dividers
+  
+  // Feedback colors
+  error: '#dc2626',            // More vibrant error red
+  success: '#16a34a',          // Added success green
+  warning: '#f59e0b',          // Added warning amber
+  info: '#2563eb',             // Added info blue
+  
+  // Neutrals
+  white: '#ffffff',
+  black: '#000000',
+  grayLight: '#f1f5f9',
+  gray: '#e2e8f0',
+  grayDark: '#94a3b8'
 };
-
 
 interface ProfileOptionProps {
   title: string;
@@ -347,7 +373,7 @@ export function ProfileScreen() {
         </View>
 
         {/* App Version */}
-        <Text style={[styles.version, { color: COLORS.textSecondary }]}>Version 1.0.0 (alpha)</Text>
+        <Text style={[styles.version, { color: COLORS.textSecondary }]}>Version 1.0.0 (beta)</Text>
       </ScrollView>
     </SafeAreaView>
   );

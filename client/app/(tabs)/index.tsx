@@ -85,37 +85,6 @@ export default function HomeScreen() {
     });
   }, []);
 
-  const renderConnections = () => {
-    const connectionDistance = Math.min(width, height) * 0.2;
-    return nodePositions.flatMap((nodeA, i) => 
-      nodePositions.slice(i + 1).map((nodeB, j) => {
-        const dx = nodeA.x - nodeB.x;
-        const dy = nodeA.y - nodeB.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        return distance < connectionDistance ? (
-          <Animated.View
-            key={`connection-${i}-${j}`}
-            style={{
-
-              width: distance,
-              height: 1,
-              backgroundColor: 'rgba(255, 255, 255, 0.5)',
-              opacity: Animated.multiply(connectionOpacity, 
-                Animated.subtract(1, Animated.divide(distance, connectionDistance))),
-              transform: [
-                { translateX: -distance / 2 },
-                { translateY: 0 },
-                { rotate: `${Math.atan2(dy, dx)}rad` },
-                { translateX: distance / 2 },
-              ]
-            }}
-          />
-        ) : null;
-      })
-    ).filter(Boolean);
-  };
-
 
   const features = [
     {
@@ -183,8 +152,7 @@ export default function HomeScreen() {
           end={{ x: 0.5, y: 1 }}
         />
         
-        {/* Render connections */}
-        {nodePositions.length > 0 && renderConnections()}
+
         
         {/* Render nodes */}
         {nodePositions.map((node, index) => (
@@ -276,7 +244,7 @@ export default function HomeScreen() {
               <View style={styles.progressContainer}>
                 <View style={[styles.progressBar, { backgroundColor: theme.progressBackground }]}>
                   <LinearGradient
-                    colors={['#07403b', '#A78AFF']}
+                    colors={['#187a72', '#187a72']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={[styles.progress, { width: '70%' }]}
