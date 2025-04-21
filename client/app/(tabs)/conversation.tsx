@@ -49,7 +49,7 @@ export default function ConversationScreen() {
   const typingDot3 = useRef(new Animated.Value(0)).current;
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [isScrolling, setIsScrolling] = useState(false);
-  const scrollUpButtonAnim = useRef(new Animated.Value(0)).current;
+  const scrollButtonAnim = useRef(new Animated.Value(0)).current;
   const floatingAssistantAnim = useRef(new Animated.Value(0)).current;
   const [showFloatingAssistant, setShowFloatingAssistant] = useState(false);
   const [lastScrollPosition, setLastScrollPosition] = useState(0);
@@ -59,6 +59,7 @@ export default function ConversationScreen() {
   const recordingAnimation = useRef(new Animated.Value(0)).current;
   const windowHeight = Dimensions.get('window').height;
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const [isNearTop, setIsNearTop] = useState(false);
 
   const { handleScroll: tabBarScrollHandler, tabBarHeight } = useContext(ScrollContext);
 
@@ -285,7 +286,7 @@ export default function ConversationScreen() {
     try {
       // Create FormData with the audio file
       const formData = new FormData();
-      formData.append('file', {
+      formData.append('audio', {
         uri: audioUri,
         type: 'audio/m4a', // Adjust based on your audio format
         name: 'recording.m4a',
@@ -299,7 +300,7 @@ export default function ConversationScreen() {
           'Content-Type': 'multipart/form-data',
         },
       });
-
+      console.log(response)
       if (!response.ok) {
         throw new Error('Transcription failed');
       }
@@ -519,15 +520,27 @@ export default function ConversationScreen() {
     }
   };
 
+  const scrollToBottom = () => {
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollToEnd({ animated: true });
+    }
+  };
+
   const handleScroll = useCallback((event) => {
     const scrollPosition = event.nativeEvent.contentOffset.y;
     const scrollingUp = scrollPosition < lastScrollPosition;
     setLastScrollPosition(scrollPosition);
 
+    // Check if we're near the top (within 100 pixels)
+    const nearTop = scrollPosition < 100;
+    if (nearTop !== isNearTop) {
+      setIsNearTop(nearTop);
+    }
+
     tabBarScrollHandler(event);
 
     const shouldShowScrollButton = scrollPosition > 300;
-    Animated.spring(scrollUpButtonAnim, {
+    Animated.spring(scrollButtonAnim, {
       toValue: shouldShowScrollButton ? 1 : 0,
       friction: 8,
       tension: 60,
@@ -547,7 +560,7 @@ export default function ConversationScreen() {
     scrollEndTimer.current = setTimeout(() => {
       setIsScrolling(false);
     }, 150);
-  }, [lastScrollPosition, tabBarScrollHandler]);
+  }, [lastScrollPosition, tabBarScrollHandler, isNearTop]);
 
   const sendMessage = async (text) => {
     const messageText = text !== undefined ? text : input;
@@ -1040,25 +1053,59 @@ export default function ConversationScreen() {
       </ScrollView>
 
       <Animated.View
-        style={[
-          styles.scrollUpButton,
-          {
-            opacity: scrollUpButtonAnim,
-            transform: [
-              {
-                scale: scrollUpButtonAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.5, 1]
-                })
-              }
-            ]
-          }
-        ]}
-      >
-        <TouchableOpacity onPress={scrollToTop} style={styles.scrollUpButtonInner}>
-          <MaterialCommunityIcons name="arrow-up" size={24} color="#FFF" />
-        </TouchableOpacity>
-      </Animated.View>
+  style={[
+    styles.scrollButton,
+    {
+      opacity: scrollButtonAnim,
+      transform: [
+        {
+          scale: scrollButtonAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.5, 1]
+          })
+        }
+      ]
+    }
+  ]}
+>
+  <TouchableOpacity
+    onPress={isNearTop ? scrollToBottom : scrollToTop}
+    style={styles.scrollButtonInner}
+    activeOpacity={0.8}
+  >
+    <LinearGradient
+      colors={isNearTop ? ['#3B82F6', '#6366F1'] : ['#6366F1', '#A855F7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.scrollButtonGradient}
+    />
+    <Animated.View
+      style={[
+        styles.scrollButtonPulse,
+        {
+          opacity: waveAnimation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.2, 0.5]
+          }),
+          transform: [
+            {
+              scale: waveAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.8, 1.2]
+              })
+            }
+          ]
+        }
+      ]}
+    />
+    <MaterialCommunityIcons
+      name={isNearTop ? "arrow-down" : "arrow-up"}
+      size={28}
+      color="#FFF"
+      style={styles.scrollButtonIcon}
+    />
+  </TouchableOpacity>
+</Animated.View>
 
       {showFloatingAssistant && (
         <Animated.View
@@ -1112,7 +1159,6 @@ export default function ConversationScreen() {
           }
         ]}
       >
-
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -1135,6 +1181,7 @@ export default function ConversationScreen() {
           style={styles.input}
           placeholder="Type a message..."
           placeholderTextColor="#999"
+
           value={input}
           onChangeText={setInput}
           multiline
@@ -1186,7 +1233,51 @@ export default function ConversationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0E1624',
+    backgroundColor: '#03302c',
+  },
+  scrollButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 100,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.27,
+    shadowRadius: 4.65,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.4)',
+    zIndex: 100,
+  },
+  scrollButtonInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  scrollButtonGradient: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+  },
+  scrollButtonIcon: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  scrollButtonPulse: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+    backgroundColor: 'rgba(99, 102, 241, 0.2)',
   },
   header: {
     flexDirection: 'row',
