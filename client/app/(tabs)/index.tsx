@@ -98,12 +98,12 @@ export default function HomeScreen() {
     },
     {
       id: 2,
-      title: 'Grammar',
-      icon: 'book-open-variant',
+      title: 'Profile',
+      icon: 'admin',
       color: '#4ECDC4',
       gradientColors: ['#4ECDC4', '#6EE7DF'],
-      route: 'grammer',
-      description: 'Master essential rules'
+      route: 'profile',
+      description: 'Visit your profile to see progress'
     },
     {
       id: 3,
@@ -112,7 +112,7 @@ export default function HomeScreen() {
       color: '#45B7D1',
       gradientColors: ['#45B7D1', '#67D1E9'],
       route: 'vocubulary',
-      description: 'Expand your word bank'
+      description: 'Expand your word bank by learning daily'
     },
     {
       id: 4,
@@ -121,7 +121,7 @@ export default function HomeScreen() {
       color: '#96CEB4',
       gradientColors: ['#96CEB4', '#B6E8D3'],
       route: 'pronounciation',
-      description: 'Perfect your accent'
+      description: 'Perfect your accent by practicing'
     }
   ];
 
@@ -477,6 +477,7 @@ export default function HomeScreen() {
   </Pressable>
 </View>
 
+
 {/* Bottom Spacer */}
 <View style={{ height: 20 }} />
       </ScrollView>
@@ -540,7 +541,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   goalContainer: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 14,
     marginTop: 16,
   },
   goalCard: {
@@ -555,7 +556,7 @@ const styles = StyleSheet.create({
 
   },
   goalContent: {
-    padding: 16,
+    padding: 12,
   },
   goalHeader: {
     flexDirection: 'row',
@@ -638,18 +639,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     marginTop: 24,
     gap: 16,
   },
   featureCard: {
-    width: (width - 56) / 2,
+    width: (width - 40) / 2,
     borderRadius: 20,
     position: 'relative',
   },
   featureContent: {
     flex: 1,
-    padding: 16,
+    padding: 14,
   },
   featureIconContainer: {
     width: 25,
@@ -689,47 +690,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  quickActionsContainer: {
-    paddingHorizontal: 24,
-    marginTop: 32,
-  },
+
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 16,
   },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 16,
-  },
-  quickAction: {
-    flex: 1,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  quickActionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  quickActionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  quickActionText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
+
   recentActivityContainer: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 14,
     marginTop: 32,
   },
   sectionHeader: {
@@ -749,7 +718,7 @@ const styles = StyleSheet.create({
   activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 14,
   },
   activityIcon: {
     width: 40,
@@ -802,6 +771,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontFamily: 'Inter_500Medium',
   },
+
 
 
 });
