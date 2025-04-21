@@ -1,3 +1,4 @@
+import { useUser } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
@@ -12,6 +13,7 @@ import {
 } from 'react-native';
 
 const RecentActivity = ({ theme, router }) => {
+  const { user } = useUser();
   const [recentActivity, setRecentActivity] = useState([]);
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,7 +24,7 @@ const RecentActivity = ({ theme, router }) => {
     const fetchRecentActivity = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/recent?email=beras5170@gmail.com');
+        const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/recent?email=' + user.primaryEmailAddress.emailAddress,);
         if (!response.ok) {
           throw new Error('Failed to fetch recent activity');
         }

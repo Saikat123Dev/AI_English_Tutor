@@ -144,7 +144,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (isUserLoaded && user) {
       fetchUserData();
-      fetchDailyQuote();
+
     }
   }, [isUserLoaded, user]);
 
@@ -152,7 +152,7 @@ export default function ProfileScreen() {
     try {
       setIsLoading(true);
       // Replace with your actual API endpoint
-      const response = await fetch(`/api/user-profile?email=${encodeURIComponent(user?.emailAddresses[0]?.emailAddress)}`);
+      const response = await fetch(`https://ai-english-tutor-9ixt.onrender.com/api/user-profile?email=${encodeURIComponent(user?.emailAddresses[0]?.emailAddress)}`);
       const data = await response.json();
       setUserData(data);
     } catch (error) {
@@ -162,16 +162,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const fetchDailyQuote = async () => {
-    try {
-      // Replace with your actual API endpoint for quotes
-      const response = await fetch('/api/daily-quote');
-      const data = await response.json();
-      setQuoteOfDay(data);
-    } catch (error) {
-      console.error('Error fetching daily quote:', error);
-    }
-  };
+
 
   const handleSignOut = async () => {
     try {
@@ -351,27 +342,23 @@ export default function ProfileScreen() {
           <ProfileOption
             title="My Vocabulary"
             icon={<MaterialCommunityIcons name="bookshelf" size={20} color={COLORS.primary} />}
-            onPress={() => navigation.navigate('Vocabulary' as never)}
+            onPress={() => router.push('/(tabs)/vocubulary')}
             badge={`${userStats.vocabulary}`}
           />
 
           <ProfileOption
             title="Favorite Words"
             icon={<MaterialCommunityIcons name="star" size={20} color={COLORS.primary} />}
-            onPress={() => navigation.navigate('Favorites' as never)}
+            onPress={() => router.push('/(tabs)/vocubulary')}
             badge={`${userStats.favoriteWords}`}
           />
 
-          <ProfileOption
-            title="Practice History"
-            icon={<MaterialCommunityIcons name="history" size={20} color={COLORS.primary} />}
-            onPress={() => navigation.navigate('History' as never)}
-          />
+
 
           <ProfileOption
             title="Pronunciation Practice"
             icon={<MaterialCommunityIcons name="microphone" size={20} color={COLORS.primary} />}
-            onPress={() => navigation.navigate('PronunciationPractice' as never)}
+            onPress={() => router.push('/(tabs)/pronounciation')}
             isLast={true}
           />
         </View>
@@ -380,11 +367,7 @@ export default function ProfileScreen() {
         <View style={styles.sectionContainer}>
           <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>ACCOUNT</Text>
 
-          <ProfileOption
-            title="Edit Learning Profile"
-            icon={<MaterialCommunityIcons name="account-edit" size={20} color={COLORS.primary} />}
-            onPress={() => router.push('/learning-profile')}
-          />
+
 
           <ProfileOption
             title="Settings"
@@ -395,16 +378,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Support Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>SUPPORT</Text>
 
-          <ProfileOption
-            title="Help Center"
-            icon={<Ionicons name="help-circle-outline" size={20} color={COLORS.primary} />}
-            onPress={() => navigation.navigate('HelpCenter' as never)}
-            isLast={true}
-          />
-        </View>
 
         {/* Sign Out Button */}
         <TouchableOpacity
