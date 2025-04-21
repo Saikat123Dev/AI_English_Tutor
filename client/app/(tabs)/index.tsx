@@ -1,3 +1,4 @@
+import { useUser } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -5,12 +6,17 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import RecentActivity from '../../components/RecentActivity';
 const { width, height } = Dimensions.get('window');
 const nodeCount = 10;
 
 export default function HomeScreen() {
+  const { user } = useUser();
   const [activeTab] = useState('home');
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [stats, setStats] = useState(null);
   const [nodePositions, setNodePositions] = useState([]);
   const nodeAnimations = useRef(Array(nodeCount).fill().map(() => ({
     opacity: new Animated.Value(0),
@@ -207,96 +213,12 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <Text style={[styles.welcomeText, { color: theme.text }]}>Welcome back!</Text>
+          <Text style={[styles.welcomeText, { color: theme.text }]}>Welcome back {user?.firstName ? user.firstName : ''}!</Text>
           <Text style={[styles.subtitle, { color: theme.secondaryText }]}>What would you like to learn today?</Text>
         </View>
 
         {/* Daily Goal Progress */}
 
-        <View style={styles.goalContainer}>
-          <View style={[styles.goalCard, {
-            backgroundColor: '#08332f',
-            borderWidth: 2,
-            borderColor: theme.cardBorder,
-          }]}>
-            <LinearGradient
-              colors={['#06403a', '#032420', '#06403a']}
-              style={styles.gradientCard}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-            <View style={styles.blurOverlay} />
-            <View style={styles.goalContent}>
-              <View style={styles.goalHeader}>
-                <View style={styles.titleContainer}>
-                  <MaterialCommunityIcons name="trophy-outline" size={18} color={theme.accent} style={{marginRight: 6}} />
-                  <Text style={[styles.goalTitle, { color: theme.text }]}>Daily Goal</Text>
-                </View>
-                <Pressable
-                  style={({ pressed }) => ({
-                    opacity: pressed ? 0.7 : 1,
-                    flexDirection: 'row',
-                    alignItems: 'center'
-                  })}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push('/achievements');
-                  }}
-                >
-                  <Text style={[styles.viewAll, { color: theme.accent }]}>View All</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={16} color={theme.accent} style={{marginLeft: 2}} />
-                </Pressable>
-              </View>
-
-              <View style={styles.progressContainer}>
-                <View style={[styles.progressBar, { backgroundColor: theme.progressBackground }]}>
-                  <LinearGradient
-                    colors={['#187a72', '#187a72']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={[styles.progress, { width: '70%' }]}
-                  />
-                </View>
-
-                <Text style={[styles.progressText, { color: theme.text, marginLeft: 0 }]}>
-                  70<Text style={{ fontSize: 14, color: theme.secondaryText }}>%</Text>
-                </Text>
-              </View>
-
-              <View style={styles.goalDetails}>
-                <View style={styles.goalFooter}>
-                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <MaterialCommunityIcons name="checkbox-marked-circle-outline" size={16} color={theme.accent} style={{marginRight: 4}} />
-                    <Text style={[styles.goalText, { color: theme.secondaryText }]}>
-                      <Text>7</Text>/10 Tasks completed
-                    </Text>
-                  </View>
-                  <View style={styles.badge}>
-                    <MaterialCommunityIcons name="star" size={16} color="#FFD700" />
-                    <Text style={{ color: theme.text, marginLeft: 4, fontWeight: '800', fontSize: 12 }}>70 pts</Text>
-                  </View>
-                </View>
-              </View>
-
-              <Pressable
-                style={({ pressed }) => ([
-                  styles.continueButton, {
-                    backgroundColor: theme.accent,
-                    opacity: pressed ? 0.9 : 1,
-                  }
-                ])}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  // Handle continue action
-                }}
-              >
-                <Text style={{color: '#FFFFFF', fontWeight: '600', marginRight: 6}}>Continue</Text>
-                <MaterialCommunityIcons name="arrow-right" size={18} color="#FFFFFF" />
-              </Pressable>
-            </View>
-            </LinearGradient>
-          </View>
-        </View>
 
 
         {/* Features Grid */}
@@ -338,7 +260,7 @@ export default function HomeScreen() {
                 style={[styles.progressMini, { width: '40%' }]}
               />
             </View>
-            <Text style={[styles.progressMiniText, { color: theme.secondaryText }]}>40%</Text>
+
           </View>
         </View>
       </LinearGradient>
@@ -347,90 +269,7 @@ export default function HomeScreen() {
 </View>
 
         {/* Recent Activity */}
-<View style={styles.recentActivityContainer}>
-  <View style={styles.sectionHeader}>
-    <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Activity</Text>
-    <Pressable
-      style={({ pressed }) => ({
-        opacity: pressed ? 0.7 : 1,
-      })}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push('/activity');
-      }}
-    >
-      <Text style={[styles.viewAll, { color: theme.accent }]}>View All</Text>
-    </Pressable>
-  </View>
-
-  <Pressable
-    style={({ pressed }) => [
-      styles.activityCard,
-      {
-        transform: [{ scale: pressed ? 0.98 : 1 }],
-        borderWidth: 2,
-        borderColor: theme.cardBorder,
-        overflow: 'hidden'
-      }
-    ]}
-    onPress={() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      // Add your onPress action here if needed
-    }}
-  >
-    <LinearGradient
-      colors={['#06403a', '#032420', '#06403a']}
-      style={styles.gradientCard}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
-      <View style={styles.activityItem}>
-        <View style={[styles.activityIcon, { backgroundColor: 'rgba(255,107,107,0.1)' }]}>
-          <MaterialCommunityIcons name="chat-processing" size={20} color="#FF6B6B" />
-        </View>
-        <View style={styles.activityTextContainer}>
-          <Text style={[styles.activityTitle, { color: theme.text }]}>Conversation Practice</Text>
-          <Text style={[styles.activityTime, { color: theme.secondaryText }]}>30 minutes ago</Text>
-        </View>
-        <View style={[styles.activityBadge, { backgroundColor: 'rgba(76,217,100,0.1)' }]}>
-          <Text style={[styles.activityBadgeText, { color: '#4CD964' }]}>+15 XP</Text>
-        </View>
-      </View>
-
-      <View style={[styles.divider, { backgroundColor: theme.cardBorder }]} />
-
-      <View style={styles.activityItem}>
-        <View style={[styles.activityIcon, { backgroundColor: 'rgba(78,205,196,0.1)' }]}>
-          <MaterialCommunityIcons name="book-open-variant" size={20} color="#4ECDC4" />
-        </View>
-        <View style={styles.activityTextContainer}>
-          <Text style={[styles.activityTitle, { color: theme.text }]}>Grammar Lesson</Text>
-          <Text style={[styles.activityTime, { color: theme.secondaryText }]}>2 hours ago</Text>
-        </View>
-        <View style={[styles.activityBadge, { backgroundColor: 'rgba(76,217,100,0.1)' }]}>
-          <Text style={[styles.activityBadgeText, { color: '#4CD964' }]}>+10 XP</Text>
-        </View>
-      </View>
-
-      <View style={[styles.divider, { backgroundColor: theme.cardBorder }]} />
-
-      <View style={styles.activityItem}>
-        <View style={[styles.activityIcon, { backgroundColor: 'rgba(76,217,100,0.1)' }]}>
-          <MaterialCommunityIcons name="trophy" size={20} color="#4CD964" />
-        </View>
-        <View style={styles.activityTextContainer}>
-          <Text style={[styles.activityTitle, { color: theme.text }]}>Daily Challenge</Text>
-          <Text style={[styles.activityTime, { color: theme.secondaryText }]}>Yesterday</Text>
-        </View>
-        <View style={[styles.activityBadge, { backgroundColor: 'rgba(76,217,100,0.1)' }]}>
-          <Text style={[styles.activityBadgeText, { color: '#4CD964' }]}>+50 XP</Text>
-        </View>
-      </View>
-    </LinearGradient>
-  </Pressable>
-</View>
-
-        {/* Modern Footer */}
+     <RecentActivity theme={theme} router={router} />
 
 
 
@@ -450,6 +289,10 @@ const styles = StyleSheet.create({
     width: width,
     height: height,
     overflow: 'hidden',
+  },
+  activitySubtitle: {
+    fontSize: 12,
+    marginTop: 2,
   },
   backgroundGradient: {
     position: 'absolute',

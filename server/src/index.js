@@ -5,6 +5,7 @@ import authRoutes from './routes/auth.js';
 import chatHistory from './routes/chatHistory.js';
 import conversationRoutes from './routes/conversation.js';
 import initialQuestionsRoutes from './routes/initialQuestions.js';
+import profile from './routes/profile.js';
 import pronounciationRoutes from './routes/pronounciation.js';
 import recentActivity from './routes/recentActivity.cjs';
 import transcript from "./routes/transcript.cjs";
@@ -22,6 +23,7 @@ app.use('/api/chat', chatHistory);
 app.use('/api',transcript)
 app.use('/api',vocabularyRoutes)
 app.use('/api',recentActivity)
+app.use('/api',profile)
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
