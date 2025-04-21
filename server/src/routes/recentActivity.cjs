@@ -4,19 +4,30 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 /**
- * Get recent activity for a user
+ * Get recent activity for a user by email
  * @route GET /recent
- * @param {string} email - The ID of the user (from auth middleware or query)
+ * @param {string} email - The email of the user
  * @returns {object} 200 - Recent user activity including vocabulary, pronunciation, questions and study sessions
  */
 router.get('/recent', async (req, res) => {
   try {
-
-    const email =  req.query.email;
+    // Get email from request
+    const email = req.query.email;
 
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
     }
+
+    // First find the user by email
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userId = user.id;
 
     // Define how many items to fetch for each activity type
     const limit = parseInt(req.query.limit) || 5;
@@ -31,7 +42,7 @@ router.get('/recent', async (req, res) => {
     ] = await Promise.all([
       // Recent vocabulary words
       prisma.vocabularyWord.findMany({
-        where: { email },
+        where: { userId },
         orderBy: { timestamp: 'desc' },
         take: limit,
         include: { favorites: true }
@@ -39,21 +50,21 @@ router.get('/recent', async (req, res) => {
 
       // Recent pronunciation attempts
       prisma.pronunciationAttempt.findMany({
-        where: { email },
+        where: { userId },
         orderBy: { createdAt: 'desc' },
         take: limit
       }),
 
       // Recent questions
       prisma.question.findMany({
-        where: { email },
+        where: { userId },
         orderBy: { createdAt: 'desc' },
         take: limit
       }),
 
       // Recent study sessions
       prisma.studySession.findMany({
-        where: { email },
+        where: { userId },
         orderBy: { startTime: 'desc' },
         take: limit,
         include: {
@@ -68,7 +79,7 @@ router.get('/recent', async (req, res) => {
       // Get current streak
       prisma.dailyStreak.findFirst({
         where: {
-          email,
+          userId,
           date: {
             gte: new Date(new Date().setHours(0, 0, 0, 0)) // Today
           }
@@ -108,14 +119,19 @@ router.get('/recent', async (req, res) => {
 
     // Calculate stats
     const stats = {
-      vocabularyCount: await prisma.vocabularyWord.count({ where: { email } }),
-      pronunciationCount: await prisma.pronunciationAttempt.count({ where: { email } }),
-      questionsCount: await prisma.question.count({ where: { email } }),
-      studySessionsCount: await prisma.studySession.count({ where: { email } }),
+      vocabularyCount: await prisma.vocabularyWord.count({ where: { userId } }),
+      pronunciationCount: await prisma.pronunciationAttempt.count({ where: { userId } }),
+      questionsCount: await prisma.question.count({ where: { userId } }),
+      studySessionsCount: await prisma.studySession.count({ where: { userId } }),
       currentStreak: streakInfo ? streakInfo.count : 0
     };
 
     res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name
+      },
       recent: sortedActivity.slice(0, limit),
       vocabulary: recentVocabulary,
       pronunciation: recentPronunciation,
@@ -125,7 +141,7 @@ router.get('/recent', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching recent activity:', error);
-    res.status(500).json({ error: 'Failed to fetch recent activity' });
+    res.status(500).json({ error: 'Failed to fetch recent activity', message: error.message });
   }
 });
 
