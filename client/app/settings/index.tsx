@@ -14,7 +14,6 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -24,7 +23,7 @@ import {
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const SettingsScreen = () => {
-  const { signOut, user } = useClerk();
+  const { user } = useClerk();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [fullName, setFullName] = useState(user?.fullName || "");
@@ -47,18 +46,17 @@ const SettingsScreen = () => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 800,
+        duration: 600,
         useNativeDriver: true,
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
-        friction: 8,
-        tension: 40,
+        friction: 6,
+        tension: 50,
         useNativeDriver: true,
       })
     ]).start();
 
-    // Load language learning profile data if available
     const metadata = user?.unsafeMetadata;
     if (metadata) {
       setMotherTongue(metadata.motherToung || "");
@@ -71,7 +69,8 @@ const SettingsScreen = () => {
   }, []);
 
   const handleEdit = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    console.log("Edit button pressed, isEditing:", isEditing);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(err => console.error("Haptics error:", err));
     setIsEditing(true);
   };
 
@@ -80,15 +79,12 @@ const SettingsScreen = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
-      // Update Clerk user profile
       await user?.update({
         username,
         firstName: fullName.split(" ")[0],
         lastName: fullName.split(" ")[1] || "",
         unsafeMetadata: {
-          // Preserve existing metadata
           ...user?.unsafeMetadata,
-          // Update language learning profile
           motherToung: motherTongue,
           englishLevel,
           learningGoal,
@@ -98,7 +94,6 @@ const SettingsScreen = () => {
         },
       });
 
-      // Update user in your database
       const email = user?.primaryEmailAddress?.emailAddress;
       if (email) {
         const response = await fetch("https://ai-english-tutor-9ixt.onrender.com/api/auth/create", {
@@ -134,7 +129,6 @@ const SettingsScreen = () => {
 
   const handleCancel = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Reset all fields to current user values
     setFullName(user?.fullName || "");
     setUsername(user?.username || "");
 
@@ -151,19 +145,6 @@ const SettingsScreen = () => {
     setIsEditing(false);
   };
 
-  const handleLogout = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    Alert.alert(
-      "Logout",
-      "Are you sure you want to logout?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Logout", onPress: () => signOut(), style: "destructive" }
-      ]
-    );
-  };
-
-  // Helper function to render picker fields
   const renderPicker = (label, value, setValue, options) => (
     <View style={styles.inputGroup}>
       <Text style={styles.label}>{label}</Text>
@@ -211,10 +192,9 @@ const SettingsScreen = () => {
                   {user?.firstName?.charAt(0) || user?.username?.charAt(0) || "U"}
                 </Text>
               </View>
-              <Text style={styles.headerText}>Account Settings</Text>
+              <Text style={styles.headerText}>Your Profile</Text>
             </Animated.View>
 
-            {/* Basic Profile Information */}
             <Animated.View
               style={[
                 styles.cardContainer,
@@ -224,23 +204,21 @@ const SettingsScreen = () => {
                 }
               ]}
             >
-              <BlurView intensity={80} tint="light" style={styles.blurContainer}>
+              <BlurView intensity={90} tint="light" style={styles.blurContainer}>
                 <View style={styles.card}>
                   <View style={styles.cardHeader}>
                     <Text style={styles.heading}>Profile Information</Text>
-                    {!isEditing ? (
-                      <TouchableOpacity onPress={handleEdit} style={styles.editButton}>
-                        <Ionicons name="pencil" size={18} color="#007AFF" />
-                        <Text style={styles.editText}>Edit</Text>
-                      </TouchableOpacity>
-                    ) : null}
+                    <TouchableOpacity onPress={handleEdit} style={styles.editButton}>
+                      <Ionicons name="pencil" size={18} color="#2A9D8F" />
+                      <Text style={styles.editText}>Edit</Text>
+                    </TouchableOpacity>
                   </View>
 
                   <View style={styles.formContainer}>
                     <View style={styles.inputGroup}>
                       <Text style={styles.label}>Email</Text>
                       <View style={[styles.inputContainer, styles.disabledInput]}>
-                        <Ionicons name="mail-outline" size={20} color="#777" style={styles.inputIcon} />
+                        <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
                         <Text style={styles.inputText}>
                           {user?.emailAddresses[0]?.emailAddress || "Not provided"}
                         </Text>
@@ -251,18 +229,19 @@ const SettingsScreen = () => {
                       <Text style={styles.label}>Full Name</Text>
                       {isEditing ? (
                         <View style={styles.inputContainer}>
-                          <Ionicons name="person-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
                           <TextInput
                             style={styles.input}
                             value={fullName}
                             onChangeText={setFullName}
                             placeholder="Enter your full name"
                             autoCapitalize="words"
+                            placeholderTextColor="#9CA3AF"
                           />
                         </View>
                       ) : (
                         <View style={[styles.inputContainer, styles.disabledInput]}>
-                          <Ionicons name="person-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
                           <Text style={styles.inputText}>{user?.fullName || "Not provided"}</Text>
                         </View>
                       )}
@@ -272,18 +251,19 @@ const SettingsScreen = () => {
                       <Text style={styles.label}>Username</Text>
                       {isEditing ? (
                         <View style={styles.inputContainer}>
-                          <Ionicons name="at-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Ionicons name="at-outline" size={20} color="#6B7280" style={styles.inputIcon} />
                           <TextInput
                             style={styles.input}
                             value={username}
                             onChangeText={setUsername}
                             placeholder="Enter your username"
                             autoCapitalize="none"
+                            placeholderTextColor="#9CA3AF"
                           />
                         </View>
                       ) : (
                         <View style={[styles.inputContainer, styles.disabledInput]}>
-                          <Ionicons name="at-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Ionicons name="at-outline" size={20} color="#6B7280" style={styles.inputIcon} />
                           <Text style={styles.inputText}>{user?.username || "Not provided"}</Text>
                         </View>
                       )}
@@ -293,7 +273,6 @@ const SettingsScreen = () => {
               </BlurView>
             </Animated.View>
 
-            {/* Language Learning Profile */}
             <Animated.View
               style={[
                 styles.cardContainer,
@@ -303,7 +282,7 @@ const SettingsScreen = () => {
                 }
               ]}
             >
-              <BlurView intensity={80} tint="light" style={styles.blurContainer}>
+              <BlurView intensity={90} tint="light" style={styles.blurContainer}>
                 <View style={styles.card}>
                   <View style={styles.cardHeader}>
                     <Text style={styles.heading}>Language Learning Profile</Text>
@@ -314,18 +293,19 @@ const SettingsScreen = () => {
                       <Text style={styles.label}>Native Language</Text>
                       {isEditing ? (
                         <View style={styles.inputContainer}>
-                          <Ionicons name="language-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Ionicons name="language-outline" size={20} color="#6B7280" style={styles.inputIcon} />
                           <TextInput
                             style={styles.input}
                             value={motherTongue}
                             onChangeText={setMotherTongue}
                             placeholder="Your native language"
                             autoCapitalize="words"
+                            placeholderTextColor="#9CA3AF"
                           />
                         </View>
                       ) : (
                         <View style={[styles.inputContainer, styles.disabledInput]}>
-                          <Ionicons name="language-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Ionicons name="language-outline" size={20} color="#6B7280" style={styles.inputIcon} />
                           <Text style={styles.inputText}>{motherTongue || "Not provided"}</Text>
                         </View>
                       )}
@@ -341,17 +321,18 @@ const SettingsScreen = () => {
                       <Text style={styles.label}>Learning Goal</Text>
                       {isEditing ? (
                         <View style={styles.inputContainer}>
-                          <Ionicons name="trophy-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Ionicons name="trophy-outline" size={20} color="#6B7280" style={styles.inputIcon} />
                           <TextInput
                             style={styles.input}
                             value={learningGoal}
                             onChangeText={setLearningGoal}
                             placeholder="Your language learning goal"
+                            placeholderTextColor="#9CA3AF"
                           />
                         </View>
                       ) : (
                         <View style={[styles.inputContainer, styles.disabledInput]}>
-                          <Ionicons name="trophy-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Ionicons name="trophy-outline" size={20} color="#6B7280" style={styles.inputIcon} />
                           <Text style={styles.inputText}>{learningGoal || "Not provided"}</Text>
                         </View>
                       )}
@@ -361,17 +342,18 @@ const SettingsScreen = () => {
                       <Text style={styles.label}>Interests</Text>
                       {isEditing ? (
                         <View style={styles.inputContainer}>
-                          <Ionicons name="heart-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Ionicons name="heart-outline" size={20} color="#6B7280" style={styles.inputIcon} />
                           <TextInput
                             style={styles.input}
                             value={interests}
                             onChangeText={setInterests}
                             placeholder="Your interests (comma separated)"
+                            placeholderTextColor="#9CA3AF"
                           />
                         </View>
                       ) : (
                         <View style={[styles.inputContainer, styles.disabledInput]}>
-                          <Ionicons name="heart-outline" size={20} color="#777" style={styles.inputIcon} />
+                          <Ionicons name="heart-outline" size={20} color="#6B7280" style={styles.inputIcon} />
                           <Text style={styles.inputText}>{interests || "Not provided"}</Text>
                         </View>
                       )}
@@ -393,52 +375,8 @@ const SettingsScreen = () => {
               </BlurView>
             </Animated.View>
 
-            {/* Preferences */}
-            <Animated.View
-              style={[
-                styles.cardContainer,
-                {
-                  opacity: fadeAnim,
-                  transform: [{ scale: scaleAnim }]
-                }
-              ]}
-            >
-              <BlurView intensity={80} tint="light" style={styles.blurContainer}>
-                <View style={styles.card}>
-                  <Text style={styles.heading}>Preferences</Text>
 
-                  <View style={styles.settingRow}>
-                    <View style={styles.settingInfo}>
-                      <Ionicons name="moon-outline" size={22} color="#555" />
-                      <Text style={styles.settingText}>Dark Mode</Text>
-                    </View>
-                    <Switch
-                      value={darkMode}
-                      onValueChange={setDarkMode}
-                      trackColor={{ false: "#D1D1D6", true: "#81b0ff" }}
-                      thumbColor={darkMode ? "#007AFF" : "#f4f3f4"}
-                      ios_backgroundColor="#D1D1D6"
-                    />
-                  </View>
 
-                  <View style={styles.settingRow}>
-                    <View style={styles.settingInfo}>
-                      <Ionicons name="notifications-outline" size={22} color="#555" />
-                      <Text style={styles.settingText}>Notifications</Text>
-                    </View>
-                    <Switch
-                      value={notifications}
-                      onValueChange={setNotifications}
-                      trackColor={{ false: "#D1D1D6", true: "#81b0ff" }}
-                      thumbColor={notifications ? "#007AFF" : "#f4f3f4"}
-                      ios_backgroundColor="#D1D1D6"
-                    />
-                  </View>
-                </View>
-              </BlurView>
-            </Animated.View>
-
-            {/* Action Buttons */}
             {isEditing && (
               <Animated.View
                 style={[
@@ -458,30 +396,13 @@ const SettingsScreen = () => {
                   disabled={isSaving}
                 >
                   {isSaving ? (
-                    <ActivityIndicator size="small" color="white" />
+                    <ActivityIndicator size="small" color="#F9FAFB" />
                   ) : (
                     <Text style={styles.saveText}>Save Changes</Text>
                   )}
                 </TouchableOpacity>
               </Animated.View>
             )}
-
-            <AnimatedTouchable
-              style={[
-                styles.logoutButton,
-                {
-                  opacity: fadeAnim,
-                  transform: [
-                    { scale: scaleAnim }
-                  ]
-                }
-              ]}
-              onPress={handleLogout}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="log-out-outline" size={20} color="white" />
-              <Text style={styles.logoutText}>Logout</Text>
-            </AnimatedTouchable>
           </SignedIn>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -495,7 +416,7 @@ const { width } = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F0F4F8",
+    backgroundColor: "#E8F5E9",
   },
   keyboardAvoid: {
     flex: 1,
@@ -503,115 +424,129 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     alignItems: "center",
-    paddingVertical: 30,
-    paddingHorizontal: 20,
+    paddingVertical: 40,
+    paddingHorizontal: 24,
   },
   header: {
     width: "100%",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 24,
   },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#007AFF",
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "#2A9D8F",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 8,
+    marginBottom: 12,
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+    borderWidth: 2,
+    borderColor: "#6EE7B7",
   },
   avatarText: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "white",
+    fontSize: 36,
+    fontWeight: "700",
+    color: "#F9FAFB",
   },
   headerText: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#333",
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1F2937",
+    letterSpacing: 0.5,
   },
   cardContainer: {
     width: "100%",
-    maxWidth: 500,
-    marginBottom: 20,
-    borderRadius: 16,
+    maxWidth: 600,
+    marginBottom: 24,
+    borderRadius: 20,
     overflow: "hidden",
   },
   blurContainer: {
     overflow: "hidden",
-    borderRadius: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(110, 231, 183, 0.3)",
   },
   card: {
-    padding: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    padding: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.85)",
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 20,
   },
   heading: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1F2937",
+    letterSpacing: 0.3,
   },
   editButton: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: "rgba(0, 122, 255, 0.1)",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "rgba(42, 157, 143, 0.1)",
   },
   editText: {
-    marginLeft: 4,
-    color: "#007AFF",
+    marginLeft: 6,
+    color: "#2A9D8F",
     fontWeight: "600",
-    fontSize: 14,
+    fontSize: 15,
   },
   formContainer: {
-    gap: 16,
+    gap: 20,
   },
   inputGroup: {
     width: "100%",
   },
   label: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
-    color: "#555",
-    marginBottom: 6,
+    color: "#374151",
+    marginBottom: 8,
+    letterSpacing: 0.2,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
-    borderRadius: 12,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#E1E1E1",
-    paddingHorizontal: 12,
-    height: 50,
+    borderColor: "#D1D5DB",
+    paddingHorizontal: 14,
+    height: 52,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: 12,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: "#333",
+    color: "#1F2937",
     height: "100%",
+    fontWeight: "500",
   },
   disabledInput: {
-    backgroundColor: "rgba(245, 245, 245, 0.6)",
+    backgroundColor: "rgba(243, 244, 246, 0.7)",
   },
   inputText: {
     fontSize: 16,
-    color: "#333",
-    paddingVertical: 12,
+    color: "#1F2937",
+    paddingVertical: 14,
+    fontWeight: "500",
   },
   pickerContainer: {
     padding: 0,
@@ -619,45 +554,54 @@ const styles = StyleSheet.create({
   },
   picker: {
     flex: 1,
-    height: 50,
+    height: 52,
+    color: "#1F2937",
   },
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "center",
     width: "100%",
-    maxWidth: 500,
-    gap: 12,
-    marginBottom: 20,
+    maxWidth: 600,
+    gap: 16,
+    marginBottom: 24,
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "#F2F2F7",
+    borderRadius: 14,
+    backgroundColor: "#F3F4F6",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   cancelText: {
-    color: "#555",
+    color: "#4B5563",
     fontWeight: "600",
     fontSize: 16,
   },
   saveButton: {
     flex: 2,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "#007AFF",
+    borderRadius: 14,
+    backgroundColor: "#2A9D8F",
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 8,
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   savingButton: {
-    backgroundColor: "#5CA5FF",
+    backgroundColor: "#6EE7B7",
   },
   saveText: {
-    color: "white",
+    color: "#F9FAFB",
     fontWeight: "600",
     fontSize: 16,
   },
@@ -665,39 +609,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.05)",
+    borderBottomColor: "rgba(209, 213, 219, 0.3)",
   },
   settingInfo: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 14,
   },
   settingText: {
     fontSize: 16,
-    color: "#333",
-  },
-  logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FF3B30",
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    width: "100%",
-    maxWidth: 500,
-    gap: 8,
-    shadowColor: "#FF3B30",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  logoutText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
+    color: "#1F2937",
+    fontWeight: "500",
   },
 });

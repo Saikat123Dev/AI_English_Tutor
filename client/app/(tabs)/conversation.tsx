@@ -758,17 +758,7 @@ export default function ConversationScreen() {
 
     return (
       <View style={styles.topicBadgeContainer}>
-        <LinearGradient
-          colors={topicColors[selectedTopic] || ['#6C63FF', '#8A63FF']}
-          style={styles.topicBadge}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        >
-          {topicIcons[selectedTopic]}
-          <Text style={styles.topicText}>
-            {selectedTopic.charAt(0).toUpperCase() + selectedTopic.slice(1)}
-          </Text>
-        </LinearGradient>
+
       </View>
     );
   };
@@ -1130,16 +1120,7 @@ export default function ConversationScreen() {
             }
           ]}
         >
-          <BlurView intensity={90} style={styles.floatingAssistantBlur} tint="dark">
-            <View style={styles.floatingAssistantInner}>
-              <View style={styles.floatingAssistantIconContainer}>
-                <MaterialCommunityIcons name="robot-happy" size={20} color="#6C63FF" />
-              </View>
-              <Text style={styles.floatingAssistantText}>
-                Need help with anything else?
-              </Text>
-            </View>
-          </BlurView>
+
         </Animated.View>
       )}
 

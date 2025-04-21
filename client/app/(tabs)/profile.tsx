@@ -3,7 +3,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollContext } from './ScrollContext';
@@ -13,34 +13,34 @@ const COLORS = {
   primary: '#0d9488',           // More vibrant teal (improves accessibility)
   primaryDark: '#115e59',       // Darker shade for better contrast
   primaryLight: '#ccfbf1',      // Soft light teal for backgrounds
-  
+
   // Accent colors
   accent: '#0f766e',            // Kept original accent
   accentLight: '#5eead4',       // Bright teal for interactive elements
-  
+
   // Background colors
   background: '#f0fdfa',        // Very light teal (easier on eyes)
   backgroundDark: '#e6f5f3',    // Slightly darker for cards/sections
-  
+
   // Card colors
   card: '#ffffff',             // Pure white for better content legibility
   cardDark: '#ecfdf5',          // Alternative card color
-  
+
   // Text colors
   text: '#042f2e',             // Darker for better readability
   textSecondary: '#3f706d',     // Softer teal-gray for secondary text
   textTertiary: '#64748b',      // Neutral gray for less important text
-  
+
   // Border colors
   border: '#cbd5e1',           // Lighter, neutral border
   borderDark: '#94a3b8',       // For stronger dividers
-  
+
   // Feedback colors
   error: '#dc2626',            // More vibrant error red
   success: '#16a34a',          // Added success green
   warning: '#f59e0b',          // Added warning amber
   info: '#2563eb',             // Added info blue
-  
+
   // Neutrals
   white: '#ffffff',
   black: '#000000',
@@ -92,101 +92,77 @@ function ProfileOption({ title, icon, onPress, showChevron = true, isLast = fals
   );
 }
 
-function AchievementBadge({ title, icon, unlocked, progress, total }) {
+// New skill progress component
+function SkillProgressCard({ title, progress, total, icon }) {
+  const percentage = Math.min(100, Math.round((progress / total) * 100));
+
   return (
-    <View style={[styles.achievementContainer, {
-      backgroundColor: COLORS.card,
-      opacity: unlocked ? 1 : 0.7
-    }]}>
-      <View style={[
-        styles.achievementIconContainer,
-        {
-          backgroundColor: unlocked ? COLORS.accent + '30' : COLORS.border + '50',
-          borderColor: unlocked ? COLORS.accent : COLORS.border
-        }
-      ]}>
-        {icon}
-      </View>
-      <Text style={[styles.achievementTitle, { color: COLORS.text }]}>{title}</Text>
-      {!unlocked && (
-        <View style={styles.achievementProgress}>
-          <View style={[styles.achievementProgressBar, { backgroundColor: COLORS.border }]}>
-            <View
-              style={[
-                styles.achievementProgressFill,
-                {
-                  width: `${Math.min(100, (progress / total) * 100)}%`,
-                  backgroundColor: COLORS.accent
-                }
-              ]}
-            />
-          </View>
-          <Text style={[styles.achievementProgressText, { color: COLORS.textSecondary }]}>
-            {progress}/{total}
-          </Text>
+    <View style={[styles.skillCard, { backgroundColor: COLORS.card }]}>
+      <View style={styles.skillHeaderRow}>
+        <View style={[styles.skillIconContainer, { backgroundColor: COLORS.primary + '20' }]}>
+          {icon}
         </View>
-      )}
+        <Text style={[styles.skillTitle, { color: COLORS.text }]}>{title}</Text>
+      </View>
+
+      <View style={styles.skillProgressContainer}>
+        <View style={[styles.skillProgressBar, { backgroundColor: COLORS.grayLight }]}>
+          <View
+            style={[
+              styles.skillProgressFill,
+              {
+                width: `${percentage}%`,
+                backgroundColor: COLORS.primary
+              }
+            ]}
+          />
+        </View>
+        <Text style={[styles.skillProgressText, { color: COLORS.textSecondary }]}>
+          {progress} / {total} ({percentage}%)
+        </Text>
+      </View>
     </View>
   );
 }
 
-export function ProfileScreen() {
+export default function ProfileScreen() {
   const { user, isLoaded: isUserLoaded } = useUser();
   const { signOut } = useAuth();
   const navigation = useNavigation();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [showAllAchievements, setShowAllAchievements] = useState(false);
   const { handleScroll, tabBarHeight } = useContext(ScrollContext);
 
-  const learningStats = {
-    streak: 7,
-    vocabulary: 320,
-    completedLessons: 24,
-    level: 'Intermediate',
-    dailyGoal: 30,
-    dailyProgress: 20,
-    weeklyActivity: [15, 30, 45, 20, 0, 10, 5],
-    wordOfDay: {
-      word: "Serendipity",
-      translation: "The occurrence of events by chance in a happy or beneficial way",
-      sentence: "Finding that rare book in the second-hand store was a moment of serendipity."
+  // State for user data from backend
+  const [userData, setUserData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [quoteOfDay, setQuoteOfDay] = useState({
+    text: "Learning another language is not only learning different words for the same things, but learning another way to think about things.",
+    author: "Flora Lewis"
+  });
+
+  // Fetch user data from the backend
+  useEffect(() => {
+    if (isUserLoaded && user) {
+      fetchUserData();
+
+    }
+  }, [isUserLoaded, user]);
+
+  const fetchUserData = async () => {
+    try {
+      setIsLoading(true);
+      // Replace with your actual API endpoint
+      const response = await fetch(`https://ai-english-tutor-9ixt.onrender.com/api/user-profile?email=${encodeURIComponent(user?.emailAddresses[0]?.emailAddress)}`);
+      const data = await response.json();
+      setUserData(data);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const achievements = [
-    {
-      id: 1,
-      title: "Vocabulary Master",
-      icon: <MaterialCommunityIcons name="book-open-page-variant" size={24} color={COLORS.accent} />,
-      unlocked: true,
-      progress: 300,
-      total: 300
-    },
-    {
-      id: 2,
-      title: "Week Warrior",
-      icon: <MaterialCommunityIcons name="calendar-check" size={24} color={COLORS.accent} />,
-      unlocked: true,
-      progress: 7,
-      total: 7
-    },
-    {
-      id: 3,
-      title: "Grammar Guru",
-      icon: <MaterialCommunityIcons name="format-letter-case" size={24} color={COLORS.textSecondary} />,
-      unlocked: false,
-      progress: 15,
-      total: 20
-    },
-    {
-      id: 4,
-      title: "Perfect Pronunciation",
-      icon: <MaterialCommunityIcons name="microphone" size={24} color={COLORS.textSecondary} />,
-      unlocked: false,
-      progress: 40,
-      total: 100
-    }
-  ];
+
 
   const handleSignOut = async () => {
     try {
@@ -215,12 +191,44 @@ export function ProfileScreen() {
     handleScroll(event);
   };
 
-  if (!isUserLoaded) {
+  if (!isUserLoaded || isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
       </SafeAreaView>
     );
+  }
+
+  // Create calculated stats from userData
+  const userStats = {
+    streak: userData?.dailyStreaks?.length > 0 ? userData.dailyStreaks[userData.dailyStreaks.length - 1].count : 0,
+    vocabulary: userData?.vocabularyWords?.length || 0,
+    completedSessions: userData?.studySessions?.filter(session => session.endTime)?.length || 0,
+    level: determineUserLevel(userData),
+    pronunciationAccuracy: calculatePronunciationAccuracy(userData?.pronunciationAttempts || []),
+    favoriteWords: userData?.favorites?.length || 0,
+    englishLevel: userData?.englishLevel || 'Beginner',
+    motherTongue: userData?.motherToung || 'Not specified'
+  };
+
+  // Helper functions for calculating user stats
+  function determineUserLevel(userData) {
+    if (!userData) return 'Beginner';
+
+    const vocabCount = userData.vocabularyWords?.length || 0;
+    const sessionsCount = userData.studySessions?.length || 0;
+
+    if (vocabCount > 500 && sessionsCount > 50) return 'Advanced';
+    if (vocabCount > 200 && sessionsCount > 20) return 'Intermediate';
+    return userData.englishLevel || 'Beginner';
+  }
+
+  function calculatePronunciationAccuracy(attempts) {
+    if (!attempts || attempts.length === 0) return 0;
+
+    const accuracies = attempts.map(attempt => attempt.accuracy || 0);
+    const sum = accuracies.reduce((total, acc) => total + acc, 0);
+    return Math.round(sum / attempts.length);
   }
 
   return (
@@ -256,92 +264,121 @@ export function ProfileScreen() {
           </Text>
 
           <View style={styles.levelBadge}>
-            <Text style={styles.levelText}>{learningStats.level}</Text>
+            <Text style={styles.levelText}>{userStats.level}</Text>
           </View>
 
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{learningStats.streak}</Text>
+              <Text style={styles.statValue}>{userStats.streak}</Text>
               <Text style={styles.statLabel}>Day Streak</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: COLORS.background + '30' }]} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{learningStats.vocabulary}</Text>
+              <Text style={styles.statValue}>{userStats.vocabulary}</Text>
               <Text style={styles.statLabel}>Words</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: COLORS.background + '30' }]} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{learningStats.completedLessons}</Text>
-              <Text style={styles.statLabel}>Lessons</Text>
+              <Text style={styles.statValue}>{userStats.completedSessions}</Text>
+              <Text style={styles.statLabel}>Sessions</Text>
             </View>
           </View>
         </LinearGradient>
 
-        {/* Achievements Section */}
+        {/* Learning Profile Section */}
         <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>ACHIEVEMENTS</Text>
-            <TouchableOpacity onPress={() => setShowAllAchievements(!showAllAchievements)}>
-              <Text style={[styles.viewAllText, { color: COLORS.primary }]}>
-                {showAllAchievements ? 'Show Less' : 'View All'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>MY LEARNING PROFILE</Text>
 
-          <View style={styles.achievementsGrid}>
-            {achievements.slice(0, showAllAchievements ? achievements.length : 2).map(achievement => (
-              <AchievementBadge
-                key={achievement.id}
-                title={achievement.title}
-                icon={achievement.icon}
-                unlocked={achievement.unlocked}
-                progress={achievement.progress}
-                total={achievement.total}
-              />
-            ))}
+          <View style={[styles.infoCard, { backgroundColor: COLORS.card }]}>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Mother Tongue:</Text>
+              <Text style={[styles.infoValue, { color: COLORS.text }]}>{userStats.motherTongue}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>English Level:</Text>
+              <Text style={[styles.infoValue, { color: COLORS.text }]}>{userStats.englishLevel}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Learning Goal:</Text>
+              <Text style={[styles.infoValue, { color: COLORS.text }]}>{userData?.learningGoal || 'Not set'}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Focus Area:</Text>
+              <Text style={[styles.infoValue, { color: COLORS.text }]}>{userData?.focus || 'Not set'}</Text>
+            </View>
           </View>
         </View>
 
-        {/* Learning Section */}
+        {/* Progress Section */}
         <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>LEARNING</Text>
+          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>MY PROGRESS</Text>
+
+          <SkillProgressCard
+            title="Pronunciation Accuracy"
+            progress={userStats.pronunciationAccuracy}
+            total={100}
+            icon={<MaterialCommunityIcons name="microphone" size={20} color={COLORS.primary} />}
+          />
+
+          <SkillProgressCard
+            title="Vocabulary Building"
+            progress={userStats.vocabulary}
+            total={1000}
+            icon={<MaterialCommunityIcons name="book-open-variant" size={20} color={COLORS.primary} />}
+          />
+
+          <SkillProgressCard
+            title="Study Sessions"
+            progress={userStats.completedSessions}
+            total={100}
+            icon={<MaterialCommunityIcons name="school" size={20} color={COLORS.primary} />}
+          />
+        </View>
+
+        {/* Quick Actions Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>QUICK ACTIONS</Text>
 
           <ProfileOption
-            title="My Progress"
-            icon={<MaterialCommunityIcons name="chart-line" size={20} color={COLORS.primary} />}
-            onPress={() => navigation.navigate('Progress' as never)}
+            title="My Vocabulary"
+            icon={<MaterialCommunityIcons name="bookshelf" size={20} color={COLORS.primary} />}
+            onPress={() => router.push('/(tabs)/vocubulary')}
+            badge={`${userStats.vocabulary}`}
           />
 
           <ProfileOption
-            title="Certificates"
-            icon={<MaterialCommunityIcons name="certificate" size={20} color={COLORS.primary} />}
-            onPress={() => navigation.navigate('Certificates' as never)}
+            title="Favorite Words"
+            icon={<MaterialCommunityIcons name="star" size={20} color={COLORS.primary} />}
+            onPress={() => router.push('/(tabs)/vocubulary')}
+            badge={`${userStats.favoriteWords}`}
+          />
+
+
+
+          <ProfileOption
+            title="Pronunciation Practice"
+            icon={<MaterialCommunityIcons name="microphone" size={20} color={COLORS.primary} />}
+            onPress={() => router.push('/(tabs)/pronounciation')}
             isLast={true}
           />
         </View>
-
 
         {/* Account Section */}
         <View style={styles.sectionContainer}>
           <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>ACCOUNT</Text>
 
+
+
           <ProfileOption
             title="Settings"
             icon={<Ionicons name="settings-outline" size={20} color={COLORS.primary} />}
             onPress={() => router.push('/settings')}
+            isLast={true}
           />
         </View>
 
         {/* Support Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>SUPPORT</Text>
 
-          <ProfileOption
-            title="Help Center"
-            icon={<Ionicons name="help-circle-outline" size={20} color={COLORS.primary} />}
-            onPress={() => navigation.navigate('HelpCenter' as never)}
-          />
-        </View>
 
         {/* Sign Out Button */}
         <TouchableOpacity
@@ -362,13 +399,13 @@ export function ProfileScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Motivational Quote */}
+        {/* Quote of the Day - Dynamic from API */}
         <View style={[styles.quoteContainer, { backgroundColor: COLORS.card }]}>
           <Text style={[styles.quoteText, { color: COLORS.text }]}>
-            "Learning another language is not only learning different words for the same things, but learning another way to think about things."
+            "{quoteOfDay.text}"
           </Text>
           <Text style={[styles.quoteAuthor, { color: COLORS.textSecondary }]}>
-            - Flora Lewis
+            - {quoteOfDay.author}
           </Text>
         </View>
 
@@ -478,117 +515,6 @@ const styles = StyleSheet.create({
     height: '80%',
     alignSelf: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    marginHorizontal: 8,
-  },
-  viewAllText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#06403a',
-  },
-  achievementsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  achievementContainer: {
-    width: '48%',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: 'rgba(6, 64, 58, 0.1)',
-    shadowColor: '#06403a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  achievementIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: '#06403a',
-    backgroundColor: 'rgba(6, 64, 58, 0.1)',
-  },
-  achievementTitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginBottom: 6,
-    color: '#06403a',
-  },
-  achievementProgress: {
-    width: '100%',
-  },
-  achievementProgressBar: {
-    height: 4,
-    borderRadius: 2,
-    marginTop: 4,
-    marginBottom: 4,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(6, 64, 58, 0.1)',
-  },
-  achievementProgressFill: {
-    height: '100%',
-    borderRadius: 2,
-    backgroundColor: '#06403a',
-  },
-  achievementProgressText: {
-    fontSize: 10,
-    textAlign: 'center',
-    color: '#06403a',
-  },
-  coursesScrollContainer: {
-    paddingLeft: -2,
-    paddingRight: 16,
-    paddingBottom: 8,
-  },
-  courseCard: {
-    width: 160,
-    borderRadius: 16,
-    padding: 12,
-    marginLeft: 8,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: 'rgba(6, 64, 58, 0.1)',
-    shadowColor: '#06403a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  courseImageContainer: {
-    width: '100%',
-    height: 90,
-    borderRadius: 12,
-    marginBottom: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(6, 64, 58, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(6, 64, 58, 0.2)',
-  },
-  courseTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
-    color: '#06403a',
-  },
-  courseSubtitle: {
-    fontSize: 12,
-    color: 'rgba(6, 64, 58, 0.7)',
   },
   sectionContainer: {
     marginBottom: 24,
@@ -704,7 +630,87 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.6,
     color: '#032420',
+  },
+  // New styles for the updated UI
+  infoCard: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: 'rgba(6, 64, 58, 0.1)',
+    shadowColor: '#06403a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    marginBottom: 8,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(6, 64, 58, 0.1)',
+  },
+  infoLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#06403a',
+  },
+  infoValue: {
+    fontSize: 14,
+    color: '#06403a',
+  },
+  skillCard: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: 'rgba(6, 64, 58, 0.1)',
+    marginBottom: 8,
+    shadowColor: '#06403a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  skillHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  skillIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(6, 64, 58, 0.1)',
+  },
+  skillTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#06403a',
+  },
+  skillProgressContainer: {
+    marginTop: 4,
+  },
+  skillProgressBar: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#e9ecef',
+    marginBottom: 6,
+    overflow: 'hidden',
+  },
+  skillProgressFill: {
+    height: '100%',
+    backgroundColor: '#06403a',
+    borderRadius: 4,
+  },
+  skillProgressText: {
+    fontSize: 12,
+    color: '#06403a',
+    textAlign: 'right',
   }
 });
-
-export default ProfileScreen;
