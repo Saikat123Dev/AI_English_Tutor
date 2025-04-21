@@ -431,51 +431,7 @@ export default function HomeScreen() {
 </View>
 
         {/* Modern Footer */}
-<View style={[styles.footer, { borderTopWidth: 1, borderTopColor: theme.cardBorder }]}>
-  <Pressable
-    style={({ pressed }) => [
-      styles.footerButton,
-      { opacity: pressed ? 0.7 : 1 }
-    ]}
-    onPress={() => router.push('/help')}
-  >
-    <MaterialCommunityIcons name="help-circle" size={20} color={theme.secondaryText} />
-    <Text style={[styles.footerText, { color: theme.secondaryText }]}>Help</Text>
-  </Pressable>
 
-  <Pressable
-    style={({ pressed }) => [
-      styles.footerButton,
-      { opacity: pressed ? 0.7 : 1 }
-    ]}
-    onPress={() => router.push('/feedback')}
-  >
-    <MaterialCommunityIcons name="message-alert" size={20} color={theme.secondaryText} />
-    <Text style={[styles.footerText, { color: theme.secondaryText }]}>Feedback</Text>
-  </Pressable>
-
-  <Pressable
-    style={({ pressed }) => [
-      styles.footerButton,
-      { opacity: pressed ? 0.7 : 1 }
-    ]}
-    onPress={() => router.push('/terms')}
-  >
-    <MaterialCommunityIcons name="file-document" size={20} color={theme.secondaryText} />
-    <Text style={[styles.footerText, { color: theme.secondaryText }]}>Terms</Text>
-  </Pressable>
-
-  <Pressable
-    style={({ pressed }) => [
-      styles.footerButton,
-      { opacity: pressed ? 0.7 : 1 }
-    ]}
-    onPress={() => router.push('/settings')}
-  >
-    <MaterialCommunityIcons name="cog" size={20} color={theme.secondaryText} />
-    <Text style={[styles.footerText, { color: theme.secondaryText }]}>Settings</Text>
-  </Pressable>
-</View>
 
 
 {/* Bottom Spacer */}
