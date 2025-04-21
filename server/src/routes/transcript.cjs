@@ -21,7 +21,7 @@ const upload = multer({ storage });
 
 // Initialize AssemblyAI client with your API key
 const client = new AssemblyAI({
-  apiKey: process.env.ASSEMBLYAI_API_KEY, // Store your API key in environment variables
+  apiKey: process.env.ASSEMBLY_AI_API_KEY, // Store your API key in environment variables
 });
 
 // POST route for transcribing audio
@@ -32,7 +32,7 @@ router.post('/transcribe', upload.single('audio'), async (req, res) => {
     }
 
     const filePath = req.file.path;
-
+    console.log('Uploaded file:', filePath);
     // Optional transcription parameters from request body
     const options = {
       audio: fs.readFileSync(filePath),
@@ -57,7 +57,7 @@ router.post('/transcribe', upload.single('audio'), async (req, res) => {
 
     console.log('Starting transcription...');
     const transcript = await client.transcripts.transcribe(options);
-
+    console.log(transcript);
     // Clean up the uploaded file
     fs.unlinkSync(filePath);
 
