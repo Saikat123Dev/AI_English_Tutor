@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +26,7 @@ export default function HomeScreen() {
       const radius = Math.min(width, height) * 0.25;
       const angle = Math.random() * Math.PI * 2;
       const distance = Math.random() * radius;
-      
+
       return {
         x: centerX + Math.cos(angle) * distance,
         y: centerY + Math.sin(angle) * distance,
@@ -42,9 +42,9 @@ export default function HomeScreen() {
       const { x, y, delay, duration } = initialNodePositions[index];
       const destX = x + (Math.random() - 0.5) * width * 0.2;
       const destY = y + (Math.random() - 0.5) * height * 0.2;
-      
+
       anim.position.setValue({ x, y });
-      
+
       Animated.sequence([
         Animated.delay(delay),
         Animated.parallel([
@@ -151,9 +151,9 @@ export default function HomeScreen() {
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
         />
-        
 
-        
+
+
         {/* Render nodes */}
         {nodePositions.map((node, index) => (
           <Animated.View
@@ -177,8 +177,8 @@ export default function HomeScreen() {
             }}
           />
         ))}
-        
-      
+
+
       </View>
 
       <ScrollView
@@ -189,7 +189,7 @@ export default function HomeScreen() {
         {/* Header Section */}
         <View style={styles.header}>
           <View style={styles.profileSection}>
-            <Pressable 
+            <Pressable
               style={styles.profileButton}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -212,9 +212,9 @@ export default function HomeScreen() {
         </View>
 
         {/* Daily Goal Progress */}
-        
+
         <View style={styles.goalContainer}>
-          <View style={[styles.goalCard, { 
+          <View style={[styles.goalCard, {
             backgroundColor: '#08332f',
             borderWidth: 2,
             borderColor: theme.cardBorder,
@@ -297,16 +297,16 @@ export default function HomeScreen() {
             </LinearGradient>
           </View>
         </View>
-        
+
 
         {/* Features Grid */}
-        
+
         <View style={styles.featuresGrid}>
   {features.map((feature) => (
     <Pressable
       key={feature.id}
       style={({ pressed }) => [
-        styles.featureCard, 
+        styles.featureCard,
         {
           transform: [{ scale: pressed ? 0.95 : 1 }],
           borderWidth: 2,
@@ -328,7 +328,7 @@ export default function HomeScreen() {
           </View>
           <Text style={[styles.featureTitle, { color: theme.text }]}>{feature.title}</Text>
           <Text style={[styles.featureDescription, { color: theme.secondaryText }]}>{feature.description}</Text>
-          
+
           <View style={styles.progressMiniContainer}>
             <View style={[styles.progressMiniBar, { backgroundColor: theme.progressBackground }]}>
               <LinearGradient
@@ -430,7 +430,53 @@ export default function HomeScreen() {
   </Pressable>
 </View>
 
-       
+        {/* Modern Footer */}
+<View style={[styles.footer, { borderTopWidth: 1, borderTopColor: theme.cardBorder }]}>
+  <Pressable
+    style={({ pressed }) => [
+      styles.footerButton,
+      { opacity: pressed ? 0.7 : 1 }
+    ]}
+    onPress={() => router.push('/help')}
+  >
+    <MaterialCommunityIcons name="help-circle" size={20} color={theme.secondaryText} />
+    <Text style={[styles.footerText, { color: theme.secondaryText }]}>Help</Text>
+  </Pressable>
+
+  <Pressable
+    style={({ pressed }) => [
+      styles.footerButton,
+      { opacity: pressed ? 0.7 : 1 }
+    ]}
+    onPress={() => router.push('/feedback')}
+  >
+    <MaterialCommunityIcons name="message-alert" size={20} color={theme.secondaryText} />
+    <Text style={[styles.footerText, { color: theme.secondaryText }]}>Feedback</Text>
+  </Pressable>
+
+  <Pressable
+    style={({ pressed }) => [
+      styles.footerButton,
+      { opacity: pressed ? 0.7 : 1 }
+    ]}
+    onPress={() => router.push('/terms')}
+  >
+    <MaterialCommunityIcons name="file-document" size={20} color={theme.secondaryText} />
+    <Text style={[styles.footerText, { color: theme.secondaryText }]}>Terms</Text>
+  </Pressable>
+
+  <Pressable
+    style={({ pressed }) => [
+      styles.footerButton,
+      { opacity: pressed ? 0.7 : 1 }
+    ]}
+    onPress={() => router.push('/settings')}
+  >
+    <MaterialCommunityIcons name="cog" size={20} color={theme.secondaryText} />
+    <Text style={[styles.footerText, { color: theme.secondaryText }]}>Settings</Text>
+  </Pressable>
+</View>
+
 
 {/* Bottom Spacer */}
 <View style={{ height: 20 }} />
@@ -588,7 +634,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: 18,
   },
-  
+
   featuresGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -708,6 +754,24 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     opacity: 0.4,
   },
-  
+
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 16,
+    marginTop: 20,
+    backgroundColor:'#072624', // or a darker color if preferred
+  },
+  footerButton: {
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  footerText: {
+    fontSize: 14,
+    marginTop: 4,
+    fontFamily: 'Inter_500Medium',
+  },
+
+
 
 });

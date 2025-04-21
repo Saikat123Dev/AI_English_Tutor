@@ -1,5 +1,6 @@
 import { useUser } from '@clerk/clerk-expo';
 import { FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,8 +11,6 @@ import {
   Dimensions,
   Easing,
   KeyboardAvoidingView,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Platform,
   ScrollView,
   StatusBar,
@@ -38,9 +37,10 @@ export default function ConversationScreen() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [speakingMessageIndex, setSpeakingMessageIndex] = useState<number | null>(null);
-  const scrollViewRef = useRef<ScrollView>(null);
-  const scrollEndTimer = useRef<NodeJS.Timeout | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [speakingMessageIndex, setSpeakingMessageIndex] = useState(null);
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const scrollEndTimer = useRef(null);
   const [suggestions, setSuggestions] = useState([]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(50)).current;
@@ -49,14 +49,17 @@ export default function ConversationScreen() {
   const typingDot3 = useRef(new Animated.Value(0)).current;
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [isScrolling, setIsScrolling] = useState(false);
-  const scrollUpButtonAnim = useRef(new Animated.Value(0)).current;
+  const scrollButtonAnim = useRef(new Animated.Value(0)).current;
   const floatingAssistantAnim = useRef(new Animated.Value(0)).current;
   const [showFloatingAssistant, setShowFloatingAssistant] = useState(false);
   const [lastScrollPosition, setLastScrollPosition] = useState(0);
   const suggestionsEntrance = useRef(new Animated.Value(0)).current;
   const waveAnimation = useRef(new Animated.Value(0)).current;
   const typingAnimation = useRef(new Animated.Value(0)).current;
+  const recordingAnimation = useRef(new Animated.Value(0)).current;
   const windowHeight = Dimensions.get('window').height;
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const [isNearTop, setIsNearTop] = useState(false);
 
   const { handleScroll: tabBarScrollHandler, tabBarHeight } = useContext(ScrollContext);
 
@@ -69,7 +72,7 @@ export default function ConversationScreen() {
     ]);
   };
 
-  const speakText = (text: string, messageIndex: number) => {
+  const speakText = (text, messageIndex) => {
     Speech.stop();
     setSpeakingMessageIndex(messageIndex);
     Speech.speak(text, {
@@ -80,7 +83,7 @@ export default function ConversationScreen() {
     });
   };
 
-  const replayText = (text: string, messageIndex: number) => {
+  const replayText = (text, messageIndex) => {
     if (speakingMessageIndex === messageIndex) {
       Speech.stop();
       setSpeakingMessageIndex(null);
@@ -158,7 +161,24 @@ export default function ConversationScreen() {
     ).start();
   };
 
-  const animateFloatingAssistant = (show: boolean) => {
+  const animateRecording = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(recordingAnimation, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(recordingAnimation, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  };
+
+  const animateFloatingAssistant = (show) => {
     setShowFloatingAssistant(show);
     Animated.spring(floatingAssistantAnim, {
       toValue: show ? 1 : 0,
@@ -193,6 +213,115 @@ export default function ConversationScreen() {
     }).start();
   };
 
+  const requestAudioPermissions = async () => {
+    const { status } = await Audio.requestPermissionsAsync();
+    return status === 'granted';
+  };
+
+  const startRecording = async () => {
+    try {
+      const hasPermission = await requestAudioPermissions();
+      if (!hasPermission) {
+        alert("Microphone permission is required for recording");
+        return;
+      }
+      setIsRecording(true);
+      if (Platform.OS === 'ios') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        Vibration.vibrate(20);
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY);
+      await recording.startAsync();
+      recordingRef.current = recording;
+      animateRecording();
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      alert(`Recording failed: ${error.message}`);
+      setIsRecording(false);
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      if (recordingRef.current) {
+        await recordingRef.current.stopAndUnloadAsync();
+        const uri = recordingRef.current.getURI();
+        setIsRecording(false);
+        recordingAnimation.stopAnimation();
+        recordingAnimation.setValue(0);
+
+        // Transcribe the audio using AssemblyAI API
+        const transcribedText = await transcribeAudio(uri);
+        if (transcribedText) {
+          setInput(transcribedText); // Set transcribed text to input box
+        }
+
+        if (Platform.OS === 'ios') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+          Vibration.vibrate(50);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
+      alert(`Failed to stop recording: ${error.message}`);
+      setIsRecording(false);
+    } finally {
+      recordingRef.current = null;
+    }
+  };
+
+  const transcribeAudio = async (audioUri) => {
+    if (!audioUri) return "";
+
+    setIsLoading(true);
+    try {
+      // Create FormData with the audio file
+      const formData = new FormData();
+      formData.append('audio', {
+        uri: audioUri,
+        type: 'audio/m4a', // Adjust based on your audio format
+        name: 'recording.m4a',
+      });
+
+      // Send to your backend endpoint that will call AssemblyAI
+      const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/transcribe', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      console.log(response)
+      if (!response.ok) {
+        throw new Error('Transcription failed');
+      }
+
+      const data = await response.json();
+
+      // Handle the AssemblyAI response
+      if (data.success && data.transcription && data.transcription.text) {
+        return data.transcription.text;
+      } else {
+        throw new Error('No transcription text returned');
+      }
+    } catch (error) {
+      console.error('Transcription error:', error);
+      alert('Could not transcribe audio. Please try again.');
+      return "";
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     animateEntranceElements();
     animateWave();
@@ -200,32 +329,149 @@ export default function ConversationScreen() {
 
     const fetchInitialQuestions = async () => {
       try {
-        if (!user?.primaryEmailAddress?.emailAddress) return false;
+        if (!user?.primaryEmailAddress?.emailAddress) {
+          setFallbackSuggestions();
+          return;
+        }
 
-        const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/initialQuestions', {
-          method: 'POST',
+        const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/chat/getHistory?email=' + user.primaryEmailAddress.emailAddress, {
+          method: 'GET',
           headers: {
             "ngrok-skip-browser-warning": "true",
-            'Accept':'application/json',
-            'Content-Type':'application/json',
-          },
-          body: JSON.stringify({
-            email: user.primaryEmailAddress.emailAddress
-          }),
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          }
         });
 
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
           const data = await response.json();
-          if (data.success && data.questions) {
-            setSuggestions(data.questions);
-            return;
+          if (data.success && data.history && data.history.length > 0) {
+            const historyMessages = data.history.map((item) => {
+              const userMessage = {
+                role: 'user',
+                content: item.userres,
+                timestamp: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              };
+
+              let assistantContent = "Sorry, I couldn't process this message.";
+              let sections = null;
+
+              try {
+                const parsedLLM = JSON.parse(item.llmres);
+
+                if (parsedLLM.success) {
+                  sections = [];
+
+                  if (parsedLLM.answer) {
+                    sections.push({
+                      type: 'answer',
+                      content: parsedLLM.answer
+                    });
+                  }
+
+                  if (parsedLLM.explanation) {
+                    sections.push({
+                      type: 'explanation',
+                      content: parsedLLM.explanation,
+                      icon: 'lightbulb-outline'
+                    });
+                  }
+
+                  if (parsedLLM.feedback) {
+                    sections.push({
+                      type: 'feedback',
+                      content: parsedLLM.feedback,
+                      icon: 'message-alert-outline'
+                    });
+                  }
+
+                  if (parsedLLM.followUp) {
+                    sections.push({
+                      type: 'followUp',
+                      content: parsedLLM.followUp,
+                      icon: 'chat-question-outline'
+                    });
+                  }
+
+                  assistantContent = [
+                    parsedLLM.answer,
+                    parsedLLM.explanation,
+                    parsedLLM.feedback,
+                    parsedLLM.followUp
+                  ].filter(Boolean).join('\n\n');
+
+                  if (parsedLLM.followUp) {
+                    generateSuggestionsFromFollowUp(parsedLLM.followUp);
+                  }
+                }
+              } catch (error) {
+                console.error('Error parsing LLM response:', error);
+                assistantContent = "Error parsing response.";
+              }
+
+              const assistantMessage = {
+                role: 'assistant',
+                content: assistantContent,
+                sections: sections,
+                timestamp: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              };
+
+              return [userMessage, assistantMessage];
+            }).flat();
+
+            if (historyMessages.length === 0) {
+              setMessages([
+                {
+                  role: 'assistant',
+                  content: `Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your language learning assistant. Let's practice conversation! What would you like to talk about?`,
+                  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  isInitial: true
+                }
+              ]);
+            } else {
+              setMessages(historyMessages);
+            }
+
+            if (data.history.length > 0) {
+              const lastItem = data.history[data.history.length - 1];
+              try {
+                const parsedLLM = JSON.parse(lastItem.llmres);
+                if (parsedLLM.followUp) {
+                  generateSuggestionsFromFollowUp(parsedLLM.followUp);
+                  return;
+                }
+              } catch (error) {
+                console.error('Error parsing last message for suggestions:', error);
+              }
+            }
+          } else {
+            setMessages([
+              {
+                role: 'assistant',
+                content: `Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your language learning assistant. Let's practice conversation! What would you like to talk about?`,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isInitial: true
+              }
+            ]);
           }
+          setFallbackSuggestions();
+        } else {
+          console.error('Invalid content type from API');
+          setFallbackSuggestions();
         }
-        setFallbackSuggestions();
       } catch (error) {
-        console.error('Error fetching initial questions:', error);
+        console.error('Error fetching chat history:', error);
         setFallbackSuggestions();
+
+        setMessages([
+          {
+            role: 'assistant',
+            content: `Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your language learning assistant. Let's practice conversation! What would you like to talk about?`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isInitial: true
+          }
+        ]);
       }
     };
 
@@ -233,6 +479,9 @@ export default function ConversationScreen() {
 
     return () => {
       Speech.stop();
+      if (recordingRef.current) {
+        recordingRef.current.stopAndUnloadAsync();
+      }
     };
   }, []);
 
@@ -254,11 +503,10 @@ export default function ConversationScreen() {
   }, [isLoading]);
 
   useEffect(() => {
-    // Auto-speak the latest assistant message
     const latestMessage = messages[messages.length - 1];
     if (latestMessage?.role === 'assistant' && !latestMessage.isInitial && messages.length > 1) {
       const content = latestMessage.sections
-        ? latestMessage.sections.find((section: any) => section.type === 'answer')?.content
+        ? latestMessage.sections.find((section) => section.type === 'answer')?.content
         : latestMessage.content;
       if (content) {
         speakText(content, messages.length - 1);
@@ -272,15 +520,27 @@ export default function ConversationScreen() {
     }
   };
 
-  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const scrollToBottom = () => {
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollToEnd({ animated: true });
+    }
+  };
+
+  const handleScroll = useCallback((event) => {
     const scrollPosition = event.nativeEvent.contentOffset.y;
     const scrollingUp = scrollPosition < lastScrollPosition;
     setLastScrollPosition(scrollPosition);
 
+    // Check if we're near the top (within 100 pixels)
+    const nearTop = scrollPosition < 100;
+    if (nearTop !== isNearTop) {
+      setIsNearTop(nearTop);
+    }
+
     tabBarScrollHandler(event);
 
     const shouldShowScrollButton = scrollPosition > 300;
-    Animated.spring(scrollUpButtonAnim, {
+    Animated.spring(scrollButtonAnim, {
       toValue: shouldShowScrollButton ? 1 : 0,
       friction: 8,
       tension: 60,
@@ -300,10 +560,12 @@ export default function ConversationScreen() {
     scrollEndTimer.current = setTimeout(() => {
       setIsScrolling(false);
     }, 150);
-  }, [lastScrollPosition, tabBarScrollHandler]);
+  }, [lastScrollPosition, tabBarScrollHandler, isNearTop]);
 
-  const sendMessage = async (text = input) => {
-    if (!text.trim()) return;
+  const sendMessage = async (text) => {
+    const messageText = text !== undefined ? text : input;
+
+    if (!messageText || messageText.trim() === '') return;
 
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -313,7 +575,7 @@ export default function ConversationScreen() {
 
     setIsLoading(true);
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const userMessage = { role: 'user', content: text, timestamp };
+    const userMessage = { role: 'user', content: messageText, timestamp, isInitial: false };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
 
@@ -329,7 +591,7 @@ export default function ConversationScreen() {
         },
         body: JSON.stringify({
           email: user.primaryEmailAddress.emailAddress,
-          message: text,
+          message: messageText,
           selectedTopic: selectedTopic
         }),
       });
@@ -386,7 +648,7 @@ export default function ConversationScreen() {
     }
   };
 
-  const formatResponseFromAPI = (data: any) => {
+  const formatResponseFromAPI = (data) => {
     const sections = [];
 
     if (data.answer) {
@@ -433,7 +695,7 @@ export default function ConversationScreen() {
     };
   };
 
-  const generateSuggestionsFromFollowUp = (followUp: string) => {
+  const generateSuggestionsFromFollowUp = (followUp) => {
     const newSuggestions = [];
 
     if (followUp.includes("aspect of travel")) {
@@ -472,7 +734,7 @@ export default function ConversationScreen() {
     setSuggestions(newSuggestions);
   };
 
-  const handleSuggestionPress = (suggestion: string) => {
+  const handleSuggestionPress = (suggestion) => {
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -528,7 +790,8 @@ export default function ConversationScreen() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <View style={styles.welcomeHeader}>
+          <View style={styles.welcomeHeader}></View>
+            <View>
             <View style={styles.welcomeAvatarContainer}>
               <View style={styles.welcomeAvatarInner}>
                 <Animated.View
@@ -591,7 +854,7 @@ export default function ConversationScreen() {
     );
   };
 
-  const renderMessageContent = (message: any, index: number) => {
+  const renderMessageContent = (message, index) => {
     if (message.isInitial) {
       return renderWelcomeCard();
     }
@@ -612,7 +875,7 @@ export default function ConversationScreen() {
     if (message.sections) {
       return (
         <View>
-          {message.sections.map((section: any, sectionIndex: number) => (
+          {message.sections.map((section, sectionIndex) => (
             <View key={sectionIndex} style={styles.messageSection}>
               {section.type === 'answer' && (
                 <>
@@ -642,9 +905,9 @@ export default function ConversationScreen() {
                         color="#FFF"
                       />
                     </View>
-                    <Text style={[styles.sectionTitle, styles.explanationTitle]}>Tips & Explanation</Text>
+                    <Text style={styles.sectionTitle}>Language Explanation</Text>
                   </View>
-                  <Text style={[styles.messageText, styles.assistantMessageText]}>
+                  <Text style={styles.explanationText}>
                     {section.content}
                   </Text>
                 </View>
@@ -660,9 +923,9 @@ export default function ConversationScreen() {
                         color="#FFF"
                       />
                     </View>
-                    <Text style={[styles.sectionTitle, styles.feedbackTitle]}>Feedback</Text>
+                    <Text style={styles.sectionTitle}>Feedback</Text>
                   </View>
-                  <Text style={[styles.messageText, styles.assistantMessageText, styles.feedbackText]}>
+                  <Text style={styles.feedbackText}>
                     {section.content}
                   </Text>
                 </View>
@@ -678,9 +941,9 @@ export default function ConversationScreen() {
                         color="#FFF"
                       />
                     </View>
-                    <Text style={[styles.sectionTitle, styles.followUpTitle]}>Continue Learning</Text>
+                    <Text style={styles.sectionTitle}>Follow-up Questions</Text>
                   </View>
-                  <Text style={[styles.messageText, styles.assistantMessageText]}>
+                  <Text style={styles.followUpText}>
                     {section.content}
                   </Text>
                 </View>
@@ -699,16 +962,18 @@ export default function ConversationScreen() {
         <Text style={[styles.messageText, styles.assistantMessageText]}>
           {message.content}
         </Text>
-        <TouchableOpacity
-          style={styles.replayButton}
-          onPress={() => replayText(message.content, index)}
-        >
-          <Ionicons
-            name={speakingMessageIndex === index ? "volume-mute" : "volume-high"}
-            size={20}
-            color={speakingMessageIndex === index ? "#FF5722" : "#23cc96"}
-          />
-        </TouchableOpacity>
+        {message.role === 'assistant' && (
+          <TouchableOpacity
+            style={styles.replayButton}
+            onPress={() => replayText(message.content, index)}
+          >
+            <Ionicons
+              name={speakingMessageIndex === index ? "volume-mute" : "volume-high"}
+              size={20}
+              color={speakingMessageIndex === index ? "#FF5722" : "#23cc96"}
+            />
+          </TouchableOpacity>
+        )}
         <Text style={[styles.timestamp, styles.assistantTimestamp]}>
           {message.timestamp}
         </Text>
@@ -716,366 +981,486 @@ export default function ConversationScreen() {
     );
   };
 
-  const renderTypingIndicator = () => {
-    return (
-      <View style={styles.typingContainer}>
-        <View style={styles.typingDotsContainer}>
-          <Animated.View style={[
-            styles.typingDot,
-            {
-              opacity: typingDot1.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.3, 1]
-              }),
-              transform: [{
-                translateY: typingAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, -5]
-                })
-              }]
-            }
-          ]} />
-          <Animated.View style={[
-            styles.typingDot,
-            {
-              opacity: typingDot2.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.3, 1]
-              }),
-              transform: [{
-                translateY: typingAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, -5]
-                })
-              }]
-            }
-          ]} />
-          <Animated.View style={[
-            styles.typingDot,
-            {
-              opacity: typingDot3.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.3, 1]
-              }),
-              transform: [{
-                translateY: typingAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, -5]
-                })
-              }]
-            }
-          ]} />
-        </View>
-        <Text style={styles.typingText}>Assistant is thinking</Text>
-      </View>
-    );
-  };
-
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar backgroundColor="#1E1E2E" barStyle="light-content" />
-
-      {renderTopicBadge()}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <StatusBar barStyle="light-content" />
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        {renderTopicBadge()}
+        <Text style={styles.headerTitle}>Language Partner</Text>
+        <View style={styles.headerRight}>
+          <MaterialCommunityIcons name="robot-happy" size={24} color="#6C63FF" />
+        </View>
+      </View>
 
       <ScrollView
         ref={scrollViewRef}
-        contentContainerStyle={[styles.chatContainer, { paddingBottom: tabBarHeight + 20 }]}
-        showsVerticalScrollIndicator={false}
+        style={styles.messagesContainer}
+        contentContainerStyle={[
+          styles.messagesContent,
+          { paddingBottom: insets.bottom + 80 }
+        ]}
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
         {messages.map((message, index) => (
-          <Animated.View
+          <View
             key={index}
             style={[
-              styles.messageRow,
-              message.role === 'user' ? styles.userRow : styles.assistantRow,
-              {
-                opacity: fadeAnim,
-                transform: index > 0 ? [] : [{ translateY }]
-              }
+              styles.messageContainer,
+              message.role === 'user' ? styles.userContainer : styles.assistantContainer
             ]}
           >
-            <View style={[
-              styles.messageBubble,
-              message.role === 'user' ? styles.userBubble : styles.assistantBubble,
-              message.isInitial && styles.initialMessageBubble
-            ]}>
-              {renderMessageContent(message, index)}
-            </View>
-          </Animated.View>
+            {renderMessageContent(message, index)}
+          </View>
         ))}
 
         {isLoading && (
-          <View style={[styles.messageRow, styles.assistantRow]}>
-            <View style={styles.avatarContainer}>
-              <LinearGradient
-                colors={['#6C63FF', '#8A63FF']}
-                style={styles.avatar}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <MaterialCommunityIcons name="robot-happy-outline" size={20} color="#FFF" />
-              </LinearGradient>
-            </View>
-            <View style={[styles.messageBubble, styles.assistantBubble, styles.typingBubble]}>
-              {renderTypingIndicator()}
-            </View>
+          <View style={styles.loadingContainer}>
+            <BlurView intensity={80} style={styles.loadingBlur} tint="dark">
+              <View style={styles.typingIndicator}>
+                <Animated.View
+                  style={[
+                    styles.typingDot,
+                    {
+                      opacity: typingDot1
+                    }
+                  ]}
+                />
+                <Animated.View
+                  style={[
+                    styles.typingDot,
+                    {
+                      opacity: typingDot2
+                    }
+                  ]}
+                />
+                <Animated.View
+                  style={[
+                    styles.typingDot,
+                    {
+                      opacity: typingDot3
+                    }
+                  ]}
+                />
+              </View>
+            </BlurView>
           </View>
         )}
-
-        {!isLoading && suggestions.length > 0 && (
-          <Animated.View
-            style={[
-              styles.suggestionsContainer,
-              {
-                opacity: suggestionsEntrance,
-                transform: [{
-                  translateY: suggestionsEntrance.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 0]
-                  })
-                }]
-              }
-            ]}
-          >
-            <Text style={styles.suggestionsTitle}>Quick Suggestions</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.suggestionsScrollView}
-            >
-              {suggestions.map((suggestion, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.suggestionBubble}
-                  onPress={() => handleSuggestionPress(suggestion)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.suggestionText}>{suggestion}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </Animated.View>
-        )}
-
-        <View style={{ height: 120 }} />
       </ScrollView>
 
       <Animated.View
-        style={[
-          styles.scrollUpButtonContainer,
-          {
-            opacity: scrollUpButtonAnim,
-            transform: [{
-              scale: scrollUpButtonAnim.interpolate({
+  style={[
+    styles.scrollButton,
+    {
+      opacity: scrollButtonAnim,
+      transform: [
+        {
+          scale: scrollButtonAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.5, 1]
+          })
+        }
+      ]
+    }
+  ]}
+>
+  <TouchableOpacity
+    onPress={isNearTop ? scrollToBottom : scrollToTop}
+    style={styles.scrollButtonInner}
+    activeOpacity={0.8}
+  >
+    <LinearGradient
+      colors={isNearTop ? ['#3B82F6', '#6366F1'] : ['#6366F1', '#A855F7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.scrollButtonGradient}
+    />
+    <Animated.View
+      style={[
+        styles.scrollButtonPulse,
+        {
+          opacity: waveAnimation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.2, 0.5]
+          }),
+          transform: [
+            {
+              scale: waveAnimation.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0.8, 1]
+                outputRange: [0.8, 1.2]
               })
-            }]
+            }
+          ]
+        }
+      ]}
+    />
+    <MaterialCommunityIcons
+      name={isNearTop ? "arrow-down" : "arrow-up"}
+      size={28}
+      color="#FFF"
+      style={styles.scrollButtonIcon}
+    />
+  </TouchableOpacity>
+</Animated.View>
+
+      {showFloatingAssistant && (
+        <Animated.View
+          style={[
+            styles.floatingAssistant,
+            {
+              opacity: floatingAssistantAnim,
+              transform: [
+                {
+                  scale: floatingAssistantAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.5, 1]
+                  })
+                },
+                {
+                  translateY: floatingAssistantAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0]
+                  })
+                }
+              ]
+            }
+          ]}
+        >
+          <BlurView intensity={90} style={styles.floatingAssistantBlur} tint="dark">
+            <View style={styles.floatingAssistantInner}>
+              <View style={styles.floatingAssistantIconContainer}>
+                <MaterialCommunityIcons name="robot-happy" size={20} color="#6C63FF" />
+              </View>
+              <Text style={styles.floatingAssistantText}>
+                Need help with anything else?
+              </Text>
+            </View>
+          </BlurView>
+        </Animated.View>
+      )}
+
+      <Animated.View
+        style={[
+          styles.suggestionsContainer,
+          {
+            opacity: suggestionsEntrance,
+            transform: [
+              {
+                translateY: suggestionsEntrance.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0]
+                })
+              }
+            ]
           }
         ]}
       >
-        <TouchableOpacity
-          style={styles.scrollUpButton}
-          onPress={scrollToTop}
-          activeOpacity={0.8}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.suggestionsScrollContent}
         >
-          <BlurView intensity={90} tint="dark" style={styles.scrollUpButtonBlur}>
-            <Ionicons name="chevron-up" size={40} color="#FFF" />
-          </BlurView>
-        </TouchableOpacity>
+          {suggestions.map((suggestion, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.suggestionButton}
+              onPress={() => handleSuggestionPress(suggestion)}
+            >
+              <Text style={styles.suggestionText}>{suggestion}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </Animated.View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? tabBarHeight + 20 : 0}
-        style={styles.inputContainer}
-      >
-        <BlurView intensity={90} tint="dark" style={styles.inputBlur}>
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.input}
-              placeholder="Type your message..."
-              placeholderTextColor="#A0A0C0"
-              value={input}
-              onChangeText={setInput}
-              multiline={true}
-              maxHeight={100}
-            />
-            <TouchableOpacity
+      <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 10 }]}>
+        <TextInput
+          style={styles.input}
+          placeholder="Type a message..."
+          placeholderTextColor="#999"
 
-              style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
-              onPress={() => sendMessage()}
-              disabled={!input.trim()}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={input.trim() ? ['#7F5AF0', '#6C56E0'] : ['#3A3A5A', '#3A3A5A']}
-                style={styles.sendButtonGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+          value={input}
+          onChangeText={setInput}
+          multiline
+          maxHeight={100}
+        />
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[
+              styles.recordButton,
+              isRecording && styles.recordingButton
+            ]}
+            onPress={isRecording ? stopRecording : startRecording}
+          >
+            {isRecording ? (
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      scale: recordingAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 1.2]
+                      })
+                    }
+                  ]
+                }}
               >
-                <Ionicons name="send" size={18} color="#FFF" />
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </BlurView>
-      </KeyboardAvoidingView>
-    </View>
+                <FontAwesome5 name="microphone" size={18} color="#FFF" />
+              </Animated.View>
+            ) : (
+              <FontAwesome5 name="microphone" size={18} color="#FFF" />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              input.trim().length === 0 ? styles.sendButtonDisabled : {}
+            ]}
+            onPress={() => sendMessage()}
+            disabled={input.trim().length === 0}
+          >
+            <Ionicons name="send" size={20} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  chatContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 20,
     backgroundColor: '#03302c',
   },
-  topicBadgeContainer: {
+  scrollButton: {
     position: 'absolute',
-    top: 70,
     right: 16,
-    zIndex: 11,
-  },
-  topicBadge: {
-    flexDirection: 'row',
+    bottom: 100,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-    backgroundColor: '#1a4499',
-    borderWidth: 1,
-    borderColor: '#4752C4',
-  },
-  topicText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 6,
-  },
-  messageRow: {
-    flexDirection: 'row',
-    marginBottom: 10,
-    alignItems: 'flex-end',
-  },
-  userRow: {
-    flexDirection: 'row-reverse',
-  },
-  assistantRow: {
-    marginRight: 8,
-  },
-  messageBubble: {
-    padding: 12,
-    borderRadius: 18,
-    maxWidth: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  userBubble: {
-    backgroundColor: '#1a3666',
-    borderBottomRightRadius: 4,
-    borderWidth: 1,
-    borderColor: '#4752C4',
-  },
-  assistantBubble: {
-    backgroundColor: '#1b2638',
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: '#1a4499',
-  },
-  initialMessageBubble: {
-    backgroundColor: 'transparent',
-    shadowColor: 'transparent',
-    padding: 0,
-    maxWidth: '100%',
-    borderWidth: 0,
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  userMessageText: {
-    color: '#FFFFFF',
-  },
-  assistantMessageText: {
-    color: '#f2f0f0',
-  },
-  timestamp: {
-    fontSize: 12,
-    marginTop: 4,
-    alignSelf: 'flex-end',
-  },
-  userTimestamp: {
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  assistantTimestamp: {
-    color: 'rgba(220, 221, 222, 0.8)',
-  },
-  replayButton: {
-    right: 8,
-    top: 8,
-    left:2 ,
-    padding: 10,           // Reduced from 12 to make it smaller
-    borderRadius: 8,      // Slightly smaller border radius
-    backgroundColor: 'rgba(35, 204, 150, 0.1)',
-    borderWidth: 1,       // Thinner border
-    borderColor: 'rgba(35, 204, 150, 0.3)',
-    width: 40,            // Fixed width
-    height: 40,           // Fixed height
-    justifyContent: 'center', 
-
-},
-  welcomeCard: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-    backgroundColor: '#23cc96',
+    shadowOpacity: 0.27,
+    shadowRadius: 4.65,
+    elevation: 6,
     borderWidth: 1,
-    borderColor: '#202225',
+    borderColor: 'rgba(99, 102, 241, 0.4)',
+    zIndex: 100,
+  },
+  scrollButtonInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  scrollButtonGradient: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+  },
+  scrollButtonIcon: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  scrollButtonPulse: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B',
+    backgroundColor: '#0F172A'
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  headerRight: {
+    position: 'absolute',
+    right: 16,
+  },
+  messagesContainer: {
+    flex: 1,
+  },
+  messagesContent: {
+    padding: 16,
+  },
+  messageContainer: {
+    marginBottom: 12,
+    maxWidth: '85%',
+  },
+  userContainer: {
+    alignSelf: 'flex-end',
+  },
+  assistantContainer: {
+    alignSelf: 'flex-start',
+  },
+  messageText: {
+    fontSize: 16,
+    padding: 12,
+    borderRadius: 18,
+  },
+  userMessageText: {
+    backgroundColor: '#3B82F6',
+    color: '#FFF',
+    borderBottomRightRadius: 2,
+  },
+  assistantMessageText: {
+    backgroundColor: '#1E293B',
+    color: '#FFF',
+    borderBottomLeftRadius: 2,
+  },
+  timestamp: {
+    fontSize: 11,
+    marginTop: 4,
+    opacity: 0.6,
+  },
+  userTimestamp: {
+    color: '#94A3B8',
+    textAlign: 'right',
+    marginRight: 4,
+  },
+  assistantTimestamp: {
+    color: '#94A3B8',
+    marginLeft: 4,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    backgroundColor: '#0F172A',
+    borderTopWidth: 1,
+    borderTopColor: '#1E293B',
+  },
+  input: {
+    flex: 1,
+    backgroundColor: '#1E293B',
+    borderRadius: 20,
+    padding: 12,
+    paddingRight: 100,
+    color: '#FFF',
+    fontSize: 16,
+    maxHeight: 100,
+  },
+  buttonContainer: {
+    position: 'absolute',
+    right: 22,
+    bottom: 17,
+    flexDirection: 'row',
+  },
+  sendButton: {
+    backgroundColor: '#3B82F6',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#334155',
+  },
+  recordButton: {
+    backgroundColor: '#6366F1',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recordingButton: {
+    backgroundColor: '#EF4444',
+  },
+  loadingContainer: {
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  loadingBlur: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    padding: 14,
+  },
+  typingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  typingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFF',
+    marginHorizontal: 2,
+  },
+  suggestionsContainer: {
+    position: 'absolute',
+    bottom: 90,
+    left: 0,
+    right: 0,
+  },
+  suggestionsScrollContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  suggestionButton: {
+    backgroundColor: 'rgba(30, 41, 59, 0.8)',
+    borderRadius: 18,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  suggestionText: {
+    color: '#FFF',
+    fontSize: 14,
+  },
+  welcomeCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 8,
   },
   welcomeGradient: {
-    padding: 20,
-    backgroundColor: '#23cc96',
+    padding: 16,
   },
   welcomeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   welcomeAvatarContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#5865F2',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#4752C4',
   },
   welcomeAvatarInner: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1085,55 +1470,83 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#FFF',
     marginBottom: 4,
   },
   welcomeSubtitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#4ADE80',
+    marginRight: 6,
+  },
   welcomeSubtitle: {
-    fontSize: 12,
-    color: '#B9BBBE',
+    fontSize: 14,
+    color: '#E2E8F0',
   },
   welcomeText: {
-    fontSize: 16,
-    color: '#DCDDDE',
-    lineHeight: 24,
-    marginBottom: 16,
+    fontSize: 15,
+    color: '#FFF',
+    lineHeight: 22,
+    marginBottom: 12,
   },
   welcomeDivider: {
     height: 1,
-    backgroundColor: '#40444B',
-    marginBottom: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginVertical: 12,
   },
   welcomeTips: {
-    gap: 14,
+    marginTop: 8,
   },
   tipItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
   },
   tipIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(88, 101, 242, 0.15)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(88, 101, 242, 0.3)',
+    marginRight: 10,
   },
   tipText: {
     fontSize: 14,
-    color: '#DCDDDE',
+    color: '#FFF',
     flex: 1,
-    lineHeight: 20,
   },
   messageSection: {
     marginBottom: 12,
-    marginTop: 4,
+  },
+  explanationSection: {
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#38BDF8',
+  },
+  feedbackSection: {
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#6366F1',
+  },
+  followUpSection: {
+    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#A855F7',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1141,181 +1554,116 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionIconContainer: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
-    borderWidth: 1,
+  },
+  explanationIcon: {
+    backgroundColor: '#38BDF8',
+  },
+  feedbackIcon: {
+    backgroundColor: '#6366F1',
+  },
+  followUpIcon: {
+    backgroundColor: '#A855F7',
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#FFF',
+    opacity: 0.9,
   },
-  explanationSection: {
-    backgroundColor: 'rgba(87, 242, 135, 0.1)',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(87, 242, 135, 0.3)',
-  },
-  explanationIcon: {
-    backgroundColor: 'rgba(87, 242, 135, 0.15)',
-    borderColor: 'rgba(87, 242, 135, 0.3)',
-  },
-  explanationTitle: {
-    color: '#23cc96',
-  },
-  feedbackSection: {
-    backgroundColor: 'rgba(255, 177, 66, 0.18)',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 177, 66, 0.4)',
-  },
-  feedbackIcon: {
-    backgroundColor: 'rgba(255, 177, 66, 0.15)',
-    borderColor: 'rgba(255, 177, 66, 0.3)',
-  },
-  feedbackTitle: {
-    color: '#FBB848',
+  explanationText: {
+    fontSize: 14,
+    color: '#E2E8F0',
+    lineHeight: 20,
   },
   feedbackText: {
-    color: '#DCDDDE',
-  },
-  followUpSection: {
-    backgroundColor: 'rgba(235, 69, 158, 0.2)',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(235, 69, 158, 0.4)',
-  },
-  followUpIcon: {
-    backgroundColor: 'rgba(235, 69, 158, 0.15)',
-    borderColor: 'rgba(235, 69, 158, 0.3)',
-  },
-  followUpTitle: {
-    color: '#23cc96',
-  },
-  typingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  typingDotsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 8,
-    backgroundColor: 'rgba(42, 57, 66, 0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  typingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#23cc96',
-    marginHorizontal: 2,
-  },
-  typingText: {
-    fontSize: 13,
-    color: '#23cc96',
-    marginLeft: 4,
-  },
-  typingBubble: {
-    backgroundColor: 'rgba(42, 57, 66, 0.9)',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 2,
-  },
-  suggestionsContainer: {
-    marginTop: 16,
-    marginBottom: 16,
-  },
-  suggestionsTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#B9BBBE',
-    marginBottom: 10,
+    color: '#E2E8F0',
+    lineHeight: 20,
   },
-  suggestionsScrollView: {
-    paddingVertical: 4,
+  followUpText: {
+    fontSize: 14,
+    color: '#E2E8F0',
+    lineHeight: 20,
   },
-  suggestionBubble: {
-    backgroundColor: 'rgba(88, 101, 242, 0.2)',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(88, 101, 242, 0.7)',
-  },
-  suggestionText: {
-    fontSize: 13,
-    color: '#23cc96',
-    fontWeight: '500',
-  },
-  scrollUpButtonContainer: {
+  replayButton: {
     position: 'absolute',
-    bottom: 100,
-    right: 16,
-    backgroundColor: 'rgba(0, 128, 128, 0.3)',
-    zIndex: 100,
+    bottom: 10,
+    right: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollUpButton: {
-    width: 45,
-    height: 45,
-    backgroundColor: 'rgba(0, 128, 128, 0.3)',
+    position: 'absolute',
+    right: 16,
+    bottom: 100,
+  },
+  scrollUpButtonInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(59, 130, 246, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
   },
-  inputContainer: {
-    paddingHorizontal: 10,
-    paddingTop: 10,
-    paddingBottom: 20,
-    backgroundColor: '#03302c',
+  floatingAssistant: {
+    position: 'absolute',
+    bottom: 150,
+    left: 16,
+    right: 16,
   },
-  inputWrapper: {
+  floatingAssistantBlur: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  floatingAssistantInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 6,
+    padding: 12,
+  },
+  floatingAssistantIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  floatingAssistantText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  topicBadgeContainer: {
+    position: 'absolute',
+    left: 16,
+  },
+  topicBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
     paddingHorizontal: 10,
-    backgroundColor: '#2a3942',
-    borderWidth: 2,
-    borderColor: '#1f2a30',
+    borderRadius: 12,
   },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    color: '#FFFFFF',
-    maxHeight: 100,
-    backgroundColor: '03302c',
-  },
-  sendButton: {
-    width: 35,
-    height: 35,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#064739',
-    borderWidth: 0,
-  },
-  sendButtonDisabled: {
-    opacity: 0.7,
-    backgroundColor: '#062e25',
-  },
-  sendButtonGradient: {
-    width: 35,
-    height: 35,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#00a884',
-  },
+  topicText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  }
 });
