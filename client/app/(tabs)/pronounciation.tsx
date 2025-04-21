@@ -877,10 +877,10 @@ export default function PronunciationPracticeScreen() {
 
   return (
 
-    
-    
+
+
     <SafeAreaView style={styles.container}>
-      
+
     <ScrollView
       ref={scrollViewRef}
       style={styles.scrollView}
@@ -888,7 +888,7 @@ export default function PronunciationPracticeScreen() {
       onScroll={combinedScrollHandler}
       scrollEventThrottle={16}
     >
-      
+
         <View style={styles.header}>
           <Text style={styles.title}>Pronunciation Practice</Text>
           <View style={styles.userInfoContainer}>
@@ -921,7 +921,7 @@ export default function PronunciationPracticeScreen() {
           </View>
           {showSearchResults && searchResults.length > 0 && (
             <View style={styles.searchResultsContainer}>
-              
+
               <ScrollView
                 style={styles.searchResultsScroll}
                 keyboardShouldPersistTaps="handled"
@@ -941,7 +941,7 @@ export default function PronunciationPracticeScreen() {
           )}
         </Animated.View>
 
-        
+
         <Animated.View style={[styles.wordsListContainer, { opacity: fadeAnim }]}>
           <Text style={styles.sectionTitle}>Practice Words</Text>
           <ScrollView
@@ -1132,7 +1132,6 @@ export default function PronunciationPracticeScreen() {
 
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
