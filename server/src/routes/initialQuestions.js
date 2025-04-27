@@ -62,7 +62,7 @@ DO NOT include any text outside of the JSON array. Return ONLY the array of 6 qu
 `;
 
     // Get the model and generate content
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     let text = response.text();

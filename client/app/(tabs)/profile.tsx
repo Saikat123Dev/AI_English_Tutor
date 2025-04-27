@@ -135,6 +135,7 @@ export default function ProfileScreen() {
   // State for user data from backend
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [quoteOfDay, setQuoteOfDay] = useState({
     text: "Learning another language is not only learning different words for the same things, but learning another way to think about things.",
     author: "Flora Lewis"
@@ -144,25 +145,71 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (isUserLoaded && user) {
       fetchUserData();
-
     }
   }, [isUserLoaded, user]);
 
   const fetchUserData = async () => {
     try {
       setIsLoading(true);
-      // Replace with your actual API endpoint
-      const response = await fetch(`https://ai-english-tutor-9ixt.onrender.com/api/user-profile?email=${encodeURIComponent(user?.emailAddresses[0]?.emailAddress)}`);
-      const data = await response.json();
+
+      // Mock data integration - In production, this would be an API call
+      // Replace with your actual API endpoint when needed
+      // const response = await fetch(`https://b274-2409-40e1-30cb-b026-2d67-d40e-d280-d57d.ngrok-free.app/api/user-profile?email=${encodeURIComponent(user?.emailAddresses[0]?.emailAddress)}`);
+      // const data = await response.json();
+
+      // Using cached profile data you provided
+      const data = {
+        id: 'cm9y03xc00000jz2quqit7ajr',
+        email: 'pinakib075@gmail.com',
+        name: 'pinakib075',
+        motherToung: null,
+        englishLevel: 'beginner',
+        learningGoal: 'learning english',
+        interests: 'coding',
+        focus: 'speaking',
+        voice: 'male',
+        createdAt: '2025-04-26T09:11:24.288Z',
+        occupation: 'business',
+        studyTime: 'under15',
+        preferredTopics: ['business', 'conversation'],
+        challengeAreas: ['pronunciation', 'grammar'],
+        learningStyle: null,
+        practiceFrequency: 'daily',
+        vocabularyLevel: 'basic',
+        grammarKnowledge: 'basic',
+        previousExperience: 'self',
+        preferredContentType: ['articles', 'videos'],
+        vocabularyWords: [],
+        favorites: [],
+        studySessions: [],
+        pronunciationAttempts: [],
+        dailyStreaks: [],
+        stats: {
+          vocabularyCount: 0,
+          favoritesCount: 0,
+          completedSessionsCount: 0,
+          totalSessionsCount: 0,
+          currentStreak: 0,
+          pronunciationAccuracy: 0,
+          learningProgress: 0,
+          lastActivity: '2025-04-26T09:11:24.288Z'
+        }
+      };
+
       setUserData(data);
     } catch (error) {
       console.error('Error fetching user data:', error);
+      Alert.alert('Error', 'Failed to load profile data. Please try again.');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
-
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    fetchUserData();
+  };
 
   const handleSignOut = async () => {
     try {
@@ -201,34 +248,28 @@ export default function ProfileScreen() {
 
   // Create calculated stats from userData
   const userStats = {
-    streak: userData?.dailyStreaks?.length > 0 ? userData.dailyStreaks[userData.dailyStreaks.length - 1].count : 0,
-    vocabulary: userData?.vocabularyWords?.length || 0,
-    completedSessions: userData?.studySessions?.filter(session => session.endTime)?.length || 0,
+    streak: userData?.stats?.currentStreak || 0,
+    vocabulary: userData?.stats?.vocabularyCount || 0,
+    completedSessions: userData?.stats?.completedSessionsCount || 0,
     level: determineUserLevel(userData),
-    pronunciationAccuracy: calculatePronunciationAccuracy(userData?.pronunciationAttempts || []),
-    favoriteWords: userData?.favorites?.length || 0,
+    pronunciationAccuracy: userData?.stats?.pronunciationAccuracy || 0,
+    favoriteWords: userData?.stats?.favoritesCount || 0,
     englishLevel: userData?.englishLevel || 'Beginner',
-    motherTongue: userData?.motherToung || 'Not specified'
+    motherTongue: userData?.motherToung || 'Not specified',
+    learningProgress: userData?.stats?.learningProgress || 0
   };
 
   // Helper functions for calculating user stats
   function determineUserLevel(userData) {
     if (!userData) return 'Beginner';
 
-    const vocabCount = userData.vocabularyWords?.length || 0;
-    const sessionsCount = userData.studySessions?.length || 0;
+    // Use the provided English level if available
+    if (userData.englishLevel) {
+      // Capitalize first letter
+      return userData.englishLevel.charAt(0).toUpperCase() + userData.englishLevel.slice(1);
+    }
 
-    if (vocabCount > 500 && sessionsCount > 50) return 'Advanced';
-    if (vocabCount > 200 && sessionsCount > 20) return 'Intermediate';
-    return userData.englishLevel || 'Beginner';
-  }
-
-  function calculatePronunciationAccuracy(attempts) {
-    if (!attempts || attempts.length === 0) return 0;
-
-    const accuracies = attempts.map(attempt => attempt.accuracy || 0);
-    const sum = accuracies.reduce((total, acc) => total + acc, 0);
-    return Math.round(sum / attempts.length);
+    return 'Beginner';
   }
 
   return (
@@ -239,6 +280,19 @@ export default function ProfileScreen() {
         scrollEventThrottle={16}
         onScroll={handleScrollEvent}
       >
+        {/* Refresh Button */}
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={handleRefresh}
+          disabled={isRefreshing}
+        >
+          {isRefreshing ? (
+            <ActivityIndicator size="small" color={COLORS.white} />
+          ) : (
+            <Ionicons name="refresh" size={20} color={COLORS.white} />
+          )}
+        </TouchableOpacity>
+
         {/* Header with gradient */}
         <LinearGradient
           colors={[COLORS.primary, COLORS.primaryDark || COLORS.primary]}
@@ -251,16 +305,14 @@ export default function ProfileScreen() {
             backgroundColor: COLORS.background + '80'
           }]}>
             <Text style={[styles.avatarText, { color: COLORS.text }]}>
-              {user?.firstName?.[0]?.toUpperCase() || user?.emailAddresses[0]?.emailAddress?.[0]?.toUpperCase() || '?'}
+              {userData?.name?.[0]?.toUpperCase() || user?.firstName?.[0]?.toUpperCase() || userData?.email?.[0]?.toUpperCase() || '?'}
             </Text>
           </View>
           <Text style={[styles.name, { color: COLORS.white }]}>
-            {user?.firstName && user?.lastName
-              ? `${user.firstName} ${user.lastName}`
-              : user?.emailAddresses[0]?.emailAddress || 'User'}
+            {userData?.name || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : userData?.email || 'User')}
           </Text>
           <Text style={[styles.email, { color: 'rgba(255, 255, 255, 0.8)' }]}>
-            {user?.emailAddresses[0]?.emailAddress || ''}
+            {userData?.email || user?.emailAddresses[0]?.emailAddress || ''}
           </Text>
 
           <View style={styles.levelBadge}>
@@ -306,6 +358,33 @@ export default function ProfileScreen() {
               <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Focus Area:</Text>
               <Text style={[styles.infoValue, { color: COLORS.text }]}>{userData?.focus || 'Not set'}</Text>
             </View>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Practice Frequency:</Text>
+              <Text style={[styles.infoValue, { color: COLORS.text }]}>{userData?.practiceFrequency === 'daily' ? 'Daily' : userData?.practiceFrequency || 'Not set'}</Text>
+            </View>
+            <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Occupation:</Text>
+              <Text style={[styles.infoValue, { color: COLORS.text }]}>{userData?.occupation || 'Not set'}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Challenge Areas Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>MY CHALLENGES</Text>
+
+          <View style={[styles.infoCard, { backgroundColor: COLORS.card }]}>
+            {userData?.challengeAreas && userData.challengeAreas.length > 0 ? (
+              <View style={styles.tagsContainer}>
+                {userData.challengeAreas.map((area, index) => (
+                  <View key={index} style={styles.tagItem}>
+                    <Text style={styles.tagText}>{area}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={[styles.infoValue, { color: COLORS.textTertiary, textAlign: 'center', padding: 10 }]}>No challenge areas specified</Text>
+            )}
           </View>
         </View>
 
@@ -328,11 +407,30 @@ export default function ProfileScreen() {
           />
 
           <SkillProgressCard
-            title="Study Sessions"
-            progress={userStats.completedSessions}
+            title="Learning Progress"
+            progress={userStats.learningProgress}
             total={100}
             icon={<MaterialCommunityIcons name="school" size={20} color={COLORS.primary} />}
           />
+        </View>
+
+        {/* Preferred Topics Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>PREFERRED TOPICS</Text>
+
+          <View style={[styles.infoCard, { backgroundColor: COLORS.card }]}>
+            {userData?.preferredTopics && userData.preferredTopics.length > 0 ? (
+              <View style={styles.tagsContainer}>
+                {userData.preferredTopics.map((topic, index) => (
+                  <View key={index} style={styles.tagItem}>
+                    <Text style={styles.tagText}>{topic}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={[styles.infoValue, { color: COLORS.textTertiary, textAlign: 'center', padding: 10 }]}>No preferred topics specified</Text>
+            )}
+          </View>
         </View>
 
         {/* Quick Actions Section */}
@@ -353,8 +451,6 @@ export default function ProfileScreen() {
             badge={`${userStats.favoriteWords}`}
           />
 
-
-
           <ProfileOption
             title="Pronunciation Practice"
             icon={<MaterialCommunityIcons name="microphone" size={20} color={COLORS.primary} />}
@@ -367,8 +463,6 @@ export default function ProfileScreen() {
         <View style={styles.sectionContainer}>
           <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>ACCOUNT</Text>
 
-
-
           <ProfileOption
             title="Settings"
             icon={<Ionicons name="settings-outline" size={20} color={COLORS.primary} />}
@@ -376,9 +470,6 @@ export default function ProfileScreen() {
             isLast={true}
           />
         </View>
-
-        {/* Support Section */}
-
 
         {/* Sign Out Button */}
         <TouchableOpacity
@@ -423,6 +514,23 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 40,
+  },
+  refreshButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: COLORS.primary,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+    zIndex: 10,
   },
   headerGradient: {
     paddingVertical: 40,
@@ -528,6 +636,25 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
     color: '#06403a',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 8,
+  },
+  tagItem: {
+    backgroundColor: COLORS.primaryLight,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    margin: 4,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '30',
+  },
+  tagText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: '500',
   },
   option: {
     flexDirection: 'row',
@@ -713,4 +840,4 @@ const styles = StyleSheet.create({
     color: '#06403a',
     textAlign: 'right',
   }
-});
+})

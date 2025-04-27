@@ -22,6 +22,17 @@ model user {
   interests             String?
   focus                 String?
   voice                 String?
+  occupation            String?
+  studyTime             String?
+  preferredTopics       String? // Stored as comma-separated values
+  challengeAreas        String? // Stored as comma-separated values
+  learningStyle         String?
+  practiceFrequency     String?
+  vocabularyLevel       String?
+  grammarKnowledge      String?
+  previousExperience    String?
+  preferredContentType  String? // Stored as comma-separated values
+  spokenAccent          String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   questions             question[]
@@ -30,6 +41,11 @@ model user {
   favorites             favorite[] // Relation to favorites
   studySessions         studySession[] // Relation to study sessions
   dailyStreaks          dailyStreak[] // Relation to daily streaks
+
+  @@index([englishLevel])
+  @@index([focus])
+  @@index([learningStyle])
+  @@index([practiceFrequency])
 }
 
 model question {
@@ -136,4 +152,28 @@ model searchHistory {
 
   @@index([userId])
   @@index([timestamp])
+}
+
+model WordDictionary {
+  id        String   @id @default(cuid())
+  word      String   @unique
+  phonetic  String?
+  syllables String?
+  content   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([word])
+}
+
+model WordTips {
+  id        String   @id @default(cuid())
+  word      String
+  language  String   @default("general")
+  content   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([word, language], name: "wordLanguage")
+  @@index([word])
 }
