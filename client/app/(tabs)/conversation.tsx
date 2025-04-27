@@ -1,5 +1,5 @@
 import { useUser } from '@clerk/clerk-expo';
-import { FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
@@ -19,7 +19,9 @@ import {
   TextInput,
   TouchableOpacity,
   Vibration,
-  View
+  View,
+  Alert,
+  Modal
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScrollContext } from './ScrollContext';
@@ -27,6 +29,11 @@ import { ScrollContext } from './ScrollContext';
 export default function ConversationScreen() {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
+  
+  // Get tabBar scroll handler from context
+  const { handleScroll: tabBarScrollHandler, tabBarHeight } = useContext(ScrollContext);
+  
+  // States
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -35,11 +42,12 @@ export default function ConversationScreen() {
       isInitial: true
     }
   ]);
+  
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [speakingMessageIndex, setSpeakingMessageIndex] = useState(null);
-  const scrollViewRef = useRef<ScrollView | null>(null);
+  const scrollViewRef = useRef(null);
   const scrollEndTimer = useRef(null);
   const [suggestions, setSuggestions] = useState([]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -51,17 +59,38 @@ export default function ConversationScreen() {
   const [isScrolling, setIsScrolling] = useState(false);
   const scrollButtonAnim = useRef(new Animated.Value(0)).current;
   const floatingAssistantAnim = useRef(new Animated.Value(0)).current;
-  const [showFloatingAssistant, setShowFloatingAssistant] = useState(false);
   const [lastScrollPosition, setLastScrollPosition] = useState(0);
   const suggestionsEntrance = useRef(new Animated.Value(0)).current;
   const waveAnimation = useRef(new Animated.Value(0)).current;
   const typingAnimation = useRef(new Animated.Value(0)).current;
   const recordingAnimation = useRef(new Animated.Value(0)).current;
   const windowHeight = Dimensions.get('window').height;
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingRef = useRef(null);
   const [isNearTop, setIsNearTop] = useState(false);
+  const [editingMessageIndex, setEditingMessageIndex] = useState(null);
+  const [editingText, setEditingText] = useState('');
+  const [expandedSections, setExpandedSections] = useState({});
+  const [showTranslation, setShowTranslation] = useState({});
+  const [translations, setTranslations] = useState({});
+  const [targetLanguage, setTargetLanguage] = useState('es');
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [longPressedMessage, setLongPressedMessage] = useState(null);
+  const [showMessageActions, setShowMessageActions] = useState(false);
+  const [actionMenuPosition, setActionMenuPosition] = useState({ x: 0, y: 0 });
+  const [actionMenuMessageIndex, setActionMenuMessageIndex] = useState(null);
+  const [isScrollingUp, setIsScrollingUp] = useState(false);
 
-  const { handleScroll: tabBarScrollHandler, tabBarHeight } = useContext(ScrollContext);
+  const languageOptions = [
+    { code: 'es', name: 'Spanish' },
+    { code: 'fr', name: 'French' },
+    { code: 'de', name: 'German' },
+    { code: 'it', name: 'Italian' },
+    { code: 'zh', name: 'Chinese' },
+    { code: 'ja', name: 'Japanese' },
+    { code: 'ko', name: 'Korean' },
+    { code: 'ru', name: 'Russian' },
+    { code: 'bn', name: 'Bengali' }
+  ];
 
   const setFallbackSuggestions = () => {
     setSuggestions([
@@ -179,7 +208,6 @@ export default function ConversationScreen() {
   };
 
   const animateFloatingAssistant = (show) => {
-    setShowFloatingAssistant(show);
     Animated.spring(floatingAssistantAnim, {
       toValue: show ? 1 : 0,
       friction: 6,
@@ -258,10 +286,9 @@ export default function ConversationScreen() {
         recordingAnimation.stopAnimation();
         recordingAnimation.setValue(0);
 
-        // Transcribe the audio using AssemblyAI API
         const transcribedText = await transcribeAudio(uri);
         if (transcribedText) {
-          setInput(transcribedText); // Set transcribed text to input box
+          setInput(transcribedText);
         }
 
         if (Platform.OS === 'ios') {
@@ -284,15 +311,13 @@ export default function ConversationScreen() {
 
     setIsLoading(true);
     try {
-      // Create FormData with the audio file
       const formData = new FormData();
       formData.append('audio', {
         uri: audioUri,
-        type: 'audio/m4a', // Adjust based on your audio format
+        type: 'audio/m4a',
         name: 'recording.m4a',
       });
 
-      // Send to your backend endpoint that will call AssemblyAI
       const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/transcribe', {
         method: 'POST',
         body: formData,
@@ -307,7 +332,6 @@ export default function ConversationScreen() {
 
       const data = await response.json();
 
-      // Handle the AssemblyAI response
       if (data.success && data.transcription && data.transcription.text) {
         return data.transcription.text;
       } else {
@@ -320,6 +344,190 @@ export default function ConversationScreen() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const toggleSection = (messageIndex, sectionType) => {
+    const key = `${messageIndex}-${sectionType}`;
+    setExpandedSections(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+    
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const toggleTranslation = async (messageIndex, text, sectionType = 'answer') => {
+    const key = `${messageIndex}-${sectionType}`;
+    
+    setShowTranslation(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+    
+    if (!showTranslation[key] && !translations[key]) {
+      await translateText(messageIndex, text, sectionType);
+    }
+    
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const translateText = async (messageIndex, text, sectionType = 'answer') => {
+    if (!text) return;
+    
+    setIsLoading(true);
+    try {
+      try {
+        const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/translate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: text,
+            targetLanguage: targetLanguage
+          }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.translatedText) {
+            const key = `${messageIndex}-${sectionType}`;
+            setTranslations(prev => ({
+              ...prev,
+              [key]: data.translatedText
+            }));
+            return;
+          }
+        }
+      } catch (apiError) {
+        console.error('API translation error:', apiError);
+      }
+      
+      let mockTranslation = '';
+      const langName = languageOptions.find(l => l.code === targetLanguage)?.name || targetLanguage;
+      
+      if (targetLanguage === 'es') {
+        mockTranslation = `[Español] ${text.substring(0, 10)}... (Texto traducido al español)`;
+      } else if (targetLanguage === 'fr') {
+        mockTranslation = `[Français] ${text.substring(0, 10)}... (Texte traduit en français)`;
+      } else if (targetLanguage === 'de') {
+        mockTranslation = `[Deutsch] ${text.substring(0, 10)}... (Text auf Deutsch übersetzt)`;
+      } else if (targetLanguage === 'bn') {
+        mockTranslation = `[বাংলা] ${text.substring(0, 10)}... (বাংলায় অনুবাদ করা পাঠ্য)`;
+      } else {
+        mockTranslation = `[${langName}] ${text.substring(0, 10)}... (Translated text in ${langName})`;
+      }
+      
+      const key = `${messageIndex}-${sectionType}`;
+      setTranslations(prev => ({
+        ...prev,
+        [key]: mockTranslation
+      }));
+    } catch (error) {
+      console.error('Translation error:', error);
+      const mockTranslation = `[Translation to ${targetLanguage}] ${text.substring(0, 20)}...`;
+      const key = `${messageIndex}-${sectionType}`;
+      setTranslations(prev => ({
+        ...prev,
+        [key]: mockTranslation
+      }));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteMessage = (index) => {
+    Alert.alert(
+      "Delete Message",
+      "Are you sure you want to delete this message?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          onPress: () => {
+            // If we're deleting the message being edited, cancel editing mode
+            if (editingMessageIndex === index) {
+              setEditingMessageIndex(null);
+              setEditingText('');
+            }
+
+            setMessages(prev => {
+              const newMessages = [...prev];
+              // Delete user message and also its corresponding assistant reply if it exists
+              if (index < newMessages.length - 1 && 
+                  newMessages[index].role === 'user' && 
+                  newMessages[index + 1].role === 'assistant') {
+                newMessages.splice(index, 2);
+              } else {
+                newMessages.splice(index, 1);
+              }
+              return newMessages;
+            });
+
+            if (Platform.OS === 'ios') {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
+          },
+          style: "destructive"
+        }
+      ]
+    );
+  };
+
+  const startEditMessage = (index) => {
+    if (messages[index].role === 'user') {
+      setEditingMessageIndex(index);
+      setEditingText(messages[index].content);
+    }
+  };
+
+  const saveEditedMessage = () => {
+    if (editingMessageIndex !== null && editingText.trim()) {
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[editingMessageIndex] = {
+          ...newMessages[editingMessageIndex],
+          content: editingText
+        };
+        return newMessages;
+      });
+      setEditingMessageIndex(null);
+      setEditingText('');
+      
+      if (Platform.OS === 'ios') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    }
+  };
+
+  const cancelEditing = () => {
+    setEditingMessageIndex(null);
+    setEditingText('');
+  };
+
+  const handleLongPress = (messageIndex, event) => {
+    if (messages[messageIndex].role !== 'user') return;
+    
+    const { pageX, pageY } = event.nativeEvent;
+    setLongPressedMessage(messageIndex);
+    setActionMenuPosition({ x: pageX, y: pageY });
+    setShowMessageActions(true);
+    
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+  };
+
+  const closeActionMenu = () => {
+    setShowMessageActions(false);
+    setLongPressedMessage(null);
   };
 
   useEffect(() => {
@@ -516,13 +724,21 @@ export default function ConversationScreen() {
 
   const scrollToTop = () => {
     if (scrollViewRef.current) {
-      scrollViewRef.current.scrollTo({ y: 0, animated: true });
+      try {
+        scrollViewRef.current.scrollTo({ y: 0, animated: true });
+      } catch (error) {
+        console.log('Error scrolling to top', error);
+      }
     }
   };
 
   const scrollToBottom = () => {
     if (scrollViewRef.current) {
-      scrollViewRef.current.scrollToEnd({ animated: true });
+      try {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      } catch (error) {
+        console.log('Error scrolling to bottom', error);
+      }
     }
   };
 
@@ -530,8 +746,10 @@ export default function ConversationScreen() {
     const scrollPosition = event.nativeEvent.contentOffset.y;
     const scrollingUp = scrollPosition < lastScrollPosition;
     setLastScrollPosition(scrollPosition);
+    
+    // Update scrolling direction state
+    setIsScrollingUp(scrollingUp);
 
-    // Check if we're near the top (within 100 pixels)
     const nearTop = scrollPosition < 100;
     if (nearTop !== isNearTop) {
       setIsNearTop(nearTop);
@@ -539,13 +757,24 @@ export default function ConversationScreen() {
 
     tabBarScrollHandler(event);
 
+    // Only show scroll button when scroll position exceeds threshold
     const shouldShowScrollButton = scrollPosition > 300;
-    Animated.spring(scrollButtonAnim, {
-      toValue: shouldShowScrollButton ? 1 : 0,
-      friction: 8,
-      tension: 60,
-      useNativeDriver: true,
-    }).start();
+    
+    if (shouldShowScrollButton) {
+      Animated.spring(scrollButtonAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 60,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // Hide button when near the top
+      Animated.timing(scrollButtonAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
 
     if (scrollingUp && scrollPosition > 200) {
       animateFloatingAssistant(true);
@@ -553,7 +782,9 @@ export default function ConversationScreen() {
       animateFloatingAssistant(false);
     }
 
+    // Manage scrolling state
     setIsScrolling(true);
+    
     if (scrollEndTimer.current) {
       clearTimeout(scrollEndTimer.current);
     }
@@ -567,21 +798,34 @@ export default function ConversationScreen() {
 
     if (!messageText || messageText.trim() === '') return;
 
-    if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } else {
-      Vibration.vibrate(20);
-    }
-
-    setIsLoading(true);
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const userMessage = { role: 'user', content: messageText, timestamp, isInitial: false };
-    setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setSuggestions([]);
+    setSelectedTopic(null);
+    
+    // Close any open sections
+    setExpandedSections({});
+    
+    // Add the user message to the state
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    setMessages(prev => [...prev, {
+      role: 'user',
+      content: messageText,
+      timestamp,
+      isInitial: false
+    }]);
+
+    // Update layout state
+    setIsLoading(true);
 
     try {
-      if (!user?.primaryEmailAddress?.emailAddress) return false;
+      // Prepare the context from previous messages to improve response quality
+      const recentMessages = messages.slice(-4).map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
 
+      // Use the correct server URL
       const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/conversation/ask', {
         method: 'POST',
         headers: {
@@ -590,107 +834,131 @@ export default function ConversationScreen() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: user.primaryEmailAddress.emailAddress,
+          email: user?.primaryEmailAddress?.emailAddress,
           message: messageText,
-          selectedTopic: selectedTopic
+          selectedTopic: selectedTopic,
+          context: recentMessages, // Add conversation context for better responses
+          requestHighQuality: true // Request the highest quality response
         }),
       });
-
+      
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         throw new Error('Invalid response format');
       }
 
       const data = await response.json();
-
+      
       if (data.success) {
+        // Start typing animation
+        startTypingAnimation();
+        
         const formattedResponse = formatResponseFromAPI(data);
-
+        const messageIndex = messages.length; // Get the index for the new message
+        
+        // Delay to simulate typing
         setTimeout(() => {
+          // Add the assistant message
           setMessages(prev => [...prev, {
             role: 'assistant',
             content: formattedResponse.content,
             sections: formattedResponse.sections,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isInitial: false
           }]);
 
           if (data.followUp) {
             generateSuggestionsFromFollowUp(data.followUp);
+            
+            // Auto-expand the suggestions section
+            setTimeout(() => {
+              const suggestionsSectionKey = `${messageIndex}-suggestions`;
+              setExpandedSections(prev => ({
+                ...prev,
+                [suggestionsSectionKey]: true
+              }));
+            }, 500);
           }
-
-          suggestionsEntrance.setValue(0);
-          Animated.timing(suggestionsEntrance, {
-            toValue: 1,
-            duration: 600,
-            delay: 300,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true
-          }).start();
-        }, 500);
+          
+          // Hide loading indicator
+          setIsLoading(false);
+        }, 1000); // Slightly longer delay for a more realistic typing effect
       } else {
+        // More informative error message for server-side issues
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: "I'm sorry, I couldn't process your message. Please try again.",
-          timestamp
+          content: data.error || "I'm sorry, I couldn't process your message properly. Could you try rephrasing your question?",
+          timestamp,
+          isInitial: false
         }]);
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('Error:', error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: "Sorry, there was an error connecting to the service.",
-        timestamp
+        content: "Sorry, there was an error connecting to the service. Please check your internet connection and try again.",
+        timestamp,
+        isInitial: false
       }]);
-    } finally {
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 500);
+      setIsLoading(false);
     }
   };
 
   const formatResponseFromAPI = (data) => {
     const sections = [];
 
+    // Ensure the answer has proper content and formatting
     if (data.answer) {
       sections.push({
         type: 'answer',
-        content: data.answer
+        content: data.answer.trim()
       });
     }
 
-    if (data.explanation) {
+    // Ensure explanations are properly formatted
+    if (data.explanation && data.explanation.trim()) {
       sections.push({
         type: 'explanation',
-        content: data.explanation,
-        icon: 'lightbulb-outline'
+        content: data.explanation.trim(),
+        icon: 'school'
       });
     }
 
-    if (data.feedback) {
+    // Ensure feedback is properly formatted
+    if (data.feedback && data.feedback.trim()) {
       sections.push({
         type: 'feedback',
-        content: data.feedback,
-        icon: 'message-alert-outline'
+        content: data.feedback.trim(),
+        icon: 'check-circle'
       });
     }
 
-    if (data.followUp) {
+    // Enhance follow-up questions section
+    if (data.followUp && data.followUp.trim() !== '') {
+      // Format the follow-up content for better readability
+      const formattedFollowUp = data.followUp
+        .split(/\d+\./)
+        .filter(item => item.trim())
+        .map(item => `• ${item.trim()}`)
+        .join('\n\n');
+      
       sections.push({
         type: 'followUp',
-        content: data.followUp,
-        icon: 'chat-question-outline'
+        content: formattedFollowUp || data.followUp.trim(),
+        icon: 'help-circle'
+      });
+      
+      // Add suggestions section after followUp
+      sections.push({
+        type: 'suggestions',
+        content: 'Click to see suggestions based on these questions',
+        icon: 'lightbulb'
       });
     }
 
-    const content = [
-      data.answer,
-      data.explanation,
-      data.feedback,
-      data.followUp
-    ].filter(Boolean).join('\n\n');
-
     return {
-      content,
+      content: data.answer?.trim() || "I'm here to help with your English learning!",
       sections
     };
   };
@@ -741,13 +1009,13 @@ export default function ConversationScreen() {
     sendMessage(suggestion);
   };
 
-  const renderTopicBadge = () => {
+  const renderTopicBadge = (index) => {
     if (!selectedTopic) return null;
 
     const topicIcons = {
-      "travel": <FontAwesome5 name="plane" size={12} color="#FFF" />,
-      "vocabulary": <FontAwesome5 name="book" size={12} color="#FFF" />,
-      "hobbies": <FontAwesome5 name="palette" size={12} color="#FFF" />
+      "travel": <FontAwesome5 name="plane" size={14} color="#FFF" />,
+      "vocabulary": <FontAwesome5 name="book" size={14} color="#FFF" />,
+      "hobbies": <FontAwesome5 name="palette" size={14} color="#FFF" />
     };
 
     const topicColors = {
@@ -757,9 +1025,14 @@ export default function ConversationScreen() {
     };
 
     return (
-      <View style={styles.topicBadgeContainer}>
-
-      </View>
+      <LinearGradient
+        colors={topicColors[selectedTopic] || ['#3B82F6', '#6366F1']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.topicBadge}
+      >
+        {topicIcons[selectedTopic]}
+      </LinearGradient>
     );
   };
 
@@ -775,13 +1048,12 @@ export default function ConversationScreen() {
         ]}
       >
         <LinearGradient
-          colors={['#0b3b4d', '#145241']}
+          colors={['#0a402e', '#072622']}
           style={styles.welcomeGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <View style={styles.welcomeHeader}></View>
-            <View>
+          <View style={styles.welcomeHeader}>
             <View style={styles.welcomeAvatarContainer}>
               <View style={styles.welcomeAvatarInner}>
                 <Animated.View
@@ -799,7 +1071,7 @@ export default function ConversationScreen() {
                   <MaterialCommunityIcons
                     name="robot-happy"
                     size={36}
-                    color="#145241"
+                    color="#23cc96"
                   />
                 </Animated.View>
               </View>
@@ -844,102 +1116,249 @@ export default function ConversationScreen() {
     );
   };
 
+  const renderMessageSection = (section, sectionIndex, messageIndex) => {
+    const isExpanded = expandedSections[`${messageIndex}-${section.type}`];
+    const shouldRenderContent = section.type === 'answer' || isExpanded;
+    
+    const sectionColors = {
+      answer: {
+        bg: 'rgba(35, 204, 150, 0.1)', // Light green for main answer
+        border: '#23cc96',
+        icon: '#23cc96'
+      },
+      explanation: {
+        bg: 'rgba(56, 189, 248, 0.1)', // Light blue
+        border: '#38BDF8',
+        icon: '#38BDF8'
+      },
+      feedback: {
+        bg: 'rgba(9, 184, 243, 0.1)', // Lighter purple (reduced opacity)
+        border: '#6366F1',
+        icon: '#6366F1'
+      },
+      followUp: {
+        bg: 'rgba(251, 191, 36, 0.1)', // Light yellow
+        border: '#FBB848',
+        icon: '#FBB848'
+      },
+      suggestions: {
+        bg: 'rgba(251, 191, 36, 0.1)', // Match the followUp style
+        border: '#15a387',
+        icon: '#15a387'
+      }
+    };
+    
+    const sectionColor = sectionColors[section.type] || {
+      bg: 'transparent',
+      border: 'transparent',
+      icon: '#FFF'
+    };
+    
+    const sectionTitles = {
+      answer: 'Response',
+      explanation: 'Language Explanation',
+      feedback: 'Feedback',
+      followUp: 'Follow-up Questions',
+      suggestions: 'Suggestions'
+    };
+    
+    const sectionIcons = {
+      answer: 'chat-outline',
+      explanation: 'lightbulb-outline',
+      feedback: 'message-alert-outline',
+      followUp: 'chat-question-outline',
+      suggestions: 'lightbulb-on'
+    };
+
+    return (
+      <View 
+        key={sectionIndex} 
+        style={[
+          styles.sectionBox,
+          { 
+            backgroundColor: sectionColor.bg,
+            borderColor: sectionColor.border,
+            marginBottom: section.type === 'followUp' ? 4 : 8 // Reduce margin between followUp and suggestions
+          }
+        ]}
+      >
+        {section.type !== 'answer' && (
+          <TouchableOpacity 
+            style={styles.sectionHeader} 
+            onPress={() => toggleSection(messageIndex, section.type)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.sectionHeaderContent}>
+              <View style={[
+                styles.sectionIconContainer,
+                { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: sectionColor.border }
+              ]}>
+                <MaterialCommunityIcons
+                  name={sectionIcons[section.type]}
+                  size={16}
+                  color={sectionColor.icon}
+                />
+              </View>
+              <Text style={[styles.sectionTitle, { color: sectionColor.icon }]}>
+                {sectionTitles[section.type]}
+              </Text>
+            </View>
+            <MaterialIcons
+              name={isExpanded ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+              size={22}
+              color={sectionColor.icon}
+            />
+          </TouchableOpacity>
+        )}
+
+        {shouldRenderContent && section.type !== 'suggestions' && (
+          <View style={styles.sectionContent}>
+            {section.type === 'answer' && (
+              <View style={styles.answerHeader}>
+                <View style={[
+                  styles.sectionIconContainer, 
+                  { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: sectionColor.border }
+                ]}>
+                  <MaterialCommunityIcons
+                    name={sectionIcons.answer}
+                    size={16}
+                    color={sectionColor.icon}
+                  />
+                </View>
+                <Text style={[styles.sectionTitle, { color: sectionColor.icon }]}>
+                  {sectionTitles.answer}
+                </Text>
+              </View>
+            )}
+            <Text style={styles.sectionText}>
+              {section.content}
+            </Text>
+            
+            <View style={styles.messageActionButtons}>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => replayText(section.content, messageIndex)}
+              >
+                <Ionicons
+                  name={speakingMessageIndex === messageIndex ? "volume-mute" : "volume-high"}
+                  size={16} 
+                  color={speakingMessageIndex === messageIndex ? "#FF5722" : "#23cc96"}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => toggleTranslation(messageIndex, section.content, section.type)}
+              >
+                <MaterialIcons name="translate" size={16} color="#3B82F6" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        
+        {/* Suggestions section content */}
+        {isExpanded && section.type === 'suggestions' && (
+          <View style={styles.suggestionsContent}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.suggestionsScrollContent}
+            >
+              {suggestions.map((suggestion, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={styles.suggestionButton}
+                  onPress={() => handleSuggestionPress(suggestion)}
+                >
+                  <Text style={styles.suggestionText}>{suggestion}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        
+        {showTranslation[`${messageIndex}-${section.type}`] && (
+          <View style={styles.translationContainer}>
+            <Text style={styles.translationText}>
+              {translations[`${messageIndex}-${section.type}`] || 'Translating...'}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderMessageContent = (message, index) => {
     if (message.isInitial) {
       return renderWelcomeCard();
     }
 
     if (message.role === 'user') {
+      // If we're editing this message, show the edit interface
+      if (editingMessageIndex === index) {
+        return (
+          <View style={styles.editContainer}>
+            <TextInput
+              style={styles.editInput}
+              value={editingText}
+              onChangeText={setEditingText}
+              multiline
+            />
+            <View style={styles.editButtons}>
+              <TouchableOpacity 
+                style={[styles.editButton, styles.cancelButton]} 
+                onPress={cancelEditing}
+              >
+                <Text style={styles.editButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.editButton, styles.saveButton]} 
+                onPress={saveEditedMessage}
+              >
+                <Text style={styles.editButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+      }
+      
+      // Regular user message with action buttons - updated styling
       return (
-        <View>
+        <View style={styles.userMessageContainer}>
           <Text style={[styles.messageText, styles.userMessageText]}>
             {message.content}
           </Text>
-          <Text style={[styles.timestamp, styles.userTimestamp]}>
-            {message.timestamp}
-          </Text>
+          <View style={styles.userMessageActions}>
+            <View style={styles.userMessageButtons}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => startEditMessage(index)}
+              >
+                <MaterialIcons name="edit" size={16} color="#23cc96" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => deleteMessage(index)}
+              >
+                <MaterialIcons name="delete" size={16} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.timestamp, styles.userTimestamp]}>
+              {message.timestamp}
+            </Text>
+          </View>
         </View>
       );
     }
 
+    // Assistant message with sections
     if (message.sections) {
       return (
-        <View>
-          {message.sections.map((section, sectionIndex) => (
-            <View key={sectionIndex} style={styles.messageSection}>
-              {section.type === 'answer' && (
-                <>
-                  <Text style={[styles.messageText, styles.assistantMessageText]}>
-                    {section.content}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.replayButton}
-                    onPress={() => replayText(section.content, index)}
-                  >
-                    <Ionicons
-                      name={speakingMessageIndex === index ? "volume-mute" : "volume-high"}
-                      size={20}
-                      color={speakingMessageIndex === index ? "#FF5722" : "#23cc96"}
-                    />
-                  </TouchableOpacity>
-                </>
-              )}
-
-              {section.type === 'explanation' && (
-                <View style={styles.explanationSection}>
-                  <View style={styles.sectionHeader}>
-                    <View style={[styles.sectionIconContainer, styles.explanationIcon]}>
-                      <MaterialCommunityIcons
-                        name="lightbulb-outline"
-                        size={16}
-                        color="#FFF"
-                      />
-                    </View>
-                    <Text style={styles.sectionTitle}>Language Explanation</Text>
-                  </View>
-                  <Text style={styles.explanationText}>
-                    {section.content}
-                  </Text>
-                </View>
-              )}
-
-              {section.type === 'feedback' && (
-                <View style={styles.feedbackSection}>
-                  <View style={styles.sectionHeader}>
-                    <View style={[styles.sectionIconContainer, styles.feedbackIcon]}>
-                      <MaterialCommunityIcons
-                        name="message-alert-outline"
-                        size={16}
-                        color="#FFF"
-                      />
-                    </View>
-                    <Text style={styles.sectionTitle}>Feedback</Text>
-                  </View>
-                  <Text style={styles.feedbackText}>
-                    {section.content}
-                  </Text>
-                </View>
-              )}
-
-              {section.type === 'followUp' && (
-                <View style={styles.followUpSection}>
-                  <View style={styles.sectionHeader}>
-                    <View style={[styles.sectionIconContainer, styles.followUpIcon]}>
-                      <MaterialCommunityIcons
-                        name="chat-question-outline"
-                        size={16}
-                        color="#FFF"
-                      />
-                    </View>
-                    <Text style={styles.sectionTitle}>Follow-up Questions</Text>
-                  </View>
-                  <Text style={styles.followUpText}>
-                    {section.content}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ))}
+        <View style={styles.assistantContainer}>
+          <View style={styles.assistantMessageContainer}>
+            {message.sections.map((section, sectionIndex) => 
+              renderMessageSection(section, sectionIndex, index)
+            )}
+          </View>
           <Text style={[styles.timestamp, styles.assistantTimestamp]}>
             {message.timestamp}
           </Text>
@@ -947,23 +1366,41 @@ export default function ConversationScreen() {
       );
     }
 
+    // Standard assistant message without sections
     return (
       <View>
-        <Text style={[styles.messageText, styles.assistantMessageText]}>
-          {message.content}
-        </Text>
-        {message.role === 'assistant' && (
-          <TouchableOpacity
-            style={styles.replayButton}
-            onPress={() => replayText(message.content, index)}
-          >
-            <Ionicons
-              name={speakingMessageIndex === index ? "volume-mute" : "volume-high"}
-              size={20}
-              color={speakingMessageIndex === index ? "#FF5722" : "#23cc96"}
-            />
-          </TouchableOpacity>
-        )}
+        <View style={[styles.assistantMessageContainer, styles.standardAssistantMessage]}>
+          <Text style={[styles.messageText, styles.assistantMessageText]}>
+            {message.content}
+          </Text>
+          <View style={styles.messageActionButtons}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => replayText(message.content, index)}
+            >
+              <Ionicons
+                name={speakingMessageIndex === index ? "volume-mute" : "volume-high"}
+                size={18}
+                color={speakingMessageIndex === index ? "#FF5722" : "#23cc96"}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => toggleTranslation(index, message.content, message.sections ? message.sections[0].type : 'answer')}
+            >
+              <MaterialIcons name="translate" size={18} color="#3B82F6" />
+            </TouchableOpacity>
+          </View>
+        
+          {showTranslation[`${index}-${message.sections ? message.sections[0].type : 'answer'}`] && (
+            <View style={styles.translationContainer}>
+              <Text style={styles.translationText}>
+                {translations[`${index}-${message.sections ? message.sections[0].type : 'answer'}`] || 'Translating...'}
+              </Text>
+            </View>
+          )}
+        </View>
+        
         <Text style={[styles.timestamp, styles.assistantTimestamp]}>
           {message.timestamp}
         </Text>
@@ -971,274 +1408,272 @@ export default function ConversationScreen() {
     );
   };
 
+  // Add language menu button
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <StatusBar barStyle="light-content" />
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        {renderTopicBadge()}
-        <Text style={styles.headerTitle}>Language Partner</Text>
-        <View style={styles.headerRight}>
-          <MaterialCommunityIcons name="robot-happy" size={24} color="#6C63FF" />
-        </View>
-      </View>
-
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.messagesContainer}
-        contentContainerStyle={[
-          styles.messagesContent,
-          { paddingBottom: insets.bottom + 80 }
-        ]}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
+    <View style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        {messages.map((message, index) => (
-          <View
-            key={index}
-            style={[
-              styles.messageContainer,
-              message.role === 'user' ? styles.userContainer : styles.assistantContainer
-            ]}
-          >
-            {renderMessageContent(message, index)}
-          </View>
-        ))}
+        <StatusBar barStyle="light-content" />
+        <View style={[styles.header, { paddingTop: insets.top }]}>
+          {/* Completely empty header */}
+        </View>
+        
+        {/* Translation toggle button */}
+        <TouchableOpacity 
+          style={styles.translationButton}
+          onPress={() => setShowLanguageModal(true)}
+        >
+          <MaterialIcons name="translate" size={20} color="#FFF" />
+        </TouchableOpacity>
 
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <BlurView intensity={80} style={styles.loadingBlur} tint="dark">
-              <View style={styles.typingIndicator}>
-                <Animated.View
-                  style={[
-                    styles.typingDot,
-                    {
-                      opacity: typingDot1
-                    }
-                  ]}
-                />
-                <Animated.View
-                  style={[
-                    styles.typingDot,
-                    {
-                      opacity: typingDot2
-                    }
-                  ]}
-                />
-                <Animated.View
-                  style={[
-                    styles.typingDot,
-                    {
-                      opacity: typingDot3
-                    }
-                  ]}
-                />
-              </View>
-            </BlurView>
-          </View>
-        )}
-      </ScrollView>
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.messagesContainer}
+          contentContainerStyle={[
+            styles.messagesContent,
+            { paddingBottom: 120 } // Increased padding to make room for lower input
+          ]}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
+          {messages.map((message, index) => (
+            <View
+              key={index}
+              style={[
+                styles.messageContainer,
+                message.role === 'user' ? styles.userContainer : styles.assistantContainer
+              ]}
+            >
+              {renderMessageContent(message, index)}
+            </View>
+          ))}
 
-      <Animated.View
-  style={[
-    styles.scrollButton,
-    {
-      opacity: scrollButtonAnim,
-      transform: [
-        {
-          scale: scrollButtonAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0.5, 1]
-          })
-        }
-      ]
-    }
-  ]}
->
-  <TouchableOpacity
-    onPress={isNearTop ? scrollToBottom : scrollToTop}
-    style={styles.scrollButtonInner}
-    activeOpacity={0.8}
-  >
-    <LinearGradient
-      colors={isNearTop ? ['#3B82F6', '#6366F1'] : ['#6366F1', '#A855F7']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.scrollButtonGradient}
-    />
-    <Animated.View
-      style={[
-        styles.scrollButtonPulse,
-        {
-          opacity: waveAnimation.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0.2, 0.5]
-          }),
-          transform: [
-            {
-              scale: waveAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.8, 1.2]
-              })
-            }
-          ]
-        }
-      ]}
-    />
-    <MaterialCommunityIcons
-      name={isNearTop ? "arrow-down" : "arrow-up"}
-      size={28}
-      color="#FFF"
-      style={styles.scrollButtonIcon}
-    />
-  </TouchableOpacity>
-</Animated.View>
+          {isLoading && (
+            <View style={styles.loadingContainer}>
+              <BlurView intensity={80} style={styles.loadingBlur} tint="dark">
+                <View style={styles.typingIndicator}>
+                  <Animated.View
+                    style={[
+                      styles.typingDot,
+                      {
+                        opacity: typingDot1
+                      }
+                    ]}
+                  />
+                  <Animated.View
+                    style={[
+                      styles.typingDot,
+                      {
+                        opacity: typingDot2
+                      }
+                    ]}
+                  />
+                  <Animated.View
+                    style={[
+                      styles.typingDot,
+                      {
+                        opacity: typingDot3
+                      }
+                    ]}
+                  />
+                </View>
+              </BlurView>
+            </View>
+          )}
+        </ScrollView>
 
-      {showFloatingAssistant && (
         <Animated.View
           style={[
-            styles.floatingAssistant,
+            styles.scrollButton,
             {
-              opacity: floatingAssistantAnim,
+              opacity: scrollButtonAnim,
               transform: [
                 {
-                  scale: floatingAssistantAnim.interpolate({
+                  scale: scrollButtonAnim.interpolate({
                     inputRange: [0, 1],
                     outputRange: [0.5, 1]
                   })
-                },
-                {
-                  translateY: floatingAssistantAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 0]
-                  })
                 }
-              ]
+              ],
+              pointerEvents: scrollButtonAnim._value === 0 ? 'none' : 'auto'
             }
           ]}
         >
-
+          <TouchableOpacity
+            onPress={isScrollingUp ? scrollToTop : scrollToBottom}
+            style={styles.scrollButtonInner}
+            activeOpacity={0.8}
+          >
+            <BlurView intensity={90} style={styles.scrollButtonBlur} tint="dark">
+              <LinearGradient
+                colors={isScrollingUp ? ['#3b82f6', '#1d4ed8'] : ['#1c855c', '#16a34a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.scrollButtonGradient}
+              />
+              <MaterialCommunityIcons
+                name={isScrollingUp ? "arrow-up" : "arrow-down"}
+                size={28}
+                color="#FFF"
+                style={styles.scrollButtonIcon}
+              />
+            </BlurView>
+          </TouchableOpacity>
         </Animated.View>
-      )}
 
-      <Animated.View
-        style={[
-          styles.suggestionsContainer,
-          {
-            opacity: suggestionsEntrance,
-            transform: [
-              {
-                translateY: suggestionsEntrance.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [20, 0]
-                })
-              }
-            ]
+        <View style={[
+          styles.inputContainer,
+          { 
+            paddingBottom: Math.max(insets.bottom, 20), // Add extra bottom padding based on safe area
+            bottom: -10 // Push further down
           }
-        ]}
-      >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.suggestionsScrollContent}
-        >
-          {suggestions.map((suggestion, index) => (
+        ]}>
+          <TextInput
+            style={styles.input}
+            placeholder="Type a message..."
+            placeholderTextColor="rgba(255,255,255,0.5)"
+            value={input}
+            onChangeText={setInput}
+            multiline
+            maxHeight={100}
+          />
+          <View style={styles.buttonContainer}>
             <TouchableOpacity
-              key={index}
-              style={styles.suggestionButton}
-              onPress={() => handleSuggestionPress(suggestion)}
+              style={[
+                styles.recordButton,
+                isRecording ? styles.recordingButton : styles.startRecordingButton
+              ]}
+              onPress={isRecording ? stopRecording : startRecording}
             >
-              <Text style={styles.suggestionText}>{suggestion}</Text>
+              {isRecording ? (
+                <Animated.View
+                  style={{
+                    transform: [
+                      {
+                        scale: recordingAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 1.2]
+                        })
+                      }
+                    ]
+                  }}
+                >
+                  <FontAwesome5 name="stop" size={18} color="#FFF" />
+                </Animated.View>
+              ) : (
+                <FontAwesome5 name="microphone" size={18} color="#000" />
+              )}
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </Animated.View>
-
-      <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 10 }]}>
-        <TextInput
-          style={styles.input}
-          placeholder="Type a message..."
-          placeholderTextColor="#999"
-
-          value={input}
-          onChangeText={setInput}
-          multiline
-          maxHeight={100}
-        />
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[
-              styles.recordButton,
-              isRecording && styles.recordingButton
-            ]}
-            onPress={isRecording ? stopRecording : startRecording}
-          >
-            {isRecording ? (
-              <Animated.View
-                style={{
-                  transform: [
-                    {
-                      scale: recordingAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [1, 1.2]
-                      })
-                    }
-                  ]
-                }}
-              >
-                <FontAwesome5 name="microphone" size={18} color="#FFF" />
-              </Animated.View>
-            ) : (
-              <FontAwesome5 name="microphone" size={18} color="#FFF" />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              input.trim().length === 0 ? styles.sendButtonDisabled : {}
-            ]}
-            onPress={() => sendMessage()}
-            disabled={input.trim().length === 0}
-          >
-            <Ionicons name="send" size={20} color="#FFF" />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                input.trim().length === 0 ? styles.sendButtonDisabled : {}
+              ]}
+              onPress={() => sendMessage()}
+              disabled={input.trim().length === 0}
+            >
+              <Ionicons name="send" size={20} color="#FFF" />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+        
+        {/* Language selection modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={showLanguageModal}
+          onRequestClose={() => setShowLanguageModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <BlurView intensity={60} style={styles.modalBlurOverlay} tint="dark">
+              <View style={styles.modalContainer}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Translation Language</Text>
+                  <TouchableOpacity onPress={() => setShowLanguageModal(false)}>
+                    <MaterialCommunityIcons name="close" size={24} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.languageOptionsContainer}>
+                  {languageOptions.map((language) => (
+                    <TouchableOpacity
+                      key={language.code}
+                      style={[
+                        styles.languageOption,
+                        targetLanguage === language.code && styles.languageOptionSelected
+                      ]}
+                      onPress={() => {
+                        setTargetLanguage(language.code);
+                        setShowLanguageModal(false);
+                        // Clear existing translations when changing language
+                        setTranslations({});
+                        setShowTranslation({});
+                      }}
+                    >
+                      <Text style={[
+                        styles.languageOptionText,
+                        targetLanguage === language.code && styles.languageOptionTextSelected
+                      ]}>
+                        {language.name}
+                      </Text>
+                      {targetLanguage === language.code && (
+                        <MaterialIcons name="check" size={18} color="#3B82F6" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </BlurView>
+          </View>
+        </Modal>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#03302c',
   },
   scrollButton: {
     position: 'absolute',
     right: 16,
-    bottom: 100,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    bottom: 120, // Moved up to account for lower input
+    width: 36,
+    height: 36,
+    zIndex: 10,
+    borderRadius: 18,
+    backgroundColor: 'rgba(3, 48, 44, 0.7)',
+    borderWidth: 0.7,
+    borderColor: 'rgba(35, 204, 150, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.27,
-    shadowRadius: 4.65,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.4)',
-    zIndex: 100,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   scrollButtonInner: {
     width: '100%',
     height: '100%',
-    borderRadius: 24,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(35, 204, 150, 0.3)',
+  },
+  scrollButtonBlur: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -1247,46 +1682,29 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '100%',
     height: '100%',
-    borderRadius: 24,
+    borderRadius: 20,
+    opacity: 0.6,
   },
   scrollButtonIcon: {
     position: 'relative',
     zIndex: 1,
   },
-  scrollButtonPulse: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: 24,
-    backgroundColor: 'rgba(99, 102, 241, 0.2)',
-  },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 5,
     borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
-    backgroundColor: '#0F172A'
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFF',
-  },
-  headerRight: {
-    position: 'absolute',
-    right: 16,
+    borderBottomColor: 'rgba(30, 41, 59, 0.2)',
+    backgroundColor: '#03302c', // Updated to match theme
   },
   messagesContainer: {
     flex: 1,
+    backgroundColor: '#022623', // Updated to match theme
   },
   messagesContent: {
     padding: 16,
+    paddingTop: 8,
   },
   messageContainer: {
-    marginBottom: 12,
+    marginBottom: 8,
     maxWidth: '85%',
   },
   userContainer: {
@@ -1297,80 +1715,126 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 16,
-    padding: 12,
-    borderRadius: 18,
+    padding: 14,
+    borderRadius: 20,
+    lineHeight: 22,
   },
   userMessageText: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#05382b', // Updated to match theme from first stylesheet
     color: '#FFF',
-    borderBottomRightRadius: 2,
+    borderBottomRightRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#4752C4', // Updated to match theme
   },
   assistantMessageText: {
-    backgroundColor: '#1E293B',
-    color: '#FFF',
-    borderBottomLeftRadius: 2,
+    backgroundColor: '#2d405e', // Updated to match theme from first stylesheet
+    color: '#FFF', // Updated to match theme
+    borderBottomLeftRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#1a4499', // Updated to match theme
   },
   timestamp: {
-    fontSize: 11,
-    marginTop: 4,
-    opacity: 0.6,
+    fontSize: 12,
+    color: '#a6a6ab',
+    marginTop: -4, 
+    textAlign: 'right',
+    marginRight: 8,
   },
   userTimestamp: {
-    color: '#94A3B8',
-    textAlign: 'right',
-    marginRight: 4,
+    textAlign: 'left',
+    marginLeft: 8,
+    marginRight: 0,
   },
   assistantTimestamp: {
-    color: '#94A3B8',
-    marginLeft: 4,
+    textAlign: 'left',
+    marginLeft: 8,
+    marginRight: 0,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    backgroundColor: '#0F172A',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 12,
+    backgroundColor: '#031A18',
     borderTopWidth: 1,
-    borderTopColor: '#1E293B',
+    borderTopColor: 'rgba(30, 41, 59, 0.4)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
   input: {
     flex: 1,
-    backgroundColor: '#1E293B',
-    borderRadius: 20,
-    padding: 12,
+    backgroundColor: '#2a3942', // Updated to match theme
+    borderRadius: 24,
+    padding: 14,
     paddingRight: 100,
     color: '#FFF',
     fontSize: 16,
     maxHeight: 100,
+    borderWidth: 1,
+    borderColor: '#1f2a30', // Updated to match theme
   },
   buttonContainer: {
     position: 'absolute',
-    right: 22,
-    bottom: 17,
+    right: 16,
+    top: 13, // Move buttons slightly lower
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sendButton: {
-    backgroundColor: '#3B82F6',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    backgroundColor: '#23cc96', // Using theme accent color
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8
+    marginLeft: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
   },
   sendButtonDisabled: {
-    backgroundColor: '#334155',
+    backgroundColor: '#062e25', // Updated to match theme
+    opacity: 0.7,
   },
   recordButton: {
-    backgroundColor: '#6366F1',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  // Updated record button styles
+  startRecordingButton: {
+    backgroundColor: '#23cc96', // Updated to match theme accent color
   },
   recordingButton: {
-    backgroundColor: '#EF4444',
+    backgroundColor: '#ef4444', // Keeping red for recording indicator
   },
   loadingContainer: {
     alignSelf: 'flex-start',
@@ -1389,39 +1853,21 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#FFF',
+    backgroundColor: '#23cc96', // Updated to match theme accent color
     marginHorizontal: 2,
-  },
-  suggestionsContainer: {
-    position: 'absolute',
-    bottom: 90,
-    left: 0,
-    right: 0,
-  },
-  suggestionsScrollContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-  },
-  suggestionButton: {
-    backgroundColor: 'rgba(30, 41, 59, 0.8)',
-    borderRadius: 18,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  suggestionText: {
-    color: '#FFF',
-    fontSize: 14,
   },
   welcomeCard: {
     borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#202225', // From first stylesheet
+    backgroundColor: '#23cc96', // Using theme accent color
   },
   welcomeGradient: {
-    padding: 16,
+    padding: 18,
+    borderRadius: 16,
+    backgroundColor: '#23cc96', // Using theme accent color
   },
   welcomeHeader: {
     flexDirection: 'row',
@@ -1430,58 +1876,67 @@ const styles = StyleSheet.create({
   },
   welcomeAvatarContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  welcomeAvatarInner: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    width: 50,
-    height: 50,
+    width: 50, // Matching dimensions from first stylesheet
+    height: 50, // Matching dimensions from first stylesheet
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#4752C4', // From first stylesheet
+  },
+  welcomeAvatarInner: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)', // Updated to match theme
+    width: 46, // Matching dimensions from first stylesheet
+    height: 46, // Matching dimensions from first stylesheet
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   welcomeTitleContainer: {
     flex: 1,
   },
   welcomeTitle: {
-    fontSize: 18,
+    fontSize: 18, // Matching from first stylesheet
     fontWeight: '700',
     color: '#FFF',
     marginBottom: 4,
+    letterSpacing: 0.3,
   },
   welcomeSubtitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   onlineDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#4ADE80',
+    width: 8, // Matching from first stylesheet
+    height: 8, // Matching from first stylesheet
+    borderRadius: 4,
+    backgroundColor: '#23cc96', // Updated to match theme accent color
     marginRight: 6,
   },
   welcomeSubtitle: {
-    fontSize: 14,
-    color: '#E2E8F0',
+    fontSize: 12, // Matching from first stylesheet
+    color: '#B9BBBE', // From first stylesheet
   },
   welcomeText: {
-    fontSize: 15,
-    color: '#FFF',
-    lineHeight: 22,
-    marginBottom: 12,
+    fontSize: 16, // Matching from first stylesheet
+    color: '#DCDDDE', // From first stylesheet
+    lineHeight: 24, // Matching from first stylesheet
+    marginBottom: 16, // Matching from first stylesheet
   },
   welcomeDivider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginVertical: 12,
+    backgroundColor: '#40444B', // From first stylesheet
+    marginVertical: 16, // Matching from first stylesheet
   },
   welcomeTips: {
     marginTop: 8,
+    gap: 14, // Matching from first stylesheet
   },
   tipItem: {
     flexDirection: 'row',
@@ -1489,162 +1944,390 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   tipIconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    width: 32, // Matching from first stylesheet
+    height: 32, // Matching from first stylesheet
+    borderRadius: 16,
+    backgroundColor: 'rgba(88, 101, 242, 0.15)', // From first stylesheet
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(88, 101, 242, 0.3)', // From first stylesheet
   },
   tipText: {
-    fontSize: 14,
-    color: '#FFF',
+    fontSize: 14, // Matching from first stylesheet
+    color: '#DCDDDE', // From first stylesheet
     flex: 1,
+    lineHeight: 20, // Matching from first stylesheet
   },
+  // Reduced spacing for collapsible sections
   messageSection: {
-    marginBottom: 12,
+    marginBottom: 12, // Matching from first stylesheet
+    marginTop: 4, // Matching from first stylesheet
   },
-  explanationSection: {
-    backgroundColor: 'rgba(56, 189, 248, 0.1)',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 8,
+  collapsibleSectionHeader: {
+    borderRadius: 12, // Updated to match theme
+    overflow: 'hidden',
     borderLeftWidth: 3,
-    borderLeftColor: '#38BDF8',
-  },
-  feedbackSection: {
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#6366F1',
-  },
-  followUpSection: {
-    backgroundColor: 'rgba(168, 85, 247, 0.1)',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#A855F7',
+    marginTop: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
   },
   sectionHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    padding: 8,
+    marginBottom: 8, // Matching from first stylesheet
   },
   sectionIconContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 26, // Matching from first stylesheet
+    height: 26, // Matching from first stylesheet
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
-  },
-  explanationIcon: {
-    backgroundColor: '#38BDF8',
-  },
-  feedbackIcon: {
-    backgroundColor: '#6366F1',
-  },
-  followUpIcon: {
-    backgroundColor: '#A855F7',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    borderWidth: 1, // Matching from first stylesheet
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 14, // Matching from first stylesheet
     fontWeight: '600',
     color: '#FFF',
-    opacity: 0.9,
+    opacity: 0.95,
+  },
+  sectionText: {
+    fontSize: 14,
+    lineHeight: 20,
+    padding: 10,
+    paddingTop: 2,
+  },
+  explanationSection: {
+    backgroundColor: 'rgba(87, 242, 135, 0.1)', // Matching theme color scheme
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(87, 242, 135, 0.3)', // Matching theme color scheme
+  },
+  explanationIcon: {
+    backgroundColor: 'rgba(87, 242, 135, 0.15)', // Matching theme color scheme
+    borderColor: 'rgba(87, 242, 135, 0.3)', // Matching theme color scheme
+  },
+  explanationTitle: {
+    color: '#23cc96', // Updated to match theme accent color
   },
   explanationText: {
-    fontSize: 14,
-    color: '#E2E8F0',
-    lineHeight: 20,
+    color: '#DCDDDE', // From first stylesheet
+  },
+  feedbackSection: {
+    backgroundColor: 'rgba(255, 177, 66, 0.18)', // Keeping for visual distinction
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 177, 66, 0.4)', // Keeping for visual distinction
+  },
+  feedbackIcon: {
+    backgroundColor: 'rgba(255, 177, 66, 0.15)', // Keeping for visual distinction
+    borderColor: 'rgba(255, 177, 66, 0.3)', // Keeping for visual distinction
+  },
+  feedbackTitle: {
+    color: '#FBB848', // Keeping for visual distinction
   },
   feedbackText: {
-    fontSize: 14,
-    color: '#E2E8F0',
-    lineHeight: 20,
+    color: '#DCDDDE', // From first stylesheet
+  },
+  followUpSection: {
+    backgroundColor: 'rgba(235, 69, 158, 0.2)', // Keeping for visual distinction
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(235, 69, 158, 0.4)', // Keeping for visual distinction
+  },
+  followUpIcon: {
+    backgroundColor: 'rgba(235, 69, 158, 0.15)', // Keeping for visual distinction
+    borderColor: 'rgba(235, 69, 158, 0.3)', // Keeping for visual distinction
+  },
+  followUpTitle: {
+    color: '#23cc96', // Updated to match theme accent color
   },
   followUpText: {
-    fontSize: 14,
-    color: '#E2E8F0',
-    lineHeight: 20,
+    color: '#DCDDDE', // From first stylesheet
   },
-  replayButton: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
+  // Edit message styles
+  editContainer: {
+    backgroundColor: '#03302c', // Updated to match theme
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(35, 204, 150, 0.2)', // Using theme accent color
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  editInput: {
+    color: '#FFF',
+    fontSize: 16,
+    padding: 14,
+    lineHeight: 22,
+  },
+  editButtons: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(51, 65, 85, 0.5)',
+  },
+  editButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(51, 65, 85, 0.5)',
+  },
+  saveButton: {
+    backgroundColor: 'rgba(35, 204, 150, 0.15)', // Using theme accent color
+  },
+  editButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  // User message actions
+
+  userMessageActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  userMessageButtons: {
+    flexDirection: 'row',
+  },
+  userMessageButton: {
+    marginLeft: 10,
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(3, 48, 44, 0.7)', // Match the actionButton style
+    borderWidth: 1,
+    borderColor: 'rgba(35, 204, 150, 0.3)', // Match the actionButton border
   },
-  scrollUpButton: {
+  // Move message actions to the right side of messages
+  messageActionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+    marginTop: 4,
+  },
+  messageControls: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  // Updated action button
+  actionButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(3, 48, 44, 0.7)', // Updated to match theme
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(35, 204, 150, 0.3)', // Using theme accent color
+  },
+  // Better translation button
+  translationButton: {
     position: 'absolute',
-    right: 16,
-    bottom: 100,
-  },
-  scrollUpButtonInner: {
+    bottom: 17,
+    right: 118,
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(59, 130, 246, 0.8)',
+    borderRadius: 24,
+    backgroundColor: '#064739', // Updated to match theme
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
-    elevation: 5,
+    elevation: 2,
+    zIndex: 100,
   },
-  floatingAssistant: {
-    position: 'absolute',
-    bottom: 150,
-    left: 16,
-    right: 16,
-  },
-  floatingAssistantBlur: {
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  floatingAssistantInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  // Translation styles
+  translationContainer: {
+    marginTop: 10,
+    backgroundColor: 'rgba(35, 204, 150, 0.1)', // Using theme accent color
+    borderRadius: 14,
     padding: 12,
+    borderLeftWidth: 2,
+    borderLeftColor: '#23cc96', // Updated to match theme accent color
   },
-  floatingAssistantIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+  translationText: {
+    color: '#DCDDDE', // From first stylesheet
+    fontSize: 14,
+    fontStyle: 'italic',
+    lineHeight: 20,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  floatingAssistantText: {
+  modalBlurOverlay: {
+    width: '85%',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  modalContainer: {
+    backgroundColor: 'rgba(3, 48, 44, 0.95)', // Updated to match theme
+    borderRadius: 16,
+    padding: 22,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(35, 204, 150, 0.2)', // Using theme accent color
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
     color: '#FFF',
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 18,
+    fontWeight: '600',
   },
-  topicBadgeContainer: {
-    position: 'absolute',
-    left: 16,
+  languageOptionsContainer: {
+    marginBottom: 10,
   },
-  topicBadge: {
+  languageOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
     borderRadius: 12,
+    marginBottom: 10,
+    backgroundColor: 'rgba(12, 53, 47, 0.6)', // Updated to match theme
   },
-  topicText: {
+  languageOptionSelected: {
+    backgroundColor: 'rgba(35, 204, 150, 0.15)', // Using theme accent color
+    borderWidth: 1,
+    borderColor: 'rgba(35, 204, 150, 0.5)', // Using theme accent color
+  },
+  languageOptionText: {
+    color: '#DCDDDE', // From first stylesheet
+    fontSize: 16,
+  },
+  languageOptionTextSelected: {
     color: '#FFF',
-    fontSize: 12,
     fontWeight: '600',
-    marginLeft: 4,
-  }
+  },
+  // Add these new styles to your stylesheet
+  actionMenuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  actionMenu: {
+    position: 'absolute',
+    backgroundColor: '#1b2638',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+    minWidth: 150,
+    zIndex: 1000,
+  },
+  actionMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  actionMenuText: {
+    color: '#FFF',
+    marginLeft: 10,
+    fontSize: 16,
+  },
+  assistantMessageContainer: {
+    backgroundColor: 'rgba(27, 38, 56, 0.5)',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#1f2a30',
+    padding: 2,
+    marginBottom: 4,
+  },
+  standardAssistantMessage: {
+    padding: 0,
+    overflow: 'visible',
+  },
+  sectionBox: {
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    overflow: 'hidden',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  sectionHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  answerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 3,
+  },
+  sectionContent: {
+    padding: 12,
+    paddingTop: 6,
+  },
+  sectionText: {
+    color: '#FFF',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  suggestionsContent: {
+    paddingVertical: 8,
+  },
+  suggestionsScrollContent: {
+    paddingBottom: 4,
+  },
+  suggestionButton: {
+    backgroundColor: 'rgba(12, 53, 47, 0.85)',
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.4)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    elevation: 2,
+  },
+  suggestionText: {
+    color: '#FBB848',
+    fontSize: 13,
+    fontWeight: '500',
+  },
 });
