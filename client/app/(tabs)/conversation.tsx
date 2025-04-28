@@ -29,10 +29,13 @@ import { ScrollContext } from './ScrollContext';
 export default function ConversationScreen() {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
-
+   console.log(user);
   // Get tabBar scroll handler from context
   const { handleScroll: tabBarScrollHandler, tabBarHeight } = useContext(ScrollContext);
-
+  const focus = user?.unsafeMetadata?.focus;
+  const challengeAreas = user?.unsafeMetadata?.challengeAreas;
+  const preferredTopics = user?.unsafeMetadata?.preferredTopics;
+  const vocabularyLevel = user?.unsafeMetadata?.vocabularyLevel
   // States
   const [messages, setMessages] = useState([
     {
