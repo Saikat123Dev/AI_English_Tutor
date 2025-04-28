@@ -1159,7 +1159,7 @@ export default function ConversationScreen() {
 
     const sectionTitles = {
       answer: 'Response',
-      explanation: 'Language Explanation',
+      explanation: 'Tips & Explanation',
       feedback: 'Feedback',
       followUp: 'Follow-up Questions',
       suggestions: 'Suggestions'
