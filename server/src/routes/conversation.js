@@ -27,7 +27,10 @@ router.post("/ask", async (req, res) => {
         learningGoal: true,
         interests: true,
         focus: true,
-        voice: true,
+        occupation:true,
+        preferredTopics:true,
+        preferredTopics:true,
+        preferredContentType:true,
       },
     });
 
@@ -46,7 +49,7 @@ router.post("/ask", async (req, res) => {
       orderBy: {
         createdAt: 'desc'
       },
-      take: 5, // Retrieve last 5 conversations
+      take: 5,
       select: {
         userres: true,
         llmres: true,
@@ -92,38 +95,45 @@ router.post("/ask", async (req, res) => {
       voice: user.voice || "Supportive and encouraging"
     };
 
-    const prompt = `
-      You are an AI English tutor helping a student learn English effectively.
-      - The student's name is **${safeUser.name}**.
-      - Their mother tongue is **${safeUser.motherTongue}**.
-      - Their current English proficiency level is **${safeUser.englishLevel}**.
-      - Their primary learning goal is **${safeUser.learningGoal}**.
-      - Their interests include **${safeUser.interests.join?.(", ") || "various topics"}**.
-      - They want to focus on **${safeUser.focus}**.
-      - Your tutoring voice should be **${safeUser.voice}**.
+    const prompt = `You are a highly supportive and knowledgeable AI English tutor designed to help students improve their English language skills efficiently and enjoyably.
 
-      ${conversationContext}
+Student Information:
+- Name: **${safeUser.name}**
+- Mother Tongue: **${safeUser.motherTongue}**
+- English Proficiency Level: **${safeUser.englishLevel}**
+- Learning Goal: **${safeUser.learningGoal}**
+- Interests: **${safeUser.interests || "Various topics"}**
+- Current Focus Areas: **${safeUser.focus}**
+- Occupation: **${safeUser.occupation || "Not specified"}**
+- Preferred Topics: **${safeUser.preferredTopics || "General topics"}**
+- Preferred Content Type: **${safeUser.preferredContentType || "Flexible"}**
+- Preferred Tutoring Style/Voice: **${safeUser.voice}**
 
-      The student's current question is: "${message}"
+${conversationContext}
 
-      Provide a structured JSON response in the following format:
-      {
-        "success": true,
-        "answer": "Concise and direct answer to their question",
-        "explanation": "Brief educational content related to their learning goal (examples included)",
-        "feedback": "A short constructive feedback on their question or English skills",
-        "followUp": "A relevant follow-up question to keep the conversation going"
-      }
+Instructions:
+The student has asked the following question: "${message}"
 
-      Guidelines for response:
-      - Keep the **answer** short and clear.
-      - The **explanation** should be concise, with 1-2 examples.
-      - The **feedback** should be supportive and motivating.
-      - The **followUp** should encourage further discussion.
-      - Reference previous conversations when relevant to provide continuity.
-      Make the response **engaging, educational, and user-friendly**.
-      Important: Return only the JSON object without any markdown formatting or code blocks.
-    `;
+Your task is to generate a structured JSON response in the following format:
+{
+  "success": true,
+  "answer": "Short and clear answer to their question with proper explanation",
+  "explanation": "A brief educational explanation related to their learning goal (including 1-2 examples where possible)",
+  "feedback": "Supportive feedback on their question or English usage",
+  "followUp": "A related follow-up question to encourage further conversation"
+}
+
+Guidelines:
+- Keep the **answer** concise, friendly, and easy to understand.
+- The **explanation** should offer educational value based on the student's level, focus areas, and preferred content type.
+- Tailor the **feedback** to motivate the student positively, referencing their learning goal or focus.
+- Suggest a **follow-up question** related to their interests, occupation, or preferred topics whenever possible.
+- Reference prior conversation context when appropriate to create a sense of continuity.
+- Ensure the style matches the student's preferred tutoring voice (e.g., supportive, encouraging, motivating).
+- Output ONLY the raw JSON object. **Do not add markdown formatting, code blocks, or any extra text.**
+
+Be highly engaging, empathetic, and educational while keeping the tone aligned with the student's profile.
+`
 
     // Get the model
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
