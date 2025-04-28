@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "expo-clerk-social-login",
+    "name": "Ella",
     "slug": "expo-clerk-social-login",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon.jpeg",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -14,7 +14,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/icon.jpeg",
         "backgroundColor": "#ffffff"
       },
       "package": "com.saikat123.expoclerksociallogin"
@@ -38,7 +38,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/icon.jpeg",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"

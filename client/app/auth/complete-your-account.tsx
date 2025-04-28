@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import HorizontalScrollRadioButtonInput from "@/components/Forms/HorizontalRadioButton";
+import MultiSelectInput from "@/components/Forms/MultiSelectInput";
 import RadioButtonInput from "@/components/Forms/RadioButtonInput";
 import TextInput from "@/components/Forms/TextInput";
 
@@ -32,6 +34,17 @@ const CompleteYourAccountScreen = () => {
       interests: "",
       focus: "",
       voice: "",
+      // New fields
+      occupation: "",
+      studyTime: "",
+      preferredTopics: [],
+      challengeAreas: [],
+      learningStyle: "",
+      practiceFrequency: "",
+      vocabularyLevel: "",
+      grammarKnowledge: "",
+      previousExperience: "",
+      preferredContentType: [],
     },
   });
 
@@ -46,6 +59,17 @@ const CompleteYourAccountScreen = () => {
       interests,
       focus,
       voice,
+      // New fields
+      occupation,
+      studyTime,
+      preferredTopics,
+      challengeAreas,
+      learningStyle,
+      practiceFrequency,
+      vocabularyLevel,
+      grammarKnowledge,
+      previousExperience,
+      preferredContentType,
     } = data;
 
     try {
@@ -64,6 +88,17 @@ const CompleteYourAccountScreen = () => {
           interests,
           focus,
           voice,
+          // New fields
+          occupation,
+          studyTime,
+          preferredTopics,
+          challengeAreas,
+          learningStyle,
+          practiceFrequency,
+          vocabularyLevel,
+          grammarKnowledge,
+          previousExperience,
+          preferredContentType,
           onboarding_completed: true,
         },
       });
@@ -86,6 +121,17 @@ const CompleteYourAccountScreen = () => {
             interests,
             focus,
             voice,
+            // New fields
+            occupation,
+            studyTime,
+            preferredTopics,
+            challengeAreas,
+            learningStyle,
+            practiceFrequency,
+            vocabularyLevel,
+            grammarKnowledge,
+            previousExperience,
+            preferredContentType,
           }),
         });
 
@@ -118,12 +164,23 @@ const CompleteYourAccountScreen = () => {
     setValue("gender", String(user?.unsafeMetadata?.gender) || "");
     const metadata = user?.unsafeMetadata;
     if (metadata) {
-      setValue("motherToung", metadata.motherToung || "");
+      setValue("motherToung", metadata.motherTongue || "");
       setValue("englishLevel", metadata.englishLevel || "");
       setValue("learningGoal", metadata.learningGoal || "");
       setValue("interests", metadata.interests || "");
       setValue("focus", metadata.focus || "");
       setValue("voice", metadata.voice || "");
+      // New fields
+      setValue("occupation", metadata.occupation || "");
+      setValue("studyTime", metadata.studyTime || "");
+      setValue("preferredTopics", metadata.preferredTopics || []);
+      setValue("challengeAreas", metadata.challengeAreas || []);
+      setValue("learningStyle", metadata.learningStyle || "");
+      setValue("practiceFrequency", metadata.practiceFrequency || "");
+      setValue("vocabularyLevel", metadata.vocabularyLevel || "");
+      setValue("grammarKnowledge", metadata.grammarKnowledge || "");
+      setValue("previousExperience", metadata.previousExperience || "");
+      setValue("preferredContentType", metadata.preferredContentType || []);
     }
   }, [isLoaded, user]);
 
@@ -145,6 +202,88 @@ const CompleteYourAccountScreen = () => {
     { label: "Female", value: "female" },
   ];
 
+  // New option arrays for the additional fields
+  const studyTimeOptions = [
+    { label: "Less than 15 minutes/day", value: "under15" },
+    { label: "15-30 minutes/day", value: "15to30" },
+    { label: "30-60 minutes/day", value: "30to60" },
+    { label: "1+ hours/day", value: "over60" },
+  ];
+
+  const topicOptions = [
+    { label: "Business", value: "business" },
+    { label: "Travel", value: "travel" },
+    { label: "Academic", value: "academic" },
+    { label: "Daily Conversation", value: "conversation" },
+    { label: "Culture & Entertainment", value: "culture" },
+    { label: "Technology", value: "technology" },
+    { label: "Health & Medicine", value: "health" },
+    { label: "Science", value: "science" },
+  ];
+
+  const challengeOptions = [
+    { label: "Pronunciation", value: "pronunciation" },
+    { label: "Grammar", value: "grammar" },
+    { label: "Vocabulary", value: "vocabulary" },
+    { label: "Listening Comprehension", value: "listening" },
+    { label: "Speaking Fluency", value: "speaking" },
+    { label: "Writing Skills", value: "writing" },
+    { label: "Reading Comprehension", value: "reading" },
+    { label: "Idioms & Expressions", value: "idioms" },
+  ];
+
+  const learningStyleOptions = [
+    { label: "Visual", value: "visual" },
+    { label: "Auditory", value: "auditory" },
+    { label: "Reading/Writing", value: "readwrite" },
+    { label: "Kinesthetic", value: "kinesthetic" },
+  ];
+
+  const practiceFrequencyOptions = [
+    { label: "Daily", value: "daily" },
+    { label: "Several times a week", value: "multiple" },
+    { label: "Once a week", value: "weekly" },
+    { label: "Less often", value: "occasional" },
+  ];
+
+  const vocabularyLevelOptions = [
+    { label: "Basic (under 1000 words)", value: "basic" },
+    { label: "Elementary (1000-2000 words)", value: "elementary" },
+    { label: "Intermediate (2000-5000 words)", value: "intermediate" },
+    { label: "Advanced (5000+ words)", value: "advanced" },
+  ];
+
+  const grammarKnowledgeOptions = [
+    { label: "Basic tenses only", value: "basic" },
+    { label: "Familiar with most tenses", value: "intermediate" },
+    { label: "Confident with complex structures", value: "advanced" },
+    { label: "Not sure", value: "unknown" },
+  ];
+
+  const experienceOptions = [
+    { label: "Self-study only", value: "self" },
+    { label: "Some classes/tutoring", value: "some" },
+    { label: "Formal education", value: "formal" },
+    { label: "Lived in English-speaking country", value: "immersion" },
+    { label: "No previous experience", value: "none" },
+  ];
+
+  const contentTypeOptions = [
+    { label: "Articles & Blog Posts", value: "articles" },
+    { label: "Videos", value: "videos" },
+    { label: "Podcasts & Audio", value: "audio" },
+    { label: "Interactive Exercises", value: "interactive" },
+    { label: "Games", value: "games" },
+    { label: "Conversations with AI", value: "ai" },
+  ];
+
+  const accentPreferenceOptions = [
+    { label: "American", value: "american" },
+    { label: "British", value: "british" },
+    { label: "Australian", value: "australian" },
+    { label: "No preference", value: "none" },
+  ];
+
   return (
     <ScrollView style={styles.scrollView}>
       <View
@@ -157,89 +296,186 @@ const CompleteYourAccountScreen = () => {
           <Text style={styles.label}>Complete your account</Text>
           <Text style={styles.description}>
             Complete your account to start your language learning journey with thousands of
-            learners around the world.
+            learners around the world. The more information you provide, the better we can
+            personalize your learning experience.
           </Text>
         </View>
 
         <View style={styles.formContainer}>
-          <TextInput
-            control={control}
-            placeholder="Enter your full name"
-            label="Full Name"
-            required
-            name="full_name"
-          />
+          {/* Basic Info Section */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Basic Information</Text>
 
-          <TextInput
-            control={control}
-            placeholder="Enter your username"
-            label="Username"
-            required
-            name="username"
-          />
+            <TextInput
+              control={control}
+              placeholder="Enter your full name"
+              label="Full Name"
+              required
+              name="full_name"
+            />
 
-          <RadioButtonInput
-            control={control}
-            placeholder="Select your gender"
-            label="Gender"
-            required
-            name="gender"
-            options={[
-              { label: "Male", value: "male" },
-              { label: "Female", value: "female" },
-              { label: "Other", value: "other" },
-            ]}
-          />
+            <TextInput
+              control={control}
+              placeholder="Enter your username"
+              label="Username"
+              required
+              name="username"
+            />
 
-          <TextInput
-            control={control}
-            placeholder="Enter your native language"
-            label="Native Language"
-            required
-            name="motherToung"
-          />
+            <RadioButtonInput
+              control={control}
+              placeholder="Select your gender"
+              label="Gender"
+              required
+              name="gender"
+              options={[
+                { label: "Male", value: "male" },
+                { label: "Female", value: "female" },
+                { label: "Other", value: "other" },
+              ]}
+            />
 
-          <RadioButtonInput
-            control={control}
-            placeholder="Select your English level"
-            label="English Level"
-            required
-            name="englishLevel"
-            options={englishLevels}
-          />
+            <TextInput
+              control={control}
+              placeholder="Enter your native language"
+              label="Native Language"
+              required
+              name="motherTongue"
+            />
 
-          <TextInput
-            control={control}
-            placeholder="What is your learning goal?"
-            label="Learning Goal"
-            required
-            name="learningGoal"
-          />
+            <TextInput
+              control={control}
+              placeholder="What is your occupation?"
+              label="Occupation"
+              name="occupation"
+            />
+          </View>
 
-          <TextInput
-            control={control}
-            placeholder="Enter your interests (comma separated)"
-            label="Interests"
-            name="interests"
-          />
+          {/* Language Proficiency Section */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Language Proficiency</Text>
 
-          <RadioButtonInput
-            control={control}
-            placeholder="Select your primary focus"
-            label="Learning Focus"
-            required
-            name="focus"
-            options={focusOptions}
-          />
+            <RadioButtonInput
+              control={control}
+              placeholder="Select your English level"
+              label="English Level"
+              required
+              name="englishLevel"
+              options={englishLevels}
+            />
 
-          <RadioButtonInput
-            control={control}
-            placeholder="Select preferred AI voice"
-            label="Preferred Voice"
-            required
-            name="voice"
-            options={voiceOptions}
-          />
+            {/* Changed to horizontal scroll */}
+            <HorizontalScrollRadioButtonInput
+              control={control}
+              placeholder="Select your vocabulary level"
+              label="Vocabulary Level"
+              name="vocabularyLevel"
+              options={vocabularyLevelOptions}
+            />
+
+            {/* Changed to horizontal scroll */}
+            <HorizontalScrollRadioButtonInput
+              control={control}
+              placeholder="Rate your grammar knowledge"
+              label="Grammar Knowledge"
+              name="grammarKnowledge"
+              options={grammarKnowledgeOptions}
+            />
+
+            {/* Changed to horizontal scroll */}
+            <HorizontalScrollRadioButtonInput
+              control={control}
+              placeholder="Previous English learning experience"
+              label="Previous Experience"
+              name="previousExperience"
+              options={experienceOptions}
+            />
+          </View>
+
+          {/* Learning Preferences Section */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Learning Preferences</Text>
+
+            <TextInput
+              control={control}
+              placeholder="What is your learning goal?"
+              label="Learning Goal"
+              required
+              name="learningGoal"
+            />
+
+            {/* Changed to horizontal scroll */}
+            <HorizontalScrollRadioButtonInput
+              control={control}
+              placeholder="Select your primary focus"
+              label="Learning Focus"
+              required
+              name="focus"
+              options={focusOptions}
+            />
+
+            <MultiSelectInput
+              control={control}
+              placeholder="Select areas you find challenging"
+              label="Challenge Areas"
+              name="challengeAreas"
+              options={challengeOptions}
+            />
+
+            <RadioButtonInput
+              control={control}
+              placeholder="Select your learning style"
+              label="Learning Style"
+              name="learningStyle"
+              options={learningStyleOptions}
+            />
+
+            {/* Changed to horizontal scroll */}
+            <HorizontalScrollRadioButtonInput
+              control={control}
+              placeholder="How often do you plan to practice?"
+              label="Practice Frequency"
+              name="practiceFrequency"
+              options={practiceFrequencyOptions}
+            />
+
+            {/* Changed to horizontal scroll */}
+            <HorizontalScrollRadioButtonInput
+              control={control}
+              placeholder="How much time can you dedicate daily?"
+              label="Daily Study Time"
+              name="studyTime"
+              options={studyTimeOptions}
+            />
+          </View>
+
+          {/* Content Preferences Section */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Content Preferences</Text>
+
+            <TextInput
+              control={control}
+              placeholder="Enter your interests (comma separated)"
+              label="Interests"
+              name="interests"
+            />
+
+            <MultiSelectInput
+              control={control}
+              placeholder="Select topics you're interested in"
+              label="Preferred Topics"
+              name="preferredTopics"
+              options={topicOptions}
+            />
+
+            <MultiSelectInput
+              control={control}
+              placeholder="Select content types you prefer"
+              label="Preferred Content Types"
+              name="preferredContentType"
+              options={contentTypeOptions}
+            />
+          </View>
 
           <View style={{ marginTop: 20 }}>
             <TouchableOpacity
@@ -291,6 +527,19 @@ const styles = StyleSheet.create({
     marginTop: 20,
     gap: 20,
   },
+  sectionContainer: {
+    width: "100%",
+    backgroundColor: "#f9f9f9",
+    padding: 15,
+    borderRadius: 10,
+    gap: 15,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#444",
+  },
   textIput: {
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "gray",
@@ -301,7 +550,7 @@ const styles = StyleSheet.create({
   button: {
     width: "100%",
     backgroundColor: "blue",
-    padding: 10,
+    padding: 15,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
@@ -310,5 +559,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
