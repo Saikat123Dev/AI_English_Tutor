@@ -41,6 +41,7 @@ model user {
   favorites             favorite[] // Relation to favorites
   studySessions         studySession[] // Relation to study sessions
   dailyStreaks          dailyStreak[] // Relation to daily streaks
+  AIGeneration          AIGeneration[]
 
   @@index([englishLevel])
   @@index([focus])
@@ -91,6 +92,18 @@ model vocabularyWord {
 
   @@index([userId])
   @@index([timestamp])
+}
+
+model AIGeneration {
+  id        String   @id @default(uuid())
+  word      String
+  userId    String
+  timestamp DateTime @default(now())
+  explicit  Boolean  @default(false)
+  user      user     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([word])
 }
 
 model favorite {

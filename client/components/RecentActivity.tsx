@@ -1,11 +1,14 @@
 import { useUser } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -17,42 +20,64 @@ const RecentActivity = ({ theme, router }) => {
   const [recentActivity, setRecentActivity] = useState([]);
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [fadeAnim] = useState(new Animated.Value(0));
 
-  useEffect(() => {
-    const fetchRecentActivity = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/recent?email=' + user.primaryEmailAddress.emailAddress,);
-        if (!response.ok) {
-          throw new Error('Failed to fetch recent activity');
-        }
-        const data = await response.json();
+  const fetchRecentActivity = async () => {
+    try {
+      if (!refreshing) setIsLoading(true);
+      const response = await fetch(
+        'https://ai-english-tutor-9ixt.onrender.com/api/recent?email=' +
+        user.primaryEmailAddress.emailAddress
+      );
 
-        // Sort activities by timestamp (newest first)
-        const sortedRecent = [...(data.recent || [])].sort((a, b) =>
-          new Date(b.timestamp) - new Date(a.timestamp)
-        );
-
-        setRecentActivity(sortedRecent);
-        setStats(data.stats || null);
-        setError(null);
-
-        // Animate fade in
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }).start();
-      } catch (err) {
-        console.error('Error fetching recent activity:', err);
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
+      if (!response.ok) {
+        throw new Error('Failed to fetch recent activity');
       }
-    };
 
+      const data = await response.json();
+
+      // Sort activities by timestamp (newest first)
+      const sortedRecent = [...(data.recent || [])].sort((a, b) =>
+        new Date(b.timestamp) - new Date(a.timestamp)
+      );
+
+      setRecentActivity(sortedRecent);
+      setStats(data.stats || null);
+      setError(null);
+
+      // Animate fade in
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }).start();
+    } catch (err) {
+      console.error('Error fetching recent activity:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Fetch data when component mounts
+  useEffect(() => {
+    fetchRecentActivity();
+  }, []);
+
+  // Refresh data whenever the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchRecentActivity();
+      return () => {}; // Cleanup function
+    }, [])
+  );
+
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
     fetchRecentActivity();
   }, []);
 
@@ -131,7 +156,7 @@ const RecentActivity = ({ theme, router }) => {
     );
   };
 
-  if (isLoading) {
+  if (isLoading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.accent} />
@@ -139,7 +164,7 @@ const RecentActivity = ({ theme, router }) => {
     );
   }
 
-  if (error) {
+  if (error && !refreshing) {
     return (
       <View style={styles.errorContainer}>
         <MaterialCommunityIcons name="alert-circle-outline" size={40} color={theme.error} />
@@ -148,7 +173,7 @@ const RecentActivity = ({ theme, router }) => {
         </Text>
         <TouchableOpacity
           style={[styles.retryButton, { backgroundColor: theme.accent }]}
-          onPress={() => fetchRecentActivity()}
+          onPress={fetchRecentActivity}
         >
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
@@ -156,80 +181,109 @@ const RecentActivity = ({ theme, router }) => {
     );
   }
 
-  if (!recentActivity?.length) {
+  if (!recentActivity?.length && !refreshing) {
     return (
-      <View style={styles.emptyContainer}>
-        <MaterialCommunityIcons name="history" size={50} color={theme.secondaryText} />
-        <Text style={[styles.emptyText, { color: theme.secondaryText }]}>
-          No recent activity found
-        </Text>
-        <Text style={[styles.emptySubtext, { color: theme.tertiaryText }]}>
-          Start learning to see your activity here
-        </Text>
-      </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollViewContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[theme.accent]}
+            tintColor={theme.accent}
+          />
+        }
+      >
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons name="history" size={50} color={theme.secondaryText} />
+          <Text style={[styles.emptyText, { color: theme.secondaryText }]}>
+            No recent activity found
+          </Text>
+          <Text style={[styles.emptySubtext, { color: theme.tertiaryText }]}>
+            Start learning to see your activity here
+          </Text>
+        </View>
+      </ScrollView>
     );
   }
 
   return (
-    <Animated.View
-      style={[
-        styles.recentActivityContainer,
-        { opacity: fadeAnim }
-      ]}
+    <ScrollView
+      contentContainerStyle={styles.scrollViewContainer}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[theme.accent]}
+          tintColor={theme.accent}
+        />
+      }
     >
-      <TouchableOpacity
-        activeOpacity={0.9}
+      <Animated.View
         style={[
-          styles.activityCard,
-          { borderColor: theme.cardBorder }
+          styles.recentActivityContainer,
+          { opacity: fadeAnim }
         ]}
       >
-        <LinearGradient
-          colors={['#06403a', '#032420', '#06403a']}
-          style={styles.gradientCard}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={[
+            styles.activityCard,
+            { borderColor: theme.cardBorder }
+          ]}
         >
-          {stats && (
-            <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.vocabularyCount}</Text>
-                <Text style={styles.statLabel}>Words</Text>
+          <LinearGradient
+            colors={['#06403a', '#032420', '#06403a']}
+            style={styles.gradientCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {stats && (
+              <View style={styles.statsContainer}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{stats.vocabularyCount}</Text>
+                  <Text style={styles.statLabel}>Words</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{stats.pronunciationCount}</Text>
+                  <Text style={styles.statLabel}>Pronunciations</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{stats.questionsCount}</Text>
+                  <Text style={styles.statLabel}>Questions</Text>
+                </View>
               </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.pronunciationCount}</Text>
-                <Text style={styles.statLabel}>Pronunciations</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.questionsCount}</Text>
-                <Text style={styles.statLabel}>Questions</Text>
-              </View>
-            </View>
-          )}
+            )}
 
-          {recentActivity.slice(0, 3).map((activity, index) => (
-            <MotiView
-              key={`${activity.type}-${activity.data.id || index}`}
-              from={{ opacity: 0, translateY: 10 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ delay: index * 100, type: 'timing', duration: 500 }}
-            >
-              {index > 0 && <View style={[styles.divider, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />}
-              {renderActivityContent(activity)}
-            </MotiView>
-          ))}
-        </LinearGradient>
-      </TouchableOpacity>
-    </Animated.View>
+            {recentActivity.slice(0, 3).map((activity, index) => (
+              <MotiView
+                key={`${activity.type}-${activity.data.id || index}`}
+                from={{ opacity: 0, translateY: 10 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ delay: index * 100, type: 'timing', duration: 500 }}
+              >
+                {index > 0 && <View style={[styles.divider, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />}
+                {renderActivityContent(activity)}
+              </MotiView>
+            ))}
+
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
+  scrollViewContainer: {
+    flexGrow: 1,
+  },
   recentActivityContainer: {
     marginTop: 20,
     paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   loadingContainer: {
     marginTop: 20,

@@ -164,7 +164,7 @@ const CompleteYourAccountScreen = () => {
     setValue("gender", String(user?.unsafeMetadata?.gender) || "");
     const metadata = user?.unsafeMetadata;
     if (metadata) {
-      setValue("motherToung", metadata.motherTongue || "");
+      setValue("motherToung", metadata.motherToung || "");
       setValue("englishLevel", metadata.englishLevel || "");
       setValue("learningGoal", metadata.learningGoal || "");
       setValue("interests", metadata.interests || "");
@@ -374,13 +374,6 @@ const CompleteYourAccountScreen = () => {
             />
 
             {/* Changed to horizontal scroll */}
-            <HorizontalScrollRadioButtonInput
-              control={control}
-              placeholder="Rate your grammar knowledge"
-              label="Grammar Knowledge"
-              name="grammarKnowledge"
-              options={grammarKnowledgeOptions}
-            />
 
             {/* Changed to horizontal scroll */}
             <HorizontalScrollRadioButtonInput
@@ -422,13 +415,7 @@ const CompleteYourAccountScreen = () => {
               options={challengeOptions}
             />
 
-            <RadioButtonInput
-              control={control}
-              placeholder="Select your learning style"
-              label="Learning Style"
-              name="learningStyle"
-              options={learningStyleOptions}
-            />
+
 
             {/* Changed to horizontal scroll */}
             <HorizontalScrollRadioButtonInput

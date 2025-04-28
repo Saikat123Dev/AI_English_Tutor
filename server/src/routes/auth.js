@@ -59,7 +59,10 @@ router.post('/create', async (req, res) => {
     console.log('Signup attempt failed: No email provided');
     return res.status(400).json({ error: 'Email is required' });
   }
-
+   if(!motherToung){
+    console.log('Signup attempt failed: No motherToung provided');
+    return res.status(400).json({ error: 'motherToung is required' });
+   }
   try {
     // Check if user exists in Redis cache first
     let existingUser = null;
