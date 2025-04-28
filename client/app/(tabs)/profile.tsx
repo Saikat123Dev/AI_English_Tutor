@@ -1,47 +1,31 @@
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScrollContext } from './ScrollContext';
 
+// Define colors - can be moved to a separate file
 const COLORS = {
-  // Primary colors
-  primary: '#0d9488',           // More vibrant teal (improves accessibility)
-  primaryDark: '#115e59',       // Darker shade for better contrast
-  primaryLight: '#ccfbf1',      // Soft light teal for backgrounds
-
-  // Accent colors
-  accent: '#0f766e',            // Kept original accent
-  accentLight: '#5eead4',       // Bright teal for interactive elements
-
-  // Background colors
-  background: '#f0fdfa',        // Very light teal (easier on eyes)
-  backgroundDark: '#e6f5f3',    // Slightly darker for cards/sections
-
-  // Card colors
-  card: '#ffffff',             // Pure white for better content legibility
-  cardDark: '#ecfdf5',          // Alternative card color
-
-  // Text colors
-  text: '#042f2e',             // Darker for better readability
-  textSecondary: '#3f706d',     // Softer teal-gray for secondary text
-  textTertiary: '#64748b',      // Neutral gray for less important text
-
-  // Border colors
-  border: '#cbd5e1',           // Lighter, neutral border
-  borderDark: '#94a3b8',       // For stronger dividers
-
-  // Feedback colors
-  error: '#dc2626',            // More vibrant error red
-  success: '#16a34a',          // Added success green
-  warning: '#f59e0b',          // Added warning amber
-  info: '#2563eb',             // Added info blue
-
-  // Neutrals
+  primary: '#0d9488',
+  primaryDark: '#115e59',
+  primaryLight: '#ccfbf1',
+  accent: '#0f766e',
+  accentLight: '#5eead4',
+  background: '#f0fdfa',
+  backgroundDark: '#e6f5f3',
+  card: '#ffffff',
+  cardDark: '#ecfdf5',
+  text: '#042f2e',
+  textSecondary: '#3f706d',
+  textTertiary: '#64748b',
+  border: '#cbd5e1',
+  borderDark: '#94a3b8',
+  error: '#dc2626',
+  success: '#16a34a',
+  warning: '#f59e0b',
+  info: '#2563eb',
   white: '#ffffff',
   black: '#000000',
   grayLight: '#f1f5f9',
@@ -49,16 +33,8 @@ const COLORS = {
   grayDark: '#94a3b8'
 };
 
-interface ProfileOptionProps {
-  title: string;
-  icon: React.ReactNode;
-  onPress: () => void;
-  showChevron?: boolean;
-  isLast?: boolean;
-  badge?: string | null;
-}
-
-function ProfileOption({ title, icon, onPress, showChevron = true, isLast = false, badge = null }: ProfileOptionProps) {
+// Reusable ProfileOption component
+function ProfileOption({ title, icon, onPress, showChevron = true, isLast = false, badge = null }) {
   return (
     <TouchableOpacity
       style={[
@@ -92,7 +68,7 @@ function ProfileOption({ title, icon, onPress, showChevron = true, isLast = fals
   );
 }
 
-// New skill progress component
+// Reusable SkillProgressCard component
 function SkillProgressCard({ title, progress, total, icon }) {
   const percentage = Math.min(100, Math.round((progress / total) * 100));
 
@@ -128,15 +104,13 @@ function SkillProgressCard({ title, progress, total, icon }) {
 export default function ProfileScreen() {
   const { user, isLoaded: isUserLoaded } = useUser();
   const { signOut } = useAuth();
-  const navigation = useNavigation();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const { handleScroll, tabBarHeight } = useContext(ScrollContext);
 
   // State for user data from backend
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [quoteOfDay, setQuoteOfDay] = useState({
+  const [quoteOfDay] = useState({
     text: "Learning another language is not only learning different words for the same things, but learning another way to think about things.",
     author: "Flora Lewis"
   });
@@ -152,50 +126,37 @@ export default function ProfileScreen() {
     try {
       setIsLoading(true);
 
-      // Mock data integration - In production, this would be an API call
-      // Replace with your actual API endpoint when needed
-      // const response = await fetch(`https://b274-2409-40e1-30cb-b026-2d67-d40e-d280-d57d.ngrok-free.app/api/user-profile?email=${encodeURIComponent(user?.emailAddresses[0]?.emailAddress)}`);
-      // const data = await response.json();
+      if (!user?.primaryEmailAddress?.emailAddress) {
+        console.error('No email address available');
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
 
-      // Using cached profile data you provided
-      const data = {
-        id: 'cm9y03xc00000jz2quqit7ajr',
-        email: 'pinakib075@gmail.com',
-        name: 'pinakib075',
-        motherToung: null,
-        englishLevel: 'beginner',
-        learningGoal: 'learning english',
-        interests: 'coding',
-        focus: 'speaking',
-        voice: 'male',
-        createdAt: '2025-04-26T09:11:24.288Z',
-        occupation: 'business',
-        studyTime: 'under15',
-        preferredTopics: ['business', 'conversation'],
-        challengeAreas: ['pronunciation', 'grammar'],
-        learningStyle: null,
-        practiceFrequency: 'daily',
-        vocabularyLevel: 'basic',
-        grammarKnowledge: 'basic',
-        previousExperience: 'self',
-        preferredContentType: ['articles', 'videos'],
-        vocabularyWords: [],
-        favorites: [],
-        studySessions: [],
-        pronunciationAttempts: [],
-        dailyStreaks: [],
-        stats: {
-          vocabularyCount: 0,
-          favoritesCount: 0,
-          completedSessionsCount: 0,
-          totalSessionsCount: 0,
-          currentStreak: 0,
-          pronunciationAccuracy: 0,
-          learningProgress: 0,
-          lastActivity: '2025-04-26T09:11:24.288Z'
-        }
-      };
+      const email = user.primaryEmailAddress.emailAddress;
+      console.log(`Fetching profile for: ${email}`);
 
+      // Use skipCache=true when refreshing to force fresh data
+      const skipCache = isRefreshing ? true : false;
+
+      // Get authentication token if available
+      // const authToken = await user.getToken();
+
+      // API URL with base URL (should be moved to config)
+      const apiUrl = `https://ai-english-tutor-9ixt.onrender.com/api/user-profile?email=${encodeURIComponent(email)}${skipCache ? '&skipCache=true' : ''}`;
+
+      const response = await fetch(apiUrl, {
+        // Add any required headers here
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch profile: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Received profile data:', data);
+
+      // Set the received data directly to userData state
       setUserData(data);
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -214,6 +175,25 @@ export default function ProfileScreen() {
   const handleSignOut = async () => {
     try {
       setIsSigningOut(true);
+
+      // Invalidate cache on logout
+      if (user?.primaryEmailAddress?.emailAddress) {
+        try {
+          await fetch('https://ai-english-tutor-9ixt.onrender.com/api/user-profile/invalidate-cache', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: user.primaryEmailAddress.emailAddress
+            })
+          });
+        } catch (err) {
+          console.error('Error invalidating cache:', err);
+          // Continue with sign out even if cache invalidation fails
+        }
+      }
+
       await signOut();
     } catch (error) {
       Alert.alert('Error', 'Failed to sign out. Please try again.');
@@ -234,10 +214,6 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleScrollEvent = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    handleScroll(event);
-  };
-
   if (!isUserLoaded || isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]}>
@@ -250,8 +226,7 @@ export default function ProfileScreen() {
   const userStats = {
     streak: userData?.stats?.currentStreak || 0,
     vocabulary: userData?.stats?.vocabularyCount || 0,
-    completedSessions: userData?.stats?.completedSessionsCount || 0,
-    level: determineUserLevel(userData),
+    level: userData?.englishLevel ? (userData.englishLevel.charAt(0).toUpperCase() + userData.englishLevel.slice(1)) : 'Beginner',
     pronunciationAccuracy: userData?.stats?.pronunciationAccuracy || 0,
     favoriteWords: userData?.stats?.favoritesCount || 0,
     englishLevel: userData?.englishLevel || 'Beginner',
@@ -259,26 +234,14 @@ export default function ProfileScreen() {
     learningProgress: userData?.stats?.learningProgress || 0
   };
 
-  // Helper functions for calculating user stats
-  function determineUserLevel(userData) {
-    if (!userData) return 'Beginner';
-
-    // Use the provided English level if available
-    if (userData.englishLevel) {
-      // Capitalize first letter
-      return userData.englishLevel.charAt(0).toUpperCase() + userData.englishLevel.slice(1);
-    }
-
-    return 'Beginner';
-  }
+  // Calculate pronunciation practice count
+  const pronunciationPracticeCount = userData?.pronunciationAttempts?.length || 0;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarHeight + 40 }]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onScroll={handleScrollEvent}
       >
         {/* Refresh Button */}
         <TouchableOpacity
@@ -295,7 +258,7 @@ export default function ProfileScreen() {
 
         {/* Header with gradient */}
         <LinearGradient
-          colors={[COLORS.primary, COLORS.primaryDark || COLORS.primary]}
+          colors={[COLORS.primary, COLORS.primaryDark]}
           style={styles.headerGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -312,7 +275,7 @@ export default function ProfileScreen() {
             {userData?.name || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : userData?.email || 'User')}
           </Text>
           <Text style={[styles.email, { color: 'rgba(255, 255, 255, 0.8)' }]}>
-            {userData?.email || user?.emailAddresses[0]?.emailAddress || ''}
+            {userData?.email || user?.primaryEmailAddress?.emailAddress || ''}
           </Text>
 
           <View style={styles.levelBadge}>
@@ -328,11 +291,6 @@ export default function ProfileScreen() {
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{userStats.vocabulary}</Text>
               <Text style={styles.statLabel}>Words</Text>
-            </View>
-            <View style={[styles.statDivider, { backgroundColor: COLORS.background + '30' }]} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userStats.completedSessions}</Text>
-              <Text style={styles.statLabel}>Sessions</Text>
             </View>
           </View>
         </LinearGradient>
@@ -354,37 +312,10 @@ export default function ProfileScreen() {
               <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Learning Goal:</Text>
               <Text style={[styles.infoValue, { color: COLORS.text }]}>{userData?.learningGoal || 'Not set'}</Text>
             </View>
-            <View style={styles.infoRow}>
+            <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
               <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Focus Area:</Text>
               <Text style={[styles.infoValue, { color: COLORS.text }]}>{userData?.focus || 'Not set'}</Text>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Practice Frequency:</Text>
-              <Text style={[styles.infoValue, { color: COLORS.text }]}>{userData?.practiceFrequency === 'daily' ? 'Daily' : userData?.practiceFrequency || 'Not set'}</Text>
-            </View>
-            <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
-              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Occupation:</Text>
-              <Text style={[styles.infoValue, { color: COLORS.text }]}>{userData?.occupation || 'Not set'}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Challenge Areas Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>MY CHALLENGES</Text>
-
-          <View style={[styles.infoCard, { backgroundColor: COLORS.card }]}>
-            {userData?.challengeAreas && userData.challengeAreas.length > 0 ? (
-              <View style={styles.tagsContainer}>
-                {userData.challengeAreas.map((area, index) => (
-                  <View key={index} style={styles.tagItem}>
-                    <Text style={styles.tagText}>{area}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={[styles.infoValue, { color: COLORS.textTertiary, textAlign: 'center', padding: 10 }]}>No challenge areas specified</Text>
-            )}
           </View>
         </View>
 
@@ -414,24 +345,39 @@ export default function ProfileScreen() {
           />
         </View>
 
-        {/* Preferred Topics Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>PREFERRED TOPICS</Text>
+        {/* Challenge Areas Section */}
+        {userData?.challengeAreas && userData.challengeAreas.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>MY CHALLENGE AREAS</Text>
 
-          <View style={[styles.infoCard, { backgroundColor: COLORS.card }]}>
-            {userData?.preferredTopics && userData.preferredTopics.length > 0 ? (
-              <View style={styles.tagsContainer}>
-                {userData.preferredTopics.map((topic, index) => (
-                  <View key={index} style={styles.tagItem}>
-                    <Text style={styles.tagText}>{topic}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={[styles.infoValue, { color: COLORS.textTertiary, textAlign: 'center', padding: 10 }]}>No preferred topics specified</Text>
-            )}
+            <View style={[styles.tagsContainer, { backgroundColor: COLORS.card }]}>
+              {userData.challengeAreas.map((area, index) => (
+                <View key={index} style={[styles.tag, { backgroundColor: COLORS.primary + '20' }]}>
+                  <Text style={[styles.tagText, { color: COLORS.primary }]}>
+                    {area.charAt(0).toUpperCase() + area.slice(1)}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
+        )}
+
+        {/* Preferred Topics Section */}
+        {userData?.preferredTopics && userData.preferredTopics.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>PREFERRED TOPICS</Text>
+
+            <View style={[styles.tagsContainer, { backgroundColor: COLORS.card }]}>
+              {userData.preferredTopics.map((topic, index) => (
+                <View key={index} style={[styles.tag, { backgroundColor: COLORS.accent + '20' }]}>
+                  <Text style={[styles.tagText, { color: COLORS.accent }]}>
+                    {topic.charAt(0).toUpperCase() + topic.slice(1)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Quick Actions Section */}
         <View style={styles.sectionContainer}>
@@ -455,20 +401,33 @@ export default function ProfileScreen() {
             title="Pronunciation Practice"
             icon={<MaterialCommunityIcons name="microphone" size={20} color={COLORS.primary} />}
             onPress={() => router.push('/(tabs)/pronounciation')}
+            badge={pronunciationPracticeCount > 0 ? `${pronunciationPracticeCount}` : null}
             isLast={true}
           />
         </View>
 
-        {/* Account Section */}
+        {/* User Details Section */}
         <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>ACCOUNT</Text>
+          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>USER DETAILS</Text>
 
-          <ProfileOption
-            title="Settings"
-            icon={<Ionicons name="settings-outline" size={20} color={COLORS.primary} />}
-            onPress={() => router.push('/settings')}
-            isLast={true}
-          />
+          <View style={[styles.infoCard, { backgroundColor: COLORS.card }]}>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Occupation:</Text>
+              <Text style={[styles.infoValue, { color: COLORS.text }]}>{userData?.occupation || 'Not specified'}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Practice Frequency:</Text>
+              <Text style={[styles.infoValue, { color: COLORS.text }]}>
+                {userData?.practiceFrequency ? userData.practiceFrequency.charAt(0).toUpperCase() + userData.practiceFrequency.slice(1) : 'Not specified'}
+              </Text>
+            </View>
+            <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Previous Experience:</Text>
+              <Text style={[styles.infoValue, { color: COLORS.text }]}>
+                {userData?.previousExperience ? userData.previousExperience.charAt(0).toUpperCase() + userData.previousExperience.slice(1) : 'Not specified'}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Sign Out Button */}
@@ -490,7 +449,7 @@ export default function ProfileScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Quote of the Day - Dynamic from API */}
+        {/* Quote of the Day */}
         <View style={[styles.quoteContainer, { backgroundColor: COLORS.card }]}>
           <Text style={[styles.quoteText, { color: COLORS.text }]}>
             "{quoteOfDay.text}"
@@ -499,6 +458,13 @@ export default function ProfileScreen() {
             - {quoteOfDay.author}
           </Text>
         </View>
+
+        {/* Last Activity */}
+        {userData?.stats?.lastActivity && (
+          <Text style={[styles.lastActivity, { color: COLORS.textSecondary }]}>
+            Last activity: {new Date(userData.stats.lastActivity).toLocaleDateString()}
+          </Text>
+        )}
 
         {/* App Version */}
         <Text style={[styles.version, { color: COLORS.textSecondary }]}>Version 1.0.0 (beta)</Text>
@@ -510,39 +476,38 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
     paddingBottom: 40,
   },
   refreshButton: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 16,
+    right: 16,
     backgroundColor: COLORS.primary,
     width: 40,
     height: 40,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: COLORS.primaryDark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
-    shadowRadius: 3,
+    shadowRadius: 4,
     elevation: 5,
     zIndex: 10,
   },
   headerGradient: {
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
     alignItems: 'center',
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     marginBottom: 24,
-    backgroundColor: '#06403a',
-    shadowColor: '#06403a',
+    shadowColor: COLORS.primaryDark,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 10,
   },
@@ -560,18 +525,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 5,
   },
   avatarText: {
     fontSize: 42,
     fontWeight: 'bold',
-    color: 'white',
+    color: COLORS.white,
   },
   name: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
     marginBottom: 4,
-    color: 'white',
+    color: COLORS.white,
   },
   email: {
     fontSize: 16,
@@ -581,15 +545,15 @@ const styles = StyleSheet.create({
   },
   levelBadge: {
     paddingHorizontal: 16,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(6, 64, 58, 0.7)',
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 20,
     marginBottom: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   levelText: {
-    color: 'white',
+    color: COLORS.white,
     fontWeight: '600',
     fontSize: 14,
   },
@@ -598,29 +562,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     width: '100%',
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(6, 64, 58, 0.5)',
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   statItem: {
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
   statValue: {
-    color: 'white',
+    color: COLORS.white,
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    marginBottom: 4,
   },
   statLabel: {
-    color: 'white',
+    color: COLORS.white,
     fontSize: 12,
     opacity: 0.9,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   statDivider: {
     width: 1,
-    height: '80%',
+    height: '60%',
     alignSelf: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
@@ -629,32 +596,90 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     marginBottom: 12,
-    marginLeft: 8,
+    marginLeft: 4,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    color: '#06403a',
+    color: COLORS.textSecondary,
   },
-  tagsContainer: {
+  infoCard: {
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: COLORS.card,
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  infoRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 8,
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
   },
-  tagItem: {
-    backgroundColor: COLORS.primaryLight,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    margin: 4,
-    borderWidth: 1,
-    borderColor: COLORS.primary + '30',
-  },
-  tagText: {
-    color: COLORS.primary,
+  infoLabel: {
     fontSize: 14,
+    color: COLORS.textSecondary,
     fontWeight: '500',
+  },
+  infoValue: {
+    fontSize: 14,
+    color: COLORS.text,
+    fontWeight: '600',
+  },
+  skillCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    backgroundColor: COLORS.card,
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  skillHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  skillIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    backgroundColor: COLORS.primary + '20',
+  },
+  skillTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  skillProgressContainer: {
+    marginTop: 8,
+  },
+  skillProgressBar: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.grayLight,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  skillProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  skillProgressText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
+    textAlign: 'right',
   },
   option: {
     flexDirection: 'row',
@@ -664,14 +689,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 12,
     marginBottom: 8,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: 'rgba(6, 64, 58, 0.1)',
-    shadowColor: '#06403a',
+    backgroundColor: COLORS.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.border,
+    shadowColor: COLORS.primaryDark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 1,
   },
   optionContent: {
     flexDirection: 'row',
@@ -689,22 +714,24 @@ const styles = StyleSheet.create({
     marginRight: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(6, 64, 58, 0.1)',
+    backgroundColor: COLORS.primary + '20',
   },
   optionText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#06403a',
+    color: COLORS.text,
   },
   badgeContainer: {
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 4,
     borderRadius: 12,
     marginRight: 8,
-    backgroundColor: '#06403a',
+    backgroundColor: COLORS.primary,
+    minWidth: 24,
+    alignItems: 'center',
   },
   badgeText: {
-    color: 'white',
+    color: COLORS.white,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -715,8 +742,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(220, 53, 69, 0.3)',
-    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+    borderColor: COLORS.error + '40',
+    backgroundColor: COLORS.error + '20',
   },
   signOutContent: {
     flexDirection: 'row',
@@ -726,118 +753,65 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 10,
-    color: '#dc3545',
+    color: COLORS.error,
   },
   quoteContainer: {
     marginHorizontal: 16,
     marginTop: 24,
-    padding: 16,
+    padding: 20,
     borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#06403a',
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: 'rgba(6, 64, 58, 0.1)',
+    backgroundColor: COLORS.card,
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   quoteText: {
-    fontSize: 14,
+    fontSize: 16,
     fontStyle: 'italic',
-    lineHeight: 20,
-    color: '#06403a',
+    color: COLORS.text,
+    marginBottom: 8,
+    lineHeight: 24,
   },
   quoteAuthor: {
-    fontSize: 12,
-    marginTop: 8,
+    fontSize: 14,
+    color: COLORS.textSecondary,
     textAlign: 'right',
-    color: 'rgba(6, 64, 58, 0.7)',
+    fontWeight: '500',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: COLORS.card,
+  },
+  tag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 8,
+    marginBottom: 8,
+    backgroundColor: COLORS.primary + '20',
+  },
+  tagText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.primary,
+  },
+  lastActivity: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 8,
+    opacity: 0.7,
   },
   version: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
     textAlign: 'center',
-    marginTop: 24,
-    fontSize: 12,
-    opacity: 0.6,
-    color: '#032420',
-  },
-  // New styles for the updated UI
-  infoCard: {
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: 'rgba(6, 64, 58, 0.1)',
-    shadowColor: '#06403a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    marginBottom: 8,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(6, 64, 58, 0.1)',
-  },
-  infoLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#06403a',
-  },
-  infoValue: {
-    fontSize: 14,
-    color: '#06403a',
-  },
-  skillCard: {
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: 'rgba(6, 64, 58, 0.1)',
-    marginBottom: 8,
-    shadowColor: '#06403a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  skillHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  skillIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(6, 64, 58, 0.1)',
-  },
-  skillTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#06403a',
-  },
-  skillProgressContainer: {
-    marginTop: 4,
-  },
-  skillProgressBar: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#e9ecef',
-    marginBottom: 6,
-    overflow: 'hidden',
-  },
-  skillProgressFill: {
-    height: '100%',
-    backgroundColor: '#06403a',
-    borderRadius: 4,
-  },
-  skillProgressText: {
-    fontSize: 12,
-    color: '#06403a',
-    textAlign: 'right',
+    marginTop: 16,
+    opacity: 0.7,
   }
-})
+});
