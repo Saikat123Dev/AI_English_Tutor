@@ -7,10 +7,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Speech from 'expo-speech';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Dimensions,
   Easing,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StatusBar,
@@ -19,9 +21,7 @@ import {
   TextInput,
   TouchableOpacity,
   Vibration,
-  View,
-  Alert,
-  Modal
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScrollContext } from './ScrollContext';
@@ -29,10 +29,10 @@ import { ScrollContext } from './ScrollContext';
 export default function ConversationScreen() {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
-  
+
   // Get tabBar scroll handler from context
   const { handleScroll: tabBarScrollHandler, tabBarHeight } = useContext(ScrollContext);
-  
+
   // States
   const [messages, setMessages] = useState([
     {
@@ -42,7 +42,7 @@ export default function ConversationScreen() {
       isInitial: true
     }
   ]);
-  
+
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -352,7 +352,7 @@ export default function ConversationScreen() {
       ...prev,
       [key]: !prev[key]
     }));
-    
+
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -360,16 +360,16 @@ export default function ConversationScreen() {
 
   const toggleTranslation = async (messageIndex, text, sectionType = 'answer') => {
     const key = `${messageIndex}-${sectionType}`;
-    
+
     setShowTranslation(prev => ({
       ...prev,
       [key]: !prev[key]
     }));
-    
+
     if (!showTranslation[key] && !translations[key]) {
       await translateText(messageIndex, text, sectionType);
     }
-    
+
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -377,7 +377,7 @@ export default function ConversationScreen() {
 
   const translateText = async (messageIndex, text, sectionType = 'answer') => {
     if (!text) return;
-    
+
     setIsLoading(true);
     try {
       try {
@@ -391,7 +391,7 @@ export default function ConversationScreen() {
             targetLanguage: targetLanguage
           }),
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.translatedText) {
@@ -406,10 +406,10 @@ export default function ConversationScreen() {
       } catch (apiError) {
         console.error('API translation error:', apiError);
       }
-      
+
       let mockTranslation = '';
       const langName = languageOptions.find(l => l.code === targetLanguage)?.name || targetLanguage;
-      
+
       if (targetLanguage === 'es') {
         mockTranslation = `[Español] ${text.substring(0, 10)}... (Texto traducido al español)`;
       } else if (targetLanguage === 'fr') {
@@ -421,7 +421,7 @@ export default function ConversationScreen() {
       } else {
         mockTranslation = `[${langName}] ${text.substring(0, 10)}... (Translated text in ${langName})`;
       }
-      
+
       const key = `${messageIndex}-${sectionType}`;
       setTranslations(prev => ({
         ...prev,
@@ -461,8 +461,8 @@ export default function ConversationScreen() {
             setMessages(prev => {
               const newMessages = [...prev];
               // Delete user message and also its corresponding assistant reply if it exists
-              if (index < newMessages.length - 1 && 
-                  newMessages[index].role === 'user' && 
+              if (index < newMessages.length - 1 &&
+                  newMessages[index].role === 'user' &&
                   newMessages[index + 1].role === 'assistant') {
                 newMessages.splice(index, 2);
               } else {
@@ -500,7 +500,7 @@ export default function ConversationScreen() {
       });
       setEditingMessageIndex(null);
       setEditingText('');
-      
+
       if (Platform.OS === 'ios') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -514,12 +514,12 @@ export default function ConversationScreen() {
 
   const handleLongPress = (messageIndex, event) => {
     if (messages[messageIndex].role !== 'user') return;
-    
+
     const { pageX, pageY } = event.nativeEvent;
     setLongPressedMessage(messageIndex);
     setActionMenuPosition({ x: pageX, y: pageY });
     setShowMessageActions(true);
-    
+
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
@@ -746,7 +746,7 @@ export default function ConversationScreen() {
     const scrollPosition = event.nativeEvent.contentOffset.y;
     const scrollingUp = scrollPosition < lastScrollPosition;
     setLastScrollPosition(scrollPosition);
-    
+
     // Update scrolling direction state
     setIsScrollingUp(scrollingUp);
 
@@ -759,7 +759,7 @@ export default function ConversationScreen() {
 
     // Only show scroll button when scroll position exceeds threshold
     const shouldShowScrollButton = scrollPosition > 300;
-    
+
     if (shouldShowScrollButton) {
       Animated.spring(scrollButtonAnim, {
         toValue: 1,
@@ -784,7 +784,7 @@ export default function ConversationScreen() {
 
     // Manage scrolling state
     setIsScrolling(true);
-    
+
     if (scrollEndTimer.current) {
       clearTimeout(scrollEndTimer.current);
     }
@@ -801,13 +801,13 @@ export default function ConversationScreen() {
     setInput('');
     setSuggestions([]);
     setSelectedTopic(null);
-    
+
     // Close any open sections
     setExpandedSections({});
-    
+
     // Add the user message to the state
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
+
     setMessages(prev => [...prev, {
       role: 'user',
       content: messageText,
@@ -841,21 +841,21 @@ export default function ConversationScreen() {
           requestHighQuality: true // Request the highest quality response
         }),
       });
-      
+
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         throw new Error('Invalid response format');
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         // Start typing animation
         startTypingAnimation();
-        
+
         const formattedResponse = formatResponseFromAPI(data);
         const messageIndex = messages.length; // Get the index for the new message
-        
+
         // Delay to simulate typing
         setTimeout(() => {
           // Add the assistant message
@@ -869,7 +869,7 @@ export default function ConversationScreen() {
 
           if (data.followUp) {
             generateSuggestionsFromFollowUp(data.followUp);
-            
+
             // Auto-expand the suggestions section
             setTimeout(() => {
               const suggestionsSectionKey = `${messageIndex}-suggestions`;
@@ -879,7 +879,7 @@ export default function ConversationScreen() {
               }));
             }, 500);
           }
-          
+
           // Hide loading indicator
           setIsLoading(false);
         }, 1000); // Slightly longer delay for a more realistic typing effect
@@ -942,13 +942,13 @@ export default function ConversationScreen() {
         .filter(item => item.trim())
         .map(item => `• ${item.trim()}`)
         .join('\n\n');
-      
+
       sections.push({
         type: 'followUp',
         content: formattedFollowUp || data.followUp.trim(),
         icon: 'help-circle'
       });
-      
+
       // Add suggestions section after followUp
       sections.push({
         type: 'suggestions',
@@ -1119,7 +1119,7 @@ export default function ConversationScreen() {
   const renderMessageSection = (section, sectionIndex, messageIndex) => {
     const isExpanded = expandedSections[`${messageIndex}-${section.type}`];
     const shouldRenderContent = section.type === 'answer' || isExpanded;
-    
+
     const sectionColors = {
       answer: {
         bg: 'rgba(35, 204, 150, 0.1)', // Light green for main answer
@@ -1147,13 +1147,13 @@ export default function ConversationScreen() {
         icon: '#15a387'
       }
     };
-    
+
     const sectionColor = sectionColors[section.type] || {
       bg: 'transparent',
       border: 'transparent',
       icon: '#FFF'
     };
-    
+
     const sectionTitles = {
       answer: 'Response',
       explanation: 'Language Explanation',
@@ -1161,7 +1161,7 @@ export default function ConversationScreen() {
       followUp: 'Follow-up Questions',
       suggestions: 'Suggestions'
     };
-    
+
     const sectionIcons = {
       answer: 'chat-outline',
       explanation: 'lightbulb-outline',
@@ -1171,11 +1171,11 @@ export default function ConversationScreen() {
     };
 
     return (
-      <View 
-        key={sectionIndex} 
+      <View
+        key={sectionIndex}
         style={[
           styles.sectionBox,
-          { 
+          {
             backgroundColor: sectionColor.bg,
             borderColor: sectionColor.border,
             marginBottom: section.type === 'followUp' ? 4 : 8 // Reduce margin between followUp and suggestions
@@ -1183,8 +1183,8 @@ export default function ConversationScreen() {
         ]}
       >
         {section.type !== 'answer' && (
-          <TouchableOpacity 
-            style={styles.sectionHeader} 
+          <TouchableOpacity
+            style={styles.sectionHeader}
             onPress={() => toggleSection(messageIndex, section.type)}
             activeOpacity={0.7}
           >
@@ -1216,7 +1216,7 @@ export default function ConversationScreen() {
             {section.type === 'answer' && (
               <View style={styles.answerHeader}>
                 <View style={[
-                  styles.sectionIconContainer, 
+                  styles.sectionIconContainer,
                   { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: sectionColor.border }
                 ]}>
                   <MaterialCommunityIcons
@@ -1233,19 +1233,19 @@ export default function ConversationScreen() {
             <Text style={styles.sectionText}>
               {section.content}
             </Text>
-            
+
             <View style={styles.messageActionButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.actionButton}
                 onPress={() => replayText(section.content, messageIndex)}
               >
                 <Ionicons
                   name={speakingMessageIndex === messageIndex ? "volume-mute" : "volume-high"}
-                  size={16} 
+                  size={16}
                   color={speakingMessageIndex === messageIndex ? "#FF5722" : "#23cc96"}
                 />
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.actionButton}
                 onPress={() => toggleTranslation(messageIndex, section.content, section.type)}
               >
@@ -1254,12 +1254,12 @@ export default function ConversationScreen() {
             </View>
           </View>
         )}
-        
+
         {/* Suggestions section content */}
         {isExpanded && section.type === 'suggestions' && (
           <View style={styles.suggestionsContent}>
-            <ScrollView 
-              horizontal 
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.suggestionsScrollContent}
             >
@@ -1275,7 +1275,7 @@ export default function ConversationScreen() {
             </ScrollView>
           </View>
         )}
-        
+
         {showTranslation[`${messageIndex}-${section.type}`] && (
           <View style={styles.translationContainer}>
             <Text style={styles.translationText}>
@@ -1304,14 +1304,14 @@ export default function ConversationScreen() {
               multiline
             />
             <View style={styles.editButtons}>
-              <TouchableOpacity 
-                style={[styles.editButton, styles.cancelButton]} 
+              <TouchableOpacity
+                style={[styles.editButton, styles.cancelButton]}
                 onPress={cancelEditing}
               >
                 <Text style={styles.editButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.editButton, styles.saveButton]} 
+              <TouchableOpacity
+                style={[styles.editButton, styles.saveButton]}
                 onPress={saveEditedMessage}
               >
                 <Text style={styles.editButtonText}>Save</Text>
@@ -1320,7 +1320,7 @@ export default function ConversationScreen() {
           </View>
         );
       }
-      
+
       // Regular user message with action buttons - updated styling
       return (
         <View style={styles.userMessageContainer}>
@@ -1355,7 +1355,7 @@ export default function ConversationScreen() {
       return (
         <View style={styles.assistantContainer}>
           <View style={styles.assistantMessageContainer}>
-            {message.sections.map((section, sectionIndex) => 
+            {message.sections.map((section, sectionIndex) =>
               renderMessageSection(section, sectionIndex, index)
             )}
           </View>
@@ -1391,7 +1391,7 @@ export default function ConversationScreen() {
               <MaterialIcons name="translate" size={18} color="#3B82F6" />
             </TouchableOpacity>
           </View>
-        
+
           {showTranslation[`${index}-${message.sections ? message.sections[0].type : 'answer'}`] && (
             <View style={styles.translationContainer}>
               <Text style={styles.translationText}>
@@ -1400,7 +1400,7 @@ export default function ConversationScreen() {
             </View>
           )}
         </View>
-        
+
         <Text style={[styles.timestamp, styles.assistantTimestamp]}>
           {message.timestamp}
         </Text>
@@ -1420,9 +1420,9 @@ export default function ConversationScreen() {
         <View style={[styles.header, { paddingTop: insets.top }]}>
           {/* Completely empty header */}
         </View>
-        
+
         {/* Translation toggle button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.translationButton}
           onPress={() => setShowLanguageModal(true)}
         >
@@ -1526,7 +1526,7 @@ export default function ConversationScreen() {
 
         <View style={[
           styles.inputContainer,
-          { 
+          {
             paddingBottom: Math.max(insets.bottom, 20), // Add extra bottom padding based on safe area
             bottom: -10 // Push further down
           }
@@ -1579,7 +1579,7 @@ export default function ConversationScreen() {
             </TouchableOpacity>
           </View>
         </View>
-        
+
         {/* Language selection modal */}
         <Modal
           animationType="slide"
@@ -1596,7 +1596,7 @@ export default function ConversationScreen() {
                     <MaterialCommunityIcons name="close" size={24} color="#FFF" />
                   </TouchableOpacity>
                 </View>
-                
+
                 <View style={styles.languageOptionsContainer}>
                   {languageOptions.map((language) => (
                     <TouchableOpacity
@@ -1746,7 +1746,7 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: 12,
     color: '#a6a6ab',
-    marginTop: -4, 
+    marginTop: -4,
     textAlign: 'right',
     marginRight: 8,
   },

@@ -7,8 +7,54 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
   },
+  pronunciationTipsContainer: {
+    backgroundColor: '#06403a',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 10,
+    borderWidth: 1,
+    borderColor: '#0a7e6e',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  tipsContent: {
+    marginTop: 12,
+  },
+  tipSection: {
+    marginBottom: 16,
+  },
+  tipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  tipContent: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    marginLeft: 26,
+  },
+  soundGuideItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  commonErrorItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
   contentContainer: {
     padding: 16,
+    overflow: 'hidden',
     paddingBottom: 40,
     backgroundColor: 'transparent',
   },
@@ -395,49 +441,20 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: 'rgba(255,255,255,0.7)',
   },
-  pronunciationTipsContainer: {
-    backgroundColor: '#06403a',
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#0a7e6e',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 4,
-  },
+
   tipsTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
     marginBottom: 4,
   },
-  tipSection: {
-    gap: 6,
-  },
-  tipHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+
   tipTitle: {
     fontSize: 16,
     fontWeight: '500',
     color: '#FFFFFF',
   },
-  tipContent: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.9)',
-    marginLeft: 26,
-  },
-  soundGuideItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 26,
-    marginBottom: 6,
-  },
+
   soundHighlight: {
     fontSize: 16,
     fontWeight: '700',
@@ -453,12 +470,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: 'rgba(255,255,255,0.9)',
   },
-  commonErrorItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 26,
-    marginBottom: 6,
-  },
+
   errorIcon: {
     marginRight: 8,
   },
@@ -769,6 +781,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#FFFFFF',
   },
+
+
   viewMoreButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -816,7 +830,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollContext } from './ScrollContext';
 
-const API_BASE_URL = 'https://db5b-2409-40e1-3095-20e2-7b0a-9884-ce57-aaf4.ngrok-free.app/api/pronounciation';
+const API_BASE_URL = 'https://ai-english-tutor-9ixt.onrender.com/api/pronounciation';
 
 const DICTIONARY_API = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
 
@@ -851,7 +865,34 @@ export default function PronunciationPracticeScreen() {
   const [pronunciationFeedback, setPronunciationFeedback] = useState(null);
   const [pronunciationHistory, setPronunciationHistory] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [animation] = useState(new Animated.Value(0));
 
+  // Toggle function for expand/collapse
+  const toggleExpand = () => {
+    const toValue = expanded ? 0 : 1;
+
+    Animated.timing(animation, {
+      toValue,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+
+    setExpanded(!expanded);
+  };
+
+  // Animation interpolations
+  const maxHeight = animation.interpolate({
+    inputRange: [0, 4],
+    outputRange: [56, 10000] // Adjust 500 based on your content
+  });
+
+  const arrowRotation = animation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg']
+  });
+
+  // The collapsible container
   // Get scroll context for navbar animation
   const { handleScroll, tabBarHeight } = useContext(ScrollContext);
 
@@ -2075,56 +2116,71 @@ export default function PronunciationPracticeScreen() {
                   )}
                 </View>
 
+
                 <View style={styles.pronunciationTipsContainer}>
-                  <Text style={styles.tipsTitle}>Pronunciation Tips</Text>
+  <TouchableOpacity
+    onPress={toggleExpand}
+    style={styles.titleContainer}
+    activeOpacity={0.7}
+  >
+    <Text style={styles.tipsTitle}>Pronunciation Tips</Text>
+    <MaterialIcons
+      name={expanded ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+      size={24}
+      color="#0ea5e9"
+    />
+  </TouchableOpacity>
 
-                  <View style={styles.tipSection}>
-                    <View style={styles.tipHeader}>
-                      <MaterialIcons name="short-text" size={18} color="#0ea5e9" />
-                      <Text style={styles.tipTitle}>Syllables:</Text>
-                    </View>
-                    <Text style={styles.tipContent}>{wordData.syllables || selectedWord.word}</Text>
-                  </View>
+  {expanded && (
+    <View style={styles.tipsContent}>
+      <View style={styles.tipSection}>
+        <View style={styles.tipHeader}>
+          <MaterialIcons name="short-text" size={18} color="#0ea5e9" />
+          <Text style={styles.tipTitle}>Syllables:</Text>
+        </View>
+        <Text style={styles.tipContent}>{wordData?.syllables || selectedWord?.word}</Text>
+      </View>
 
-                  <View style={styles.tipSection}>
-  <View style={styles.tipHeader}>
-    <MaterialCommunityIcons name="volume-vibrate" size={18} color="#0ea5e9" />
-    <Text style={styles.tipTitle}>Word Stress:</Text>
-  </View>
-  <Text style={styles.tipContent}>{formatStressText(wordData.stress) || 'First syllable'}</Text>
+      <View style={styles.tipSection}>
+        <View style={styles.tipHeader}>
+          <MaterialCommunityIcons name="volume-vibrate" size={18} color="#0ea5e9" />
+          <Text style={styles.tipTitle}>Word Stress:</Text>
+        </View>
+        <Text style={styles.tipContent}>{formatStressText(wordData?.stress) || 'First syllable'}</Text>
+      </View>
+
+      {wordData?.soundGuide && (
+        <View style={styles.tipSection}>
+          <View style={styles.tipHeader}>
+            <MaterialIcons name="record-voice-over" size={18} color="#0ea5e9" />
+            <Text style={styles.tipTitle}>Sound Guide:</Text>
+          </View>
+          {wordData.soundGuide.map((guide, index) => (
+            <View key={`guide-${index}`} style={styles.soundGuideItem}>
+              <Text style={styles.soundHighlight}>{guide.sound}</Text>
+              <Text style={styles.soundGuideText}>{guide.howTo}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {wordData?.commonErrors && (
+        <View style={styles.tipSection}>
+          <View style={styles.tipHeader}>
+            <MaterialIcons name="warning" size={18} color="#f59e0b" />
+            <Text style={styles.tipTitle}>Common Errors:</Text>
+          </View>
+          {wordData.commonErrors.map((error, index) => (
+            <View key={`error-${index}`} style={styles.commonErrorItem}>
+              <MaterialIcons name="error-outline" size={16} color="#f59e0b" style={styles.errorIcon} />
+              <Text style={styles.commonErrorText}>{error}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  )}
 </View>
-
-                  {wordData.soundGuide && (
-                    <View style={styles.tipSection}>
-                      <View style={styles.tipHeader}>
-                        <MaterialIcons name="record-voice-over" size={18} color="#0ea5e9" />
-                        <Text style={styles.tipTitle}>Sound Guide:</Text>
-                      </View>
-                      {wordData.soundGuide.map((guide, index) => (
-                        <View key={`guide-${index}`} style={styles.soundGuideItem}>
-                          <Text style={styles.soundHighlight}>{guide.sound}</Text>
-                          <Text style={styles.soundGuideText}>{guide.howTo}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
-                  {wordData.commonErrors && (
-                    <View style={styles.tipSection}>
-                      <View style={styles.tipHeader}>
-                        <MaterialIcons name="warning" size={18} color="#f59e0b" />
-                        <Text style={styles.tipTitle}>Common Errors:</Text>
-                      </View>
-                      {wordData.commonErrors.map((error, index) => (
-                        <View key={`error-${index}`} style={styles.commonErrorItem}>
-                          <MaterialIcons name="error-outline" size={16} color="#f59e0b" style={styles.errorIcon} />
-                          <Text style={styles.commonErrorText}>{error}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
-
                 <View style={styles.recordingContainer}>
                   <Text style={styles.recordingTitle}>Record Your Pronunciation</Text>
 
