@@ -115,6 +115,7 @@ const CompleteYourAccountScreen = () => {
           },
           body: JSON.stringify({
             email,
+            full_name,
             motherToung,
             englishLevel,
             learningGoal,
