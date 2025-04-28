@@ -49,7 +49,7 @@ router.post("/ask", async (req, res) => {
       orderBy: {
         createdAt: 'desc'
       },
-      take: 5, // Retrieve last 5 conversations
+      take: 5,
       select: {
         userres: true,
         llmres: true,
@@ -102,10 +102,10 @@ Student Information:
 - Mother Tongue: **${safeUser.motherTongue}**
 - English Proficiency Level: **${safeUser.englishLevel}**
 - Learning Goal: **${safeUser.learningGoal}**
-- Interests: **${safeUser.interests.join(", ") || "Various topics"}**
+- Interests: **${safeUser.interests || "Various topics"}**
 - Current Focus Areas: **${safeUser.focus}**
 - Occupation: **${safeUser.occupation || "Not specified"}**
-- Preferred Topics: **${safeUser.preferredTopics?.join(", ") || "General topics"}**
+- Preferred Topics: **${safeUser.preferredTopics || "General topics"}**
 - Preferred Content Type: **${safeUser.preferredContentType || "Flexible"}**
 - Preferred Tutoring Style/Voice: **${safeUser.voice}**
 
