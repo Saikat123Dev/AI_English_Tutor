@@ -32,6 +32,7 @@ async function clearUserCache(userId) {
 router.post('/create', async (req, res) => {
   const {
     email,
+    full_name,
     motherToung, // Fixed typo from motherToung
     englishLevel,
     learningGoal,
@@ -103,7 +104,7 @@ router.post('/create', async (req, res) => {
       },
       create: {
         email,
-        name: email.split('@')[0],
+        name: full_name,
         // Set initial values for any provided fields
         ...(motherToung && { motherToung }),
         ...(englishLevel && { englishLevel }),
