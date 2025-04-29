@@ -26,6 +26,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScrollContext } from './ScrollContext';
 
+// Add your Gemini API key here
+const GEMINI_API_KEY = "AIzaSyDpgRM_SDRjbh-vliR6SnHCVmtzfgevbQs"; // Replace with your actual Gemini API key
+
 export default function ConversationScreen() {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
@@ -83,6 +86,7 @@ export default function ConversationScreen() {
   const [actionMenuMessageIndex, setActionMenuMessageIndex] = useState(null);
   const [isScrollingUp, setIsScrollingUp] = useState(false);
 
+  // Updated language options to include Hindi
   const languageOptions = [
     { code: 'es', name: 'Spanish' },
     { code: 'fr', name: 'French' },
@@ -92,7 +96,8 @@ export default function ConversationScreen() {
     { code: 'ja', name: 'Japanese' },
     { code: 'ko', name: 'Korean' },
     { code: 'ru', name: 'Russian' },
-    { code: 'bn', name: 'Bengali' }
+    { code: 'bn', name: 'Bengali' },
+    { code: 'hi', name: 'Hindi' } // Added Hindi language
   ];
 
   const setFallbackSuggestions = () => {
@@ -378,11 +383,86 @@ export default function ConversationScreen() {
     }
   };
 
+  // Helper function for Gemini translation
+  const translateWithGemini = async (text, targetLanguage) => {
+    try {
+      // Map the language code to full language name that Gemini understands
+      const languageMapping = {
+        'es': 'Spanish',
+        'fr': 'French',
+        'de': 'German',
+        'it': 'Italian',
+        'zh': 'Chinese',
+        'ja': 'Japanese',
+        'ko': 'Korean',
+        'ru': 'Russian',
+        'bn': 'Bengali',
+        'hi': 'Hindi'
+      };
+      
+      const languageName = languageMapping[targetLanguage] || targetLanguage;
+      
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+      
+      const requestBody = {
+        contents: [{
+          parts: [{ 
+            text: `Translate the following text into ${languageName}. Only provide the translated text without any additional explanation or notes:\n\n"${text}"`
+          }]
+        }]
+      };
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extract the translation from the response
+      if (data.candidates && 
+          data.candidates[0] && 
+          data.candidates[0].content && 
+          data.candidates[0].content.parts && 
+          data.candidates[0].content.parts[0] && 
+          data.candidates[0].content.parts[0].text) {
+        return data.candidates[0].content.parts[0].text.trim();
+      } else {
+        throw new Error('Unexpected response format from Gemini API');
+      }
+    } catch (error) {
+      console.error('Gemini translation error:', error);
+      return null;
+    }
+  };
+
+  // Updated translateText function using Gemini API
   const translateText = async (messageIndex, text, sectionType = 'answer') => {
     if (!text) return;
 
     setIsLoading(true);
     try {
+      // First try to use Gemini API for translation
+      const translatedText = await translateWithGemini(text, targetLanguage);
+      
+      if (translatedText) {
+        const key = `${messageIndex}-${sectionType}`;
+        setTranslations(prev => ({
+          ...prev,
+          [key]: translatedText
+        }));
+        setIsLoading(false);
+        return;
+      }
+      
+      // If Gemini API fails, try the original API as fallback
       try {
         const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/translate', {
           method: 'POST',
@@ -410,6 +490,7 @@ export default function ConversationScreen() {
         console.error('API translation error:', apiError);
       }
 
+      // If both APIs fail, use mock translation as last resort
       let mockTranslation = '';
       const langName = languageOptions.find(l => l.code === targetLanguage)?.name || targetLanguage;
 
@@ -421,6 +502,8 @@ export default function ConversationScreen() {
         mockTranslation = `[Deutsch] ${text.substring(0, 10)}... (Text auf Deutsch übersetzt)`;
       } else if (targetLanguage === 'bn') {
         mockTranslation = `[বাংলা] ${text.substring(0, 10)}... (বাংলায় অনুবাদ করা পাঠ্য)`;
+      } else if (targetLanguage === 'hi') {
+        mockTranslation = `[हिंदी] ${text.substring(0, 10)}... (हिंदी में अनुवादित पाठ)`;
       } else {
         mockTranslation = `[${langName}] ${text.substring(0, 10)}... (Translated text in ${langName})`;
       }
