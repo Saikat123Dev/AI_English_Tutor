@@ -75,11 +75,16 @@ const CompleteYourAccountScreen = () => {
     try {
       setIsLoading(true);
 
+      // Properly handle full name splitting
+      const nameParts = full_name.trim().split(/\s+/);
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
+
       // Update Clerk user profile with all fields in unsafeMetadata
       await user?.update({
         username: username,
-        firstName: full_name.split(" ")[0],
-        lastName: full_name.split(" ")[1] || "",
+        firstName: firstName,
+        lastName: lastName,
         unsafeMetadata: {
           gender,
           motherToung,
@@ -164,6 +169,7 @@ const CompleteYourAccountScreen = () => {
     setValue("username", user?.username || "");
     setValue("gender", String(user?.unsafeMetadata?.gender) || "");
     const metadata = user?.unsafeMetadata;
+    console.log(metadata);
     if (metadata) {
       setValue("motherToung", metadata.motherToung || "");
       setValue("englishLevel", metadata.englishLevel || "");
@@ -341,7 +347,7 @@ const CompleteYourAccountScreen = () => {
               placeholder="Enter your native language"
               label="Native Language"
               required
-              name="motherTongue"
+              name="motherToung"
             />
 
             <TextInput
