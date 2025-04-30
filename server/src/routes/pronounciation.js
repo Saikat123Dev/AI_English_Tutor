@@ -340,12 +340,7 @@ async function storePronunciationAttempt(attemptData) {
   }
 }
 
-/**
- * Function to submit audio file to AssemblyAI and get transcription with analysis
- * @param {Object} audioFile - The audio file object from multer
- * @param {string} targetWord - The word the user is attempting to pronounce
- * @returns {Promise<Object>} - Transcription and analysis data
- */
+
 async function getAssemblyAITranscription(audioFile, targetWord) {
   try {
     if (!audioFile) {
@@ -388,13 +383,6 @@ async function getAssemblyAITranscription(audioFile, targetWord) {
   }
 }
 
-/**
- * Improved function to analyze pronunciation match based on AssemblyAI results
- * Enhanced to better support British accent and provide more accurate scoring
- * @param {Object} transcriptionData - Data from AssemblyAI
- * @param {string} targetWord - The target word user attempted to pronounce
- * @returns {Object} - Enhanced analysis of the pronunciation
- */
 function analyzeAssemblyResults(transcriptionData, targetWord) {
   // Handle error case
   if (transcriptionData.error) {
@@ -414,7 +402,6 @@ function analyzeAssemblyResults(transcriptionData, targetWord) {
     };
   }
 
-  // Set default values in case we can't extract everything
   const analysis = {
     detectedText: transcriptionData.text || "",
     wordMatch: false,
@@ -428,16 +415,7 @@ function analyzeAssemblyResults(transcriptionData, targetWord) {
     accentVariant: null
   };
 
-  // Detect accent variant based on language code
-  if (analysis.languageDetected === "en-GB") {
-    analysis.accentVariant = "British";
-  } else if (analysis.languageDetected === "en-US") {
-    analysis.accentVariant = "American";
-  } else if (analysis.languageDetected === "en-AU") {
-    analysis.accentVariant = "Australian";
-  } else {
-    analysis.accentVariant = "General";
-  }
+  analysis.accentVariant = "General";
 
   // Check for word match (case insensitive)
   const lowerCaseTarget = targetWord.toLowerCase().trim();
@@ -514,7 +492,7 @@ function analyzeAssemblyResults(transcriptionData, targetWord) {
     let bonus = 0;
 
     // Check for British spelling patterns in the target word
-    if (analysis.accentVariant === "British" || analysis.accentVariant === "General") {
+    if (analysis.accentVariant === "General") {
       for (const pattern of britishSpellingPatterns) {
         if (lowerCaseTarget.includes(pattern.brit)) {
           bonus += 5; // Bonus for matching British spelling patterns
@@ -523,12 +501,9 @@ function analyzeAssemblyResults(transcriptionData, targetWord) {
       }
     }
 
-    // Check audio duration (British pronunciation often more deliberate)
     if (analysis.totalDuration > 0) {
-      const expectedDuration = lowerCaseTarget.length * 0.15; // approx 150ms per character
+      const expectedDuration = lowerCaseTarget.length * 0.15;
       const durationRatio = analysis.totalDuration / expectedDuration;
-
-      // British speakers often take slightly longer on certain vowel sounds
       if (analysis.accentVariant === "British" && durationRatio > 1 && durationRatio < 1.5) {
         bonus += 5;
       }
@@ -559,49 +534,42 @@ function analyzeAssemblyResults(transcriptionData, targetWord) {
       analysis.pronunciationSpeed = targetWord.length / analysis.wordAlignment.duration;
     }
 
-    // IMPROVED: More generous base accuracy for exact matches
-    // Removed the artificial ceiling - perfect pronunciations can reach 100%
-    baseAccuracy = 80 + (analysis.confidenceScore * 20); // Max 100%
+    // Allow for 100% accuracy with perfect confidence
+    baseAccuracy = 80 + (analysis.confidenceScore * 20); // Can reach 100%
     confidentMatch = true;
 
-    // Apply accent-specific bonus
+    // Apply accent-specific bonus (capped at 100%)
     phonemeMatchBonus = calculatePhoneticMatchBonus();
   }
-  // Case 2: The transcription matches exactly the target word (full transcription)
-  else if (detectedTextLower === lowerCaseTarget) {
+  // Case 2: The transcription matches exactly the target word or very close (ignoring punctuation)
+  else if (detectedTextLower === lowerCaseTarget || detectedTextLower.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").trim() === lowerCaseTarget) {
     analysis.wordMatch = true;
-    analysis.confidenceScore = 0.95; // High confidence for exact match
-    baseAccuracy = 95; // Very good match - increased from 90
+    analysis.confidenceScore = 1.0; // Full confidence for exact match
+    baseAccuracy = 100; // Perfect match - allow 100%
     confidentMatch = true;
 
-    // Apply accent-specific bonus
+    // Apply accent-specific bonus (capped at 100%)
     phonemeMatchBonus = calculatePhoneticMatchBonus();
   }
   // Case 3: The target word is contained within the transcription
   else if (detectedTextLower.includes(lowerCaseTarget)) {
     analysis.wordMatch = true;
-    analysis.confidenceScore = 0.8; // Increased from 0.7
+    analysis.confidenceScore = 0.95; // Increased from 0.8 since this is nearly exact
     analysis.note = "Word detected as part of a longer phrase";
-    baseAccuracy = 80; // Good but not perfect - increased from 75
-
-    // Apply accent-specific bonus
+    baseAccuracy = 95; // Higher base accuracy for contained phrases
     phonemeMatchBonus = calculatePhoneticMatchBonus();
   }
   // Case 4: Partial match using string similarity
   else if (detectedTextLower) {
     const similarity = calculateSimilarity(lowerCaseTarget, detectedTextLower);
 
-    // Handle British-American variations through phonetic equivalence matching
     let enhancedSimilarity = similarity;
-
-    // Check for potential British-American pronunciation differences
-    // This helps with words like "water", "schedule", "aluminum/aluminium", etc.
     if (similarity >= 60 && similarity < 90) {
       // Apply phonetic equivalence checks
       for (const [britPron, usPron] of Object.entries(phoneticEquivalents)) {
         // If the word contains this sound pattern, consider it equivalent
         if (detectedTextLower.includes(britPron) || detectedTextLower.includes(usPron)) {
-          enhancedSimilarity = Math.min(enhancedSimilarity + 15, 95); // Boost similarity but cap at 95%
+          enhancedSimilarity = Math.min(enhancedSimilarity + 15, 100);
           break;
         }
       }
@@ -613,35 +581,45 @@ function analyzeAssemblyResults(transcriptionData, targetWord) {
       analysis.note = "Close pronunciation detected";
       baseAccuracy = enhancedSimilarity;
 
-      // Apply accent-specific bonus
       phonemeMatchBonus = calculatePhoneticMatchBonus();
     } else if (enhancedSimilarity >= 60) {
       analysis.wordMatch = false;
-      analysis.confidenceScore = enhancedSimilarity / 150; // Lower confidence
+      analysis.confidenceScore = enhancedSimilarity / 150;
       analysis.note = "Partial pronunciation detected";
-      baseAccuracy = enhancedSimilarity / 1.5; // Less penalty
+      baseAccuracy = enhancedSimilarity / 1.5;
 
       // Apply accent-specific bonus (smaller)
       phonemeMatchBonus = calculatePhoneticMatchBonus() / 2;
     } else {
+      analysis.wordMatch = false;
       analysis.note = "Target word not clearly detected in transcript";
       analysis.detectedTextInstead = detectedTextLower;
-      console.log(similarity);
-      baseAccuracy = Math.max(20, similarity / 2); // Minimum 20% if anything was detected
+
+      // Allow for 0% accuracy with completely different content
+      baseAccuracy = similarity;
     }
+  } else {
+    // No text detected at all
+    analysis.wordMatch = false;
+    analysis.note = "No speech detected";
+    baseAccuracy = 0; // 0% accuracy when nothing is detected
   }
 
   // Check for disfluencies
   if (transcriptionData.text && /\bum\b|\buh\b|\ber\b|\behm\b/i.test(transcriptionData.text)) {
     analysis.disfluencies = true;
-    // Penalize accuracy for disfluencies
+    // Penalize accuracy for disfluencies, but don't impose a minimum floor
     if (confidentMatch) {
-      baseAccuracy = Math.max(50, baseAccuracy - 15);
+      baseAccuracy = baseAccuracy - 15;
     }
   }
 
-  // IMPROVED: Apply the phoneme match bonus for accent variants
+  // Apply the phoneme match bonus for accent variants (capped at 100%)
   baseAccuracy = Math.min(100, baseAccuracy + phonemeMatchBonus);
+
+  // Ensure accuracy is between 0-100%
+  baseAccuracy = Math.max(0, baseAccuracy);
+  baseAccuracy = Math.min(100, baseAccuracy);
 
   // Finalize accuracy score
   analysis.accuracyScore = Math.round(baseAccuracy);
@@ -650,14 +628,12 @@ function analyzeAssemblyResults(transcriptionData, targetWord) {
   analysis.accentNotes = analysis.accentVariant
     ? `Detected ${analysis.accentVariant} accent patterns`
     : "No specific accent variant detected";
-
+  console.log(analysis);
   return analysis;
 }
 
-// Updated safeJsonParse function with better error handling
 function safeJsonParse(jsonString, fallback = {}) {
   try {
-    // Remove any potential code block formatting and control characters
     const cleanedText = jsonString
       .replace(/```json|```/g, '')
       .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
@@ -718,7 +694,8 @@ const buildPrompt = (word, user, pronunciationAnalysis) => {
   {
     "success": true,
     "word": "${word}",
-    "accuracy": 85,
+    "accuracy": 100,
+    "maximum accurecy":100,
     "correctSounds": ["specific phonemes or syllables pronounced well"],
     "improvementNeeded": ["specific phonemes or syllables needing improvement"],
     "accentNotes": "Brief notes about the accent detected (if any)",
