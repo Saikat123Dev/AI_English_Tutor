@@ -8,6 +8,7 @@ import initialQuestionsRoutes from './routes/initialQuestions.js';
 import profile from './routes/profile.js';
 import pronounciationRoutes from './routes/pronounciation.js';
 import recentActivity from './routes/recentActivity.cjs';
+// import userStatus from './routes/status.cjs';
 import transcript from "./routes/transcript.cjs";
 import vocabularyRoutes from './routes/vocabulary.js';
 const app = express();
@@ -24,6 +25,7 @@ app.use('/api',transcript)
 app.use('/api',vocabularyRoutes)
 app.use('/api',recentActivity)
 app.use('/api',profile)
+// app.use("/api/status",userStatus)
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });

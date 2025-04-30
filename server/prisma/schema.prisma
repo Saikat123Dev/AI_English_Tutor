@@ -13,28 +13,29 @@ datasource db {
 }
 
 model user {
-  id                    String                 @id @default(cuid())
-  email                 String                 @unique
-  name                  String?
-  motherToung           String?
-  englishLevel          String?
-  learningGoal          String?
-  interests             String?
-  focus                 String?
-  voice                 String?
-  occupation            String?
-  studyTime             String?
-  preferredTopics       String? // Stored as comma-separated values
-  challengeAreas        String? // Stored as comma-separated values
-  learningStyle         String?
-  practiceFrequency     String?
-  vocabularyLevel       String?
-  grammarKnowledge      String?
-  previousExperience    String?
-  preferredContentType  String? // Stored as comma-separated values
-  spokenAccent          String?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  id                   String   @id @default(cuid())
+  email                String   @unique
+  name                 String?
+  motherToung          String?
+  englishLevel         String?
+  learningGoal         String?
+  interests            String?
+  focus                String?
+  voice                String?
+  occupation           String?
+  studyTime            String?
+  preferredTopics      String? // Stored as comma-separated values
+  challengeAreas       String? // Stored as comma-separated values
+  learningStyle        String?
+  practiceFrequency    String?
+  vocabularyLevel      String?
+  grammarKnowledge     String?
+  previousExperience   String?
+  preferredContentType String? // Stored as comma-separated values
+  spokenAccent         String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
   questions             question[]
   pronunciationAttempts pronunciationAttempt[]
   vocabularyWords       vocabularyWord[] // Relation to vocabulary words
@@ -64,7 +65,7 @@ model pronunciationAttempt {
   word               String
   audioUrl           String?
   userId             String
-  accuracy           Float?   @default(0) // Stores values like 85.50
+  accuracy           Float    @default(0) // Stores values like 85.50
   feedback           String?  @db.Text
   transcriptionData  String?  @db.Text
   assemblyConfidence Float? // Confidence score from AssemblyAI
