@@ -5,32 +5,33 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Define colors - can be moved to a separate file
 const COLORS = {
-  primary: '#0d9488',
-  primaryDark: '#115e59',
-  primaryLight: '#ccfbf1',
-  accent: '#0f766e',
-  accentLight: '#5eead4',
-  background: '#f0fdfa',
-  backgroundDark: '#e6f5f3',
-  card: '#ffffff',
-  cardDark: '#ecfdf5',
-  text: '#042f2e',
-  textSecondary: '#3f706d',
-  textTertiary: '#64748b',
-  border: '#cbd5e1',
-  borderDark: '#94a3b8',
-  error: '#dc2626',
-  success: '#16a34a',
-  warning: '#f59e0b',
-  info: '#2563eb',
-  white: '#ffffff',
-  black: '#000000',
-  grayLight: '#f1f5f9',
-  gray: '#e2e8f0',
-  grayDark: '#94a3b8'
+  primary: '#09b3a6',       // Deeper, richer green
+  primaryDark: '#033330',   // Very dark green, almost black
+  primaryLight: '#9fd0cb',  // Soft, light green with more saturation
+  accent: '#047857',        // Forest green accent
+  accentLight: '#34d399',   // Mint green for highlights
+  background: '#0f292f',    // Dark teal-green background
+  backgroundDark: '#0a1f24', // Even darker background for contrast
+  card: '#103b3f',          // Dark card background with green tint
+  cardDark: '#072e30',      // Darker card variant
+  text: '#e6fff5',          // Light green-white text for dark backgrounds
+  textSecondary: '#a8e6d5', // Lighter green for secondary text
+  textTertiary: '#68c0ac',  // Medium light green for tertiary text
+  border: '#164e52',        // Darker green border for dark theme
+  borderDark: '#246b67',    // Medium green border with more contrast
+  error: '#f87171',         // Brighter red for visibility on dark backgrounds
+  success: '#10b981',       // Brighter green success for visibility
+  warning: '#fbbf24',       // Brighter amber warning for visibility
+  info: '#38bdf8',          // Brighter blue for info on dark backgrounds
+  white: '#ffffff',         // Unchanged
+  black: '#000000',         // Unchanged
+  grayLight: '#1a3e44',     // Dark gray with green tint
+  gray: '#112e33',          // Darker gray with green tint
+  grayDark: '#0d2226',      // Very dark gray with green tint
+  star: '#FFD700',          // Gold color for achievement stars
 };
 
 // Reusable ProfileOption component
@@ -68,9 +69,10 @@ function ProfileOption({ title, icon, onPress, showChevron = true, isLast = fals
   );
 }
 
-// Reusable SkillProgressCard component
+// Reusable SkillProgressCard component with star achievement
 function SkillProgressCard({ title, progress, total, icon }) {
   const percentage = Math.min(100, Math.round((progress / total) * 100));
+  const isCompleted = percentage >= 100;
 
   return (
     <View style={[styles.skillCard, { backgroundColor: COLORS.card }]}>
@@ -79,6 +81,9 @@ function SkillProgressCard({ title, progress, total, icon }) {
           {icon}
         </View>
         <Text style={[styles.skillTitle, { color: COLORS.text }]}>{title}</Text>
+        {isCompleted && (
+          <MaterialCommunityIcons name="star" size={24} color={COLORS.star} style={styles.starIcon} />
+        )}
       </View>
 
       <View style={styles.skillProgressContainer}>
@@ -101,6 +106,106 @@ function SkillProgressCard({ title, progress, total, icon }) {
   );
 }
 
+// Progress Section Component with 7-day cycle
+function ProgressSection({ userStats, lastResetTime, onTimerToggle, showTimer }) {
+  const [timeRemaining, setTimeRemaining] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  });
+
+  // Calculate time remaining until next reset
+  useEffect(() => {
+    const calculateTimeRemaining = () => {
+      // Get the current date and time
+      const now = new Date();
+      
+      // Find when the next reset should happen (7 days from the last reset)
+      const lastReset = new Date(lastResetTime || now);
+      const nextResetTime = new Date(lastReset);
+      nextResetTime.setDate(nextResetTime.getDate() + 7);
+      
+      // Calculate the difference
+      const diffTime = nextResetTime - now;
+      
+      // If time is up, trigger reset
+      if (diffTime <= 0) {
+        setTimeRemaining({ days: 7, hours: 0, minutes: 0, seconds: 0 });
+        return;
+      }
+      
+      // Calculate days, hours, minutes, seconds
+      const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diffTime % (1000 * 60)) / 1000);
+      
+      setTimeRemaining({ days, hours, minutes, seconds });
+    };
+
+    // Calculate immediately
+    calculateTimeRemaining();
+    
+    // Then update every second
+    const interval = setInterval(calculateTimeRemaining, 1000);
+    
+    // Clean up
+    return () => clearInterval(interval);
+  }, [lastResetTime]);
+
+  return (
+    <View style={styles.sectionContainer}>
+      <View style={styles.progressSectionHeader}>
+        <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>MY PROGRESS</Text>
+        
+        <TouchableOpacity 
+          style={styles.timerButton}
+          onPress={onTimerToggle}
+        >
+          <MaterialCommunityIcons 
+            name="timer-outline" 
+            size={22} 
+            color={COLORS.primary} 
+          />
+          <Text style={styles.timerButtonText}>
+            {showTimer ? "Hide Timer" : "Show Timer"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+      
+      {showTimer && (
+        <View style={styles.timerContainer}>
+          <Text style={styles.timerText}>
+            Next reset in: {timeRemaining.days}d {timeRemaining.hours}h {timeRemaining.minutes}m {timeRemaining.seconds}s
+          </Text>
+        </View>
+      )}
+
+      <SkillProgressCard
+        title="Pronunciation Accuracy"
+        progress={userStats.pronunciationAccuracy}
+        total={100}
+        icon={<MaterialCommunityIcons name="microphone" size={20} color={COLORS.primary} />}
+      />
+
+      <SkillProgressCard
+        title="Vocabulary Building"
+        progress={userStats.vocabulary}
+        total={100}
+        icon={<MaterialCommunityIcons name="book-open-variant" size={20} color={COLORS.primary} />}
+      />
+
+      <SkillProgressCard
+        title="Learning Progress"
+        progress={userStats.learningProgress}
+        total={100}
+        icon={<MaterialCommunityIcons name="school" size={20} color={COLORS.primary} />}
+      />
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
   const { user, isLoaded: isUserLoaded } = useUser();
   const { signOut } = useAuth();
@@ -114,11 +219,82 @@ export default function ProfileScreen() {
     text: "Learning another language is not only learning different words for the same things, but learning another way to think about things.",
     author: "Flora Lewis"
   });
+  
+  // Progress cycle state
+  const [lastResetTime, setLastResetTime] = useState(new Date().toISOString());
+  const [showTimer, setShowTimer] = useState(false);
+  const [previousAchievements, setPreviousAchievements] = useState([]);
+  
+  const PROGRESS_STORAGE_KEY = '@language_app_progress_data';
+
+  // Load progress data
+  const loadProgressData = async () => {
+    try {
+      const storedData = await AsyncStorage.getItem(PROGRESS_STORAGE_KEY);
+      if (storedData) {
+        const parsedData = JSON.parse(storedData);
+        setLastResetTime(parsedData.lastResetTime);
+        setPreviousAchievements(parsedData.previousAchievements || []);
+        
+        // Check if reset is needed
+        checkAndResetProgress(parsedData);
+      }
+    } catch (error) {
+      console.error('Error loading progress data:', error);
+    }
+  };
+  
+  // Check if progress needs to be reset (7-day cycle)
+  const checkAndResetProgress = async (data) => {
+    const now = new Date();
+    const lastReset = new Date(data.lastResetTime);
+    const diffDays = Math.floor((now - lastReset) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays >= 7) {
+      // Store achievements before reset
+      const achievements = [
+        ...(data.previousAchievements || []),
+        {
+          cycle: (data.previousAchievements?.length || 0) + 1,
+          completedOn: lastReset.toISOString(),
+          pronunciationCompleted: userData?.stats?.pronunciationAccuracy >= 100,
+          vocabularyCompleted: userData?.stats?.vocabulary >= 100,
+          learningCompleted: userData?.stats?.learningProgress >= 100,
+        }
+      ];
+      
+      // Reset progress stats in userData
+      if (userData && userData.stats) {
+        const resetUserData = {
+          ...userData,
+          stats: {
+            ...userData.stats,
+            pronunciationAccuracy: 0,
+            vocabulary: userData.stats.vocabulary, // Keep vocabulary count
+            learningProgress: 0,
+          }
+        };
+        setUserData(resetUserData);
+      }
+      
+      // Update storage
+      const updatedData = {
+        lastResetTime: now.toISOString(),
+        previousAchievements: achievements
+      };
+      
+      setLastResetTime(now.toISOString());
+      setPreviousAchievements(achievements);
+      
+      await AsyncStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(updatedData));
+    }
+  };
 
   // Fetch user data from the backend
   useEffect(() => {
     if (isUserLoaded && user) {
       fetchUserData();
+      loadProgressData();
     }
   }, [isUserLoaded, user]);
 
@@ -158,6 +334,17 @@ export default function ProfileScreen() {
 
       // Set the received data directly to userData state
       setUserData(data);
+      
+      // Initialize progress data if it doesn't exist yet
+      const progressData = await AsyncStorage.getItem(PROGRESS_STORAGE_KEY);
+      if (!progressData) {
+        const initialProgressData = {
+          lastResetTime: new Date().toISOString(),
+          previousAchievements: []
+        };
+        await AsyncStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(initialProgressData));
+        setLastResetTime(initialProgressData.lastResetTime);
+      }
     } catch (error) {
       console.error('Error fetching user data:', error);
       Alert.alert('Error', 'Failed to load profile data. Please try again.');
@@ -319,31 +506,13 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Progress Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>MY PROGRESS</Text>
-
-          <SkillProgressCard
-            title="Pronunciation Accuracy"
-            progress={userStats.pronunciationAccuracy}
-            total={100}
-            icon={<MaterialCommunityIcons name="microphone" size={20} color={COLORS.primary} />}
-          />
-
-          <SkillProgressCard
-            title="Vocabulary Building"
-            progress={userStats.vocabulary}
-            total={1000}
-            icon={<MaterialCommunityIcons name="book-open-variant" size={20} color={COLORS.primary} />}
-          />
-
-          <SkillProgressCard
-            title="Learning Progress"
-            progress={userStats.learningProgress}
-            total={100}
-            icon={<MaterialCommunityIcons name="school" size={20} color={COLORS.primary} />}
-          />
-        </View>
+        {/* Progress Section with 7-day cycle */}
+        <ProgressSection 
+          userStats={userStats}
+          lastResetTime={lastResetTime}
+          onTimerToggle={() => setShowTimer(!showTimer)}
+          showTimer={showTimer}
+        />
 
         {/* Challenge Areas Section */}
         {userData?.challengeAreas && userData.challengeAreas.length > 0 && (
@@ -373,6 +542,45 @@ export default function ProfileScreen() {
                   <Text style={[styles.tagText, { color: COLORS.accent }]}>
                     {topic.charAt(0).toUpperCase() + topic.slice(1)}
                   </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Previous Achievements Section - Only show if there are any */}
+        {previousAchievements.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>PREVIOUS ACHIEVEMENTS</Text>
+            
+            <View style={[styles.infoCard, { backgroundColor: COLORS.card }]}>
+              {previousAchievements.slice(-3).map((achievement, index) => (
+                <View key={index} style={[styles.achievementRow, 
+                  index !== previousAchievements.slice(-3).length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border }
+                ]}>
+                  <Text style={[styles.achievementTitle, { color: COLORS.text }]}>
+                    Cycle {achievement.cycle} - {new Date(achievement.completedOn).toLocaleDateString()}
+                  </Text>
+                  <View style={styles.achievementIcons}>
+                    {achievement.pronunciationCompleted && (
+                      <View style={styles.achievementIconContainer}>
+                        <MaterialCommunityIcons name="microphone" size={16} color={COLORS.primary} />
+                        <MaterialCommunityIcons name="star" size={12} color={COLORS.star} style={styles.miniStar} />
+                      </View>
+                    )}
+                    {achievement.vocabularyCompleted && (
+                      <View style={styles.achievementIconContainer}>
+                        <MaterialCommunityIcons name="book-open-variant" size={16} color={COLORS.primary} />
+                        <MaterialCommunityIcons name="star" size={12} color={COLORS.star} style={styles.miniStar} />
+                      </View>
+                    )}
+                    {achievement.learningCompleted && (
+                      <View style={styles.achievementIconContainer}>
+                        <MaterialCommunityIcons name="school" size={16} color={COLORS.primary} />
+                        <MaterialCommunityIcons name="star" size={12} color={COLORS.star} style={styles.miniStar} />
+                      </View>
+                    )}
+                  </View>
                 </View>
               ))}
             </View>
@@ -666,6 +874,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.text,
+    flex: 1,
+  },
+  starIcon: {
+    marginLeft: 8,
   },
   skillProgressContainer: {
     marginTop: 8,
@@ -819,5 +1031,73 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 16,
     opacity: 0.7,
+  },
+  // New styles for 7-day cycle feature
+  progressSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  timerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.card,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  timerButtonText: {
+    fontSize: 12,
+    marginLeft: 4,
+    color: COLORS.primary,
+    fontWeight: '500',
+  },
+  timerContainer: {
+    backgroundColor: COLORS.card,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+  },
+  timerText: {
+    fontSize: 14,
+    color: COLORS.text,
+    fontWeight: '500',
+  },
+  // Styles for previous achievements
+  achievementRow: {
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  achievementTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.text,
+  },
+  achievementIcons: {
+    flexDirection: 'row',
+  },
+  achievementIconContainer: {
+    position: 'relative',
+    marginLeft: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  miniStar: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
   }
 });
