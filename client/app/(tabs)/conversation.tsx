@@ -800,7 +800,7 @@ useEffect(() => {
       }
 
       const response = await fetch(
-        `https://436e-2409-40e1-30d9-8b3a-8f83-f1a5-cc76-e36.ngrok-free.app/api/chat/getHistory?email=${encodeURIComponent(user.primaryEmailAddress.emailAddress)}`,
+        `https://ai-english-tutor-9ixt.onrender.com/api/chat/getHistory?email=${encodeURIComponent(user.primaryEmailAddress.emailAddress)}`,
         {
           method: 'GET',
           headers: {
