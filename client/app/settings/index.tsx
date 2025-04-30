@@ -1,626 +1,530 @@
-import { SignedIn, useClerk } from "@clerk/clerk-expo";
-import { Ionicons } from "@expo/vector-icons";
+import { SignedIn, useClerk, useUser } from '@clerk/clerk-expo';
+import { FontAwesome5, MaterialIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import { BlurView } from "expo-blur";
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from "react";
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Animated,
-  Dimensions,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
-} from "react-native";
-
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+  View,
+} from 'react-native';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 const SettingsScreen = () => {
-  const { user } = useClerk();
-  const [isEditing, setIsEditing] = useState(false);
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [fullName, setFullName] = useState(user?.fullName || "");
-  const [username, setUsername] = useState(user?.username || "");
-  const [darkMode, setDarkMode] = useState(false);
-  const [notifications, setNotifications] = useState(true);
+  const [formData, setFormData] = useState({
+    name: '',
+    motherToung: '',
+    englishLevel: '',
+    learningGoal: '',
+    interests: '',
+    focus: '',
+    voice: '',
+    occupation: '',
+    studyTime: '',
+    preferredTopics: '',
+    challengeAreas: '',
+    learningStyle: '',
+    practiceFrequency: '',
+    vocabularyLevel: '',
+    grammarKnowledge: '',
+    previousExperience: '',
+    preferredContentType: '',
+    spokenAccent: '',
+  });
 
-  // Language learning profile state
-  const [motherTongue, setMotherTongue] = useState(user?.unsafeMetadata?.motherToung || "");
-  const [englishLevel, setEnglishLevel] = useState(user?.unsafeMetadata?.englishLevel || "intermediate");
-  const [learningGoal, setLearningGoal] = useState(user?.unsafeMetadata?.learningGoal || "");
-  const [interests, setInterests] = useState(user?.unsafeMetadata?.interests || "");
-  const [focus, setFocus] = useState(user?.unsafeMetadata?.focus || "speaking");
-  const [voice, setVoice] = useState(user?.unsafeMetadata?.voice || "female");
-
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const englishLevels = ['Beginner', 'Intermediate', 'Advanced', 'Fluent'];
+  const learningGoals = ['Conversation', 'Business', 'Academic', 'Travel', 'Exam Preparation'];
+  const voices = ['Male', 'Female', 'Neutral'];
+  const studyTimes = ['Morning', 'Afternoon', 'Evening', 'Night', 'Weekends'];
+  const learningStyles = ['Visual', 'Auditory', 'Kinesthetic', 'Reading/Writing'];
+  const practiceFrequencies = ['Daily', 'Weekly', 'Bi-weekly', 'Monthly'];
+  const vocabularyLevels = ['Basic', 'Intermediate', 'Advanced', 'Academic'];
+  const grammarKnowledgeLevels = ['Basic', 'Intermediate', 'Advanced', 'Expert'];
+  const accents = ['American', 'British', 'Australian', 'Canadian', 'Indian', 'Other'];
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 6,
-        tension: 50,
-        useNativeDriver: true,
-      })
-    ]).start();
+    if (user) {
+      const metadata = user.unsafeMetadata || {};
+      const formatArrayField = (field: string | string[]) => {
+        if (Array.isArray(field)) return field.join(', ');
+        return field || '';
+      };
 
-    const metadata = user?.unsafeMetadata;
-    if (metadata) {
-      setMotherTongue(metadata.motherToung || "");
-      setEnglishLevel(metadata.englishLevel || "intermediate");
-      setLearningGoal(metadata.learningGoal || "");
-      setInterests(metadata.interests || "");
-      setFocus(metadata.focus || "speaking");
-      setVoice(metadata.voice || "female");
+      setFormData({
+        name: user.fullName || '',
+        motherToung: metadata.motherToung || metadata.motherTongue || '',
+        englishLevel: metadata.englishLevel || '',
+        learningGoal: metadata.learningGoal || '',
+        interests: metadata.interests || '',
+        focus: metadata.focus || '',
+        voice: metadata.voice || '',
+        occupation: metadata.occupation || '',
+        studyTime: metadata.studyTime || '',
+        preferredTopics: formatArrayField(metadata.preferredTopics || ''),
+        challengeAreas: formatArrayField(metadata.challengeAreas || ''),
+        learningStyle: metadata.learningStyle || '',
+        practiceFrequency: metadata.practiceFrequency || '',
+        vocabularyLevel: metadata.vocabularyLevel || '',
+        grammarKnowledge: metadata.grammarKnowledge || '',
+        previousExperience: metadata.previousExperience || '',
+        preferredContentType: formatArrayField(metadata.preferredContentType || ''),
+        spokenAccent: metadata.spokenAccent || '',
+      });
+      setIsLoading(false);
     }
-  }, []);
+  }, [user]);
 
-  const handleEdit = () => {
-    console.log("Edit button pressed, isEditing:", isEditing);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(err => console.error("Haptics error:", err));
-    setIsEditing(true);
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   const handleSave = async () => {
     setIsSaving(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
+    Haptics.selectionAsync();
     try {
-      await user?.update({
-        username,
-        firstName: fullName.split(" ")[0],
-        lastName: fullName.split(" ")[1] || "",
-        unsafeMetadata: {
-          ...user?.unsafeMetadata,
-          motherToung: motherTongue,
-          englishLevel,
-          learningGoal,
-          interests,
-          focus,
-          voice
-        },
-      });
-
-      const email = user?.primaryEmailAddress?.emailAddress;
-      if (email) {
-        const response = await fetch("https://ai-english-tutor-9ixt.onrender.com/api/auth/create", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            motherToung: motherTongue,
-            englishLevel,
-            learningGoal,
-            interests,
-            focus,
-            voice,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to update user profile in database");
-        }
-      }
-
-      setIsEditing(false);
-      Alert.alert("Success", "Your profile has been updated successfully!");
+      if (!user) throw new Error('User not found');
+      const updateData = {
+        motherToung: formData.motherToung,
+        englishLevel: formData.englishLevel,
+        learningGoal: formData.learningGoal,
+        interests: formData.interests,
+        focus: formData.focus,
+        voice: formData.voice,
+        occupation: formData.occupation,
+        studyTime: formData.studyTime,
+        preferredTopics: formData.preferredTopics.split(',').map(t => t.trim()),
+        challengeAreas: formData.challengeAreas.split(',').map(t => t.trim()),
+        learningStyle: formData.learningStyle,
+        practiceFrequency: formData.practiceFrequency,
+        vocabularyLevel: formData.vocabularyLevel,
+        grammarKnowledge: formData.grammarKnowledge,
+        previousExperience: formData.previousExperience,
+        preferredContentType: formData.preferredContentType.split(',').map(t => t.trim()),
+        spokenAccent: formData.spokenAccent,
+      };
+      await user.update({ unsafeMetadata: updateData });
+      Alert.alert('Success', 'Your settings have been saved successfully!');
     } catch (error) {
-      console.error("Error updating profile:", error);
-      Alert.alert("Error", "Failed to update profile");
+      console.error('Error saving settings:', error);
+      Alert.alert('Error', error.message || 'Failed to save settings');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleCancel = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setFullName(user?.fullName || "");
-    setUsername(user?.username || "");
-
-    const metadata = user?.unsafeMetadata;
-    if (metadata) {
-      setMotherTongue(metadata.motherToung || "");
-      setEnglishLevel(metadata.englishLevel || "intermediate");
-      setLearningGoal(metadata.learningGoal || "");
-      setInterests(metadata.interests || "");
-      setFocus(metadata.focus || "speaking");
-      setVoice(metadata.voice || "female");
-    }
-
-    setIsEditing(false);
+  const handleLogout = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    signOut();
   };
 
-  const renderPicker = (label, value, setValue, options) => (
-    <View style={styles.inputGroup}>
-      <Text style={styles.label}>{label}</Text>
-      {isEditing ? (
-        <View style={[styles.inputContainer, styles.pickerContainer]}>
-          <Picker
-            selectedValue={value}
-            onValueChange={(itemValue) => setValue(itemValue)}
-            style={styles.picker}
-          >
-            {options.map((option) => (
-              <Picker.Item key={option.value} label={option.label} value={option.value} />
-            ))}
-          </Picker>
-        </View>
-      ) : (
-        <View style={[styles.inputContainer, styles.disabledInput]}>
-          <Text style={styles.inputText}>
-            {options.find(opt => opt.value === value)?.label || "Not set"}
-          </Text>
-        </View>
-      )}
-    </View>
+  if (isLoading) {
+    return (
+      <LinearGradient colors={['#e0f7fa', '#b2ebf2']} style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#00796b" />
+        <Text style={styles.loadingText}>Loading your profile...</Text>
+      </LinearGradient>
+    );
+  }
+
+  const renderInputField = (label: string, field: string, placeholder: string, icon: string, multiline: boolean = false) => (
+    <Animated.View entering={FadeInDown} style={styles.inputGroup}>
+      <View style={styles.labelContainer}>
+        <MaterialIcons name={icon} size={18} color="#00796b" />
+        <Text style={styles.label}>{label}</Text>
+      </View>
+      <TextInput
+        style={[styles.input, multiline && styles.multilineInput]}
+        value={formData[field]}
+        onChangeText={(text) => handleInputChange(field, text)}
+        placeholder={placeholder}
+        placeholderTextColor="#90a4ae"
+        multiline={multiline}
+        accessibilityLabel={label}
+      />
+    </Animated.View>
+  );
+
+  const renderPickerField = (label: string, field: string, placeholder: string, options: string[], icon: string) => (
+    <Animated.View entering={FadeInDown} style={styles.inputGroup}>
+      <View style={styles.labelContainer}>
+        <MaterialIcons name={icon} size={18} color="#00796b" />
+        <Text style={styles.label}>{label}</Text>
+      </View>
+      <View style={styles.pickerContainer}>
+        <Picker
+          selectedValue={formData[field]}
+          onValueChange={(itemValue) => handleInputChange(field, itemValue)}
+          style={styles.picker}
+          dropdownIconColor="#00796b"
+          accessibilityLabel={label}
+        >
+          <Picker.Item label={placeholder} value="" color="#90a4ae" />
+          {options.map((option) => (
+            <Picker.Item key={option} label={option} value={option.toLowerCase()} color="#424242" />
+          ))}
+        </Picker>
+      </View>
+    </Animated.View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardAvoid}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <SignedIn>
-            <Animated.View
-              style={[
-                styles.header,
-                {
-                  opacity: fadeAnim,
-                  transform: [{ scale: scaleAnim }]
-                }
-              ]}
-            >
-              <View style={styles.avatarContainer}>
-                <Text style={styles.avatarText}>
-                  {user?.firstName?.charAt(0) || user?.username?.charAt(0) || "U"}
-                </Text>
+    <SignedIn>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <LinearGradient colors={['#e0f7fa', '#b2ebf2']} style={styles.container}>
+          <View style={styles.headerContainer}>
+            <BlurView intensity={100} style={styles.header}>
+              <MaterialIcons name="settings" size={28} color="#ffffff" />
+              <Text style={styles.headerText}>Profile Settings</Text>
+            </BlurView>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+            <Animated.View entering={FadeInUp} style={styles.profileHeader}>
+              <BlurView intensity={50} style={styles.profileHeaderBlur}>
+                {user?.imageUrl ? (
+                  <Image source={{ uri: user.imageUrl }} style={styles.profileImage} />
+                ) : (
+                  <View style={styles.profileImagePlaceholder}>
+                    <MaterialIcons name="person" size={40} color="#00796b" />
+                  </View>
+                )}
+                <View style={styles.profileTextContainer}>
+                  <Text style={styles.profileName}>{user?.fullName || 'User'}</Text>
+                  <View style={styles.emailContainer}>
+                    <MaterialIcons name="email" size={14} color="#90a4ae" />
+                    <Text style={styles.profileEmail}>{user?.primaryEmailAddress?.emailAddress}</Text>
+                  </View>
+                </View>
+              </BlurView>
+            </Animated.View>
+
+            <View style={styles.section}>
+              <View style={styles.sectionTitleContainer}>
+                <FontAwesome5 name="user-alt" size={16} color="#00796b" />
+                <Text style={styles.sectionTitle}>Basic Information</Text>
               </View>
-              <Text style={styles.headerText}>Your Profile</Text>
-            </Animated.View>
+              {renderInputField('Name', 'name', 'Enter your name', 'person')}
+              {renderInputField('Mother Tongue', 'motherToung', 'Enter your native language', 'language')}
+              {renderPickerField('English Level', 'englishLevel', 'Select your English level', englishLevels, 'school')}
+            </View>
 
-            <Animated.View
-              style={[
-                styles.cardContainer,
-                {
-                  opacity: fadeAnim,
-                  transform: [{ scale: scaleAnim }]
-                }
-              ]}
-            >
-              <BlurView intensity={90} tint="light" style={styles.blurContainer}>
-                <View style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.heading}>Profile Information</Text>
-                    <TouchableOpacity onPress={handleEdit} style={styles.editButton}>
-                      <Ionicons name="pencil" size={18} color="#2A9D8F" />
-                      <Text style={styles.editText}>Edit</Text>
-                    </TouchableOpacity>
-                  </View>
+            <View style={styles.section}>
+              <View style={styles.sectionTitleContainer}>
+                <FontAwesome5 name="graduation-cap" size={16} color="#00796b" />
+                <Text style={styles.sectionTitle}>Learning Preferences</Text>
+              </View>
+              {renderInputField('Learning Goal', 'learningGoal', 'Enter your learning goal', 'flag')}
+              {renderInputField('Interests', 'interests', 'Enter your interests (comma separated)', 'favorite', true)}
+              {renderInputField('Focus Area', 'focus', 'What do you want to focus on?', 'center-focus-strong')}
+              {renderPickerField('Preferred Voice', 'voice', 'Select preferred voice', voices, 'record-voice-over')}
+            </View>
 
-                  <View style={styles.formContainer}>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Email</Text>
-                      <View style={[styles.inputContainer, styles.disabledInput]}>
-                        <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                        <Text style={styles.inputText}>
-                          {user?.emailAddresses[0]?.emailAddress || "Not provided"}
-                        </Text>
-                      </View>
-                    </View>
+            <View style={styles.section}>
+              <View style={styles.sectionTitleContainer}>
+                <FontAwesome5 name="book-reader" size={16} color="#00796b" />
+                <Text style={styles.sectionTitle}>Study Details</Text>
+              </View>
+              {renderInputField('Occupation', 'occupation', 'Enter your occupation', 'work')}
+              {renderInputField('Challenge Areas', 'challengeAreas', 'Enter areas you find challenging (comma separated)', 'trending-up', true)}
+            </View>
 
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Full Name</Text>
-                      {isEditing ? (
-                        <View style={styles.inputContainer}>
-                          <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                          <TextInput
-                            style={styles.input}
-                            value={fullName}
-                            onChangeText={setFullName}
-                            placeholder="Enter your full name"
-                            autoCapitalize="words"
-                            placeholderTextColor="#9CA3AF"
-                          />
-                        </View>
-                      ) : (
-                        <View style={[styles.inputContainer, styles.disabledInput]}>
-                          <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                          <Text style={styles.inputText}>{user?.fullName || "Not provided"}</Text>
-                        </View>
-                      )}
-                    </View>
+            <View style={styles.section}>
+              <View style={styles.sectionTitleContainer}>
+                <FontAwesome5 name="brain" size={16} color="#00796b" />
+                <Text style={styles.sectionTitle}>Learning Style</Text>
+              </View>
+              {renderPickerField('Vocabulary Level', 'vocabularyLevel', 'Select vocabulary level', vocabularyLevels, 'library-books')}
+              {renderPickerField('Grammar Knowledge', 'grammarKnowledge', 'Select grammar knowledge level', grammarKnowledgeLevels, 'spellcheck')}
+            </View>
 
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Username</Text>
-                      {isEditing ? (
-                        <View style={styles.inputContainer}>
-                          <Ionicons name="at-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                          <TextInput
-                            style={styles.input}
-                            value={username}
-                            onChangeText={setUsername}
-                            placeholder="Enter your username"
-                            autoCapitalize="none"
-                            placeholderTextColor="#9CA3AF"
-                          />
-                        </View>
-                      ) : (
-                        <View style={[styles.inputContainer, styles.disabledInput]}>
-                          <Ionicons name="at-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                          <Text style={styles.inputText}>{user?.username || "Not provided"}</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              </BlurView>
-            </Animated.View>
+            <View style={styles.section}>
+              <View style={styles.sectionTitleContainer}>
+                <FontAwesome5 name="info-circle" size={16} color="#00796b" />
+                <Text style={styles.sectionTitle}>Additional Information</Text>
+              </View>
+              {renderInputField('Previous Experience', 'previousExperience', 'Describe your previous English learning experience', 'history', true)}
+              {renderInputField('Preferred Content Type', 'preferredContentType', 'Enter content types you prefer (comma separated)', 'folder', true)}
+            </View>
 
-            <Animated.View
-              style={[
-                styles.cardContainer,
-                {
-                  opacity: fadeAnim,
-                  transform: [{ scale: scaleAnim }]
-                }
-              ]}
-            >
-              <BlurView intensity={90} tint="light" style={styles.blurContainer}>
-                <View style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.heading}>Language Learning Profile</Text>
-                  </View>
-
-                  <View style={styles.formContainer}>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Native Language</Text>
-                      {isEditing ? (
-                        <View style={styles.inputContainer}>
-                          <Ionicons name="language-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                          <TextInput
-                            style={styles.input}
-                            value={motherTongue}
-                            onChangeText={setMotherTongue}
-                            placeholder="Your native language"
-                            autoCapitalize="words"
-                            placeholderTextColor="#9CA3AF"
-                          />
-                        </View>
-                      ) : (
-                        <View style={[styles.inputContainer, styles.disabledInput]}>
-                          <Ionicons name="language-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                          <Text style={styles.inputText}>{motherTongue || "Not provided"}</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {renderPicker("English Level", englishLevel, setEnglishLevel, [
-                      { label: "Beginner", value: "beginner" },
-                      { label: "Intermediate", value: "intermediate" },
-                      { label: "Advanced", value: "advanced" },
-                    ])}
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Learning Goal</Text>
-                      {isEditing ? (
-                        <View style={styles.inputContainer}>
-                          <Ionicons name="trophy-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                          <TextInput
-                            style={styles.input}
-                            value={learningGoal}
-                            onChangeText={setLearningGoal}
-                            placeholder="Your language learning goal"
-                            placeholderTextColor="#9CA3AF"
-                          />
-                        </View>
-                      ) : (
-                        <View style={[styles.inputContainer, styles.disabledInput]}>
-                          <Ionicons name="trophy-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                          <Text style={styles.inputText}>{learningGoal || "Not provided"}</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Interests</Text>
-                      {isEditing ? (
-                        <View style={styles.inputContainer}>
-                          <Ionicons name="heart-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                          <TextInput
-                            style={styles.input}
-                            value={interests}
-                            onChangeText={setInterests}
-                            placeholder="Your interests (comma separated)"
-                            placeholderTextColor="#9CA3AF"
-                          />
-                        </View>
-                      ) : (
-                        <View style={[styles.inputContainer, styles.disabledInput]}>
-                          <Ionicons name="heart-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                          <Text style={styles.inputText}>{interests || "Not provided"}</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {renderPicker("Learning Focus", focus, setFocus, [
-                      { label: "Speaking", value: "speaking" },
-                      { label: "Listening", value: "listening" },
-                      { label: "Reading", value: "reading" },
-                      { label: "Writing", value: "writing" },
-                    ])}
-
-                    {renderPicker("Preferred Voice", voice, setVoice, [
-                      { label: "Male", value: "male" },
-                      { label: "Female", value: "female" },
-                    ])}
-                  </View>
-                </View>
-              </BlurView>
-            </Animated.View>
-
-
-
-            {isEditing && (
-              <Animated.View
-                style={[
-                  styles.buttonContainer,
-                  {
-                    opacity: fadeAnim,
-                    transform: [{ scale: scaleAnim }]
-                  }
-                ]}
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+                onPress={handleSave}
+                disabled={isSaving}
+                activeOpacity={0.7}
               >
-                <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-                  <Text style={styles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.saveButton, isSaving && styles.savingButton]}
-                  onPress={handleSave}
-                  disabled={isSaving}
+                <LinearGradient
+                  colors={['#00796b', '#0288d1']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.saveButtonGradient}
                 >
                   {isSaving ? (
-                    <ActivityIndicator size="small" color="#F9FAFB" />
+                    <ActivityIndicator color="#ffffff" />
                   ) : (
-                    <Text style={styles.saveText}>Save Changes</Text>
+                    <>
+                      <MaterialIcons name="save" size={20} color="#ffffff" />
+                      <Text style={styles.buttonText}>Save Changes</Text>
+                    </>
                   )}
-                </TouchableOpacity>
-              </Animated.View>
-            )}
-          </SignedIn>
-        </ScrollView>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.logoutButton}
+                onPress={handleLogout}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="logout" size={20} color="#d32f2f" />
+                <Text style={styles.logoutButtonText}>Log Out</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </LinearGradient>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SignedIn>
   );
 };
 
-export default SettingsScreen;
-
-const { width } = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#E8F5E9",
   },
-  keyboardAvoid: {
+  contentContainer: {
+    paddingBottom: 40,
+  },
+  loadingContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  scrollContainer: {
-    flexGrow: 1,
-    alignItems: "center",
-    paddingVertical: 40,
-    paddingHorizontal: 24,
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#00796b',
+    fontWeight: '600',
+  },
+  headerContainer: {
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    paddingBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
+    zIndex: 100,
   },
   header: {
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  avatarContainer: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: "#2A9D8F",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-    shadowColor: "#059669",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
-    borderWidth: 2,
-    borderColor: "#6EE7B7",
-  },
-  avatarText: {
-    fontSize: 36,
-    fontWeight: "700",
-    color: "#F9FAFB",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    backgroundColor: 'rgba(0, 121, 107, 0.8)',
   },
   headerText: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1F2937",
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginLeft: 10,
     letterSpacing: 0.5,
   },
-  cardContainer: {
-    width: "100%",
-    maxWidth: 600,
-    marginBottom: 24,
+  profileHeader: {
+    marginVertical: 16,
+    marginHorizontal: 16,
     borderRadius: 20,
-    overflow: "hidden",
-  },
-  blurContainer: {
-    overflow: "hidden",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(110, 231, 183, 0.3)",
-  },
-  card: {
-    padding: 24,
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1F2937",
-    letterSpacing: 0.3,
-  },
-  editButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: "rgba(42, 157, 143, 0.1)",
-  },
-  editText: {
-    marginLeft: 6,
-    color: "#2A9D8F",
-    fontWeight: "600",
-    fontSize: 15,
-  },
-  formContainer: {
-    gap: 20,
-  },
-  inputGroup: {
-    width: "100%",
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 8,
-    letterSpacing: 0.2,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F9FAFB",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    paddingHorizontal: 14,
-    height: 52,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: "#1F2937",
-    height: "100%",
-    fontWeight: "500",
-  },
-  disabledInput: {
-    backgroundColor: "rgba(243, 244, 246, 0.7)",
-  },
-  inputText: {
-    fontSize: 16,
-    color: "#1F2937",
-    paddingVertical: 14,
-    fontWeight: "500",
-  },
-  pickerContainer: {
-    padding: 0,
     overflow: 'hidden',
   },
-  picker: {
+  profileHeaderBlur: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  profileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: '#00796b',
+  },
+  profileImagePlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#e0f7fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#00796b',
+  },
+  profileTextContainer: {
+    marginLeft: 16,
     flex: 1,
-    height: 52,
-    color: "#1F2937",
+  },
+  profileName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#00796b',
+    marginBottom: 4,
+  },
+  emailContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: '#90a4ae',
+    marginLeft: 4,
+  },
+  section: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 20,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0f7fa',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#00796b',
+    marginLeft: 8,
+    letterSpacing: 0.5,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#424242',
+    marginLeft: 6,
+  },
+  input: {
+    backgroundColor: '#f5f6f5',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    color: '#212121',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  multilineInput: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  pickerContainer: {
+    backgroundColor: '#f5f6f5',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  picker: {
+    height: 50,
+    width: '100%',
+    color: '#212121',
   },
   buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    width: "100%",
-    maxWidth: 600,
-    gap: 16,
+    marginTop: 8,
+    marginHorizontal: 16,
     marginBottom: 24,
   },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  cancelText: {
-    color: "#4B5563",
-    fontWeight: "600",
-    fontSize: 16,
-  },
   saveButton: {
-    flex: 2,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: "#2A9D8F",
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-    shadowColor: "#059669",
-    shadowOffset: { width: 0, height: 4 },
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#00796b',
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
+    elevation: 5,
   },
-  savingButton: {
-    backgroundColor: "#6EE7B7",
+  saveButtonGradient: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
   },
-  saveText: {
-    color: "#F9FAFB",
-    fontWeight: "600",
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: '#ffffff',
     fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 8,
+    letterSpacing: 0.5,
   },
-  settingRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(209, 213, 219, 0.3)",
+  logoutButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d32f2f',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    shadowColor: '#d32f2f',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  settingInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  settingText: {
+  logoutButtonText: {
+    color: '#d32f2f',
     fontSize: 16,
-    color: "#1F2937",
-    fontWeight: "500",
+    fontWeight: '600',
+    marginLeft: 8,
+    letterSpacing: 0.5,
   },
 });
+
+export default SettingsScreen;

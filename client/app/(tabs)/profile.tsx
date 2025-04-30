@@ -404,6 +404,12 @@ export default function ProfileScreen() {
             badge={pronunciationPracticeCount > 0 ? `${pronunciationPracticeCount}` : null}
             isLast={true}
           />
+          <ProfileOption
+            title="Settings"
+            icon={<MaterialCommunityIcons name="settings-helper" size={20} color={COLORS.primary} />}
+            onPress={() => router.push('/settings')}
+
+          />
         </View>
 
         {/* User Details Section */}
