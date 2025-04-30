@@ -105,7 +105,7 @@ export default function HomeScreen() {
     {
       id: 2,
       title: 'Profile',
-      icon: 'admin',
+      icon: 'account',
       color: '#4ECDC4',
       gradientColors: ['#4ECDC4', '#6EE7DF'],
       route: 'profile',

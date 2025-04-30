@@ -225,6 +225,16 @@ const RecentActivity = ({ theme, router }) => {
           { opacity: fadeAnim }
         ]}
       >
+        {/* Section Header */}
+        <View style={styles.sectionHeader}>
+          <View style={styles.titleContainer}>
+            <MaterialCommunityIcons name="history" size={22} color={'#FFFFFF'} />
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Activities</Text>
+          </View>
+
+
+        </View>
+
         <TouchableOpacity
           activeOpacity={0.9}
           style={[
@@ -257,7 +267,7 @@ const RecentActivity = ({ theme, router }) => {
               </View>
             )}
 
-            {recentActivity.slice(0, 3).map((activity, index) => (
+            {recentActivity.slice(0, 8).map((activity, index) => (
               <MotiView
                 key={`${activity.type}-${activity.data.id || index}`}
                 from={{ opacity: 0, translateY: 10 }}
@@ -269,6 +279,7 @@ const RecentActivity = ({ theme, router }) => {
               </MotiView>
             ))}
 
+
           </LinearGradient>
         </TouchableOpacity>
       </Animated.View>
@@ -279,6 +290,7 @@ const RecentActivity = ({ theme, router }) => {
 const styles = StyleSheet.create({
   scrollViewContainer: {
     flexGrow: 1,
+    paddingBottom: 20,
   },
   recentActivityContainer: {
     marginTop: 20,
@@ -310,22 +322,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+    paddingHorizontal: 4,
   },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     marginLeft: 8,
   },
   viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(9, 179, 166, 0.1)',
+    borderRadius: 12,
   },
   viewAll: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     marginRight: 2,
   },
@@ -402,7 +419,7 @@ const styles = StyleSheet.create({
   },
   activityTime: {
     fontSize: 11,
-    color: '#ffcc80', // Changed to a light orange color that should be visible on dark backgrounds
+    color: '#ffcc80', // Light orange color that should be visible on dark backgrounds
   },
   divider: {
     height: 1,

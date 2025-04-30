@@ -30,7 +30,7 @@ router.get('/recent', async (req, res) => {
     const userId = user.id;
 
     // Define how many items to fetch for each activity type
-    const limit = parseInt(req.query.limit) || 5;
+    const limit = 8;
 
     // Get recent data in parallel for better performance
     const [

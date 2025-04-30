@@ -582,7 +582,7 @@ export default function ProfileScreen() {
         )}
 
         {/* App Version */}
-        <Text style={[styles.version, { color: COLORS.textSecondary }]}>Version 1.0.0 (beta)</Text>
+        <Text style={[styles.version, { color: COLORS.textSecondary }]}>Version 1.0.1</Text>
       </ScrollView>
     </SafeAreaView>
   );
