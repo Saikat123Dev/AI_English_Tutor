@@ -85,6 +85,7 @@ export default function ConversationScreen() {
   const [actionMenuPosition, setActionMenuPosition] = useState({ x: 0, y: 0 });
   const [actionMenuMessageIndex, setActionMenuMessageIndex] = useState(null);
   const [isScrollingUp, setIsScrollingUp] = useState(false);
+  const [messageIds, setMessageIds] = useState({}); // Store message IDs from the API
 
   // Updated language options to include Hindi
   const languageOptions = [
@@ -399,19 +400,19 @@ export default function ConversationScreen() {
         'bn': 'Bengali',
         'hi': 'Hindi'
       };
-      
+
       const languageName = languageMapping[targetLanguage] || targetLanguage;
-      
+
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-      
+
       const requestBody = {
         contents: [{
-          parts: [{ 
+          parts: [{
             text: `Translate the following text into ${languageName}. Only provide the translated text without any additional explanation or notes:\n\n"${text}"`
           }]
         }]
       };
-      
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -419,19 +420,19 @@ export default function ConversationScreen() {
         },
         body: JSON.stringify(requestBody)
       });
-      
+
       if (!response.ok) {
         throw new Error(`Gemini API error: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       // Extract the translation from the response
-      if (data.candidates && 
-          data.candidates[0] && 
-          data.candidates[0].content && 
-          data.candidates[0].content.parts && 
-          data.candidates[0].content.parts[0] && 
+      if (data.candidates &&
+          data.candidates[0] &&
+          data.candidates[0].content &&
+          data.candidates[0].content.parts &&
+          data.candidates[0].content.parts[0] &&
           data.candidates[0].content.parts[0].text) {
         return data.candidates[0].content.parts[0].text.trim();
       } else {
@@ -451,7 +452,7 @@ export default function ConversationScreen() {
     try {
       // First try to use Gemini API for translation
       const translatedText = await translateWithGemini(text, targetLanguage);
-      
+
       if (translatedText) {
         const key = `${messageIndex}-${sectionType}`;
         setTranslations(prev => ({
@@ -461,7 +462,7 @@ export default function ConversationScreen() {
         setIsLoading(false);
         return;
       }
-      
+
       // If Gemini API fails, try the original API as fallback
       try {
         const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/translate', {
@@ -526,7 +527,28 @@ export default function ConversationScreen() {
     }
   };
 
-  const deleteMessage = (index) => {
+
+
+  const startEditMessage = (index) => {
+    if (messages[index].role === 'user') {
+      setEditingMessageIndex(index);
+      setEditingText(messages[index].content);
+    }
+  };
+
+  const deleteMessage = async (index) => {
+    const message = messages[index];
+
+    // Check if we have an ID for this message
+    if (!message.id && message.isInitial) {
+      Alert.alert(
+        "Cannot Delete",
+        "The initial greeting message cannot be deleted.",
+        [{ text: "OK", style: "default" }]
+      );
+      return;
+    }
+
     Alert.alert(
       "Delete Message",
       "Are you sure you want to delete this message?",
@@ -537,28 +559,71 @@ export default function ConversationScreen() {
         },
         {
           text: "Delete",
-          onPress: () => {
-            // If we're deleting the message being edited, cancel editing mode
-            if (editingMessageIndex === index) {
-              setEditingMessageIndex(null);
-              setEditingText('');
-            }
+          onPress: async () => {
+            setIsLoading(true);
+            try {
+              // Check if there's a corresponding assistant message to delete
+              const hasAssistantResponse = index < messages.length - 1 &&
+                  messages[index].role === 'user' &&
+                  messages[index + 1].role === 'assistant';
 
-            setMessages(prev => {
-              const newMessages = [...prev];
-              // Delete user message and also its corresponding assistant reply if it exists
-              if (index < newMessages.length - 1 &&
-                  newMessages[index].role === 'user' &&
-                  newMessages[index + 1].role === 'assistant') {
-                newMessages.splice(index, 2);
-              } else {
-                newMessages.splice(index, 1);
+              // If we have a message ID, delete it from the server
+              if (message.id) {
+                const response = await fetch(
+                  `https://ai-english-tutor-9ixt.onrender.com/api/conversation/${message.id}?email=${encodeURIComponent(user?.primaryEmailAddress?.emailAddress || '')}`,
+                  {
+                    method: 'DELETE',
+                    headers: {
+                      "ngrok-skip-browser-warning": "true",
+                      'Accept': 'application/json',
+                      'Content-Type': 'application/json',
+                    }
+                  }
+                );
+
+                if (!response.ok) {
+                  throw new Error('Failed to delete message from server');
+                }
+
+                // If there's an assistant response, also delete it
+                if (hasAssistantResponse && messages[index + 1].id) {
+                  await fetch(
+                    `https://ai-english-tutor-9ixt.onrender.com/api/conversation/${messages[index + 1].id}?email=${encodeURIComponent(user?.primaryEmailAddress?.emailAddress || '')}`,
+                    {
+                      method: 'DELETE',
+                      headers: {
+                        "ngrok-skip-browser-warning": "true",
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                      }
+                    }
+                  );
+                }
               }
-              return newMessages;
-            });
 
-            if (Platform.OS === 'ios') {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              // Update the UI state
+              setMessages(prev => {
+                const newMessages = [...prev];
+                if (hasAssistantResponse) {
+                  newMessages.splice(index, 2); // Delete both user and assistant messages
+                } else {
+                  newMessages.splice(index, 1); // Just delete the single message
+                }
+                return newMessages;
+              });
+
+              if (Platform.OS === 'ios') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+            } catch (error) {
+              console.error('Error deleting message:', error);
+              Alert.alert(
+                "Error",
+                "Failed to delete the message. Please try again later.",
+                [{ text: "OK", style: "default" }]
+              );
+            } finally {
+              setIsLoading(false);
             }
           },
           style: "destructive"
@@ -566,33 +631,138 @@ export default function ConversationScreen() {
       ]
     );
   };
+  const saveEditedMessage = async () => {
+    if (editingMessageIndex === null || !editingText.trim()) return;
+    const message = messages[editingMessageIndex];
+    if (!message) return;
 
-  const startEditMessage = (index) => {
-    if (messages[index].role === 'user') {
-      setEditingMessageIndex(index);
-      setEditingText(messages[index].content);
-    }
-  };
+    setIsLoading(true);
+    try {
+      // Update the message on the server if we have an ID
+      if (message.id) {
+        // Check if we need a new AI response
+        const oldMessageContent = message.content;
+        const needsNewResponse = oldMessageContent !== editingText;
 
-  const saveEditedMessage = () => {
-    if (editingMessageIndex !== null && editingText.trim()) {
-      setMessages(prev => {
-        const newMessages = [...prev];
-        newMessages[editingMessageIndex] = {
-          ...newMessages[editingMessageIndex],
-          content: editingText
-        };
-        return newMessages;
-      });
+        const response = await fetch(
+          `https://ai-english-tutor-9ixt.onrender.com/api/conversation/${message.id}`,
+          {
+            method: 'PUT',
+            headers: {
+              "ngrok-skip-browser-warning": "true",
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: user?.primaryEmailAddress?.emailAddress,
+              content: editingText,
+              generateNewResponse: needsNewResponse
+            })
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to update message on server');
+        }
+
+        // Get the response data
+        const responseData = await response.json();
+        console.log('Server response:', responseData);
+
+        // Check if there's an assistant response that needs updating
+        const hasAssistantResponse = editingMessageIndex < messages.length - 1 &&
+          messages[editingMessageIndex].role === 'user' &&
+          messages[editingMessageIndex + 1].role === 'assistant';
+
+        // Update the message in the UI
+        setMessages(prev => {
+          const newMessages = [...prev];
+          newMessages[editingMessageIndex] = {
+            ...newMessages[editingMessageIndex],
+            content: editingText
+          };
+
+          // If the backend generated a new response and returned it
+          if (needsNewResponse && hasAssistantResponse && responseData.data && responseData.data.llmres) {
+            try {
+              // Try to parse the LLM response
+              const llmData = JSON.parse(responseData.data.llmres);
+
+              // Format the response
+              const formattedResponse = formatResponseFromAPI(llmData);
+
+              // Update the assistant message
+              newMessages[editingMessageIndex + 1] = {
+                ...newMessages[editingMessageIndex + 1],
+                content: formattedResponse.content,
+                sections: formattedResponse.sections,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isInitial: false,
+                id: responseData.data.id // Keep the same ID
+              };
+
+              // Generate suggestions if there's a follow-up
+              if (llmData.followUp) {
+                generateSuggestionsFromFollowUp(llmData.followUp);
+              }
+            } catch (parseError) {
+              console.error('Error parsing LLM response:', parseError);
+              // Just update the timestamp if parsing fails
+              newMessages[editingMessageIndex + 1] = {
+                ...newMessages[editingMessageIndex + 1],
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              };
+            }
+          } else if (needsNewResponse && hasAssistantResponse) {
+            // If we need a new response but it's not in the response data
+            // Just update the timestamp to show the message was updated
+            newMessages[editingMessageIndex + 1] = {
+              ...newMessages[editingMessageIndex + 1],
+              content: "Response was updated. Refresh to see the latest content.",
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+          }
+
+          return newMessages;
+        });
+      } else {
+        // If there's no ID, just update in the UI
+        setMessages(prev => {
+          const newMessages = [...prev];
+          newMessages[editingMessageIndex] = {
+            ...newMessages[editingMessageIndex],
+            content: editingText
+          };
+          return newMessages;
+        });
+
+        // Optionally show an alert about local-only changes
+        Alert.alert(
+          "Local Change Only",
+          "This message was updated locally but not saved to the server because it has no ID.",
+          [{ text: "OK", style: "default" }]
+        );
+      }
+
+      // Clear editing state
       setEditingMessageIndex(null);
       setEditingText('');
 
+      // Provide haptic feedback on success
       if (Platform.OS === 'ios') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
+    } catch (error) {
+      console.error('Error updating message:', error);
+      Alert.alert(
+        "Error",
+        `Failed to update the message: ${error.message}`,
+        [{ text: "OK", style: "default" }]
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
-
   const cancelEditing = () => {
     setEditingMessageIndex(null);
     setEditingText('');
@@ -616,1047 +786,1031 @@ export default function ConversationScreen() {
     setLongPressedMessage(null);
   };
 
-  useEffect(() => {
-    animateEntranceElements();
-    animateWave();
-    startTypingAnimation();
+// Improved message loading that properly handles message IDs
+useEffect(() => {
+  animateEntranceElements();
+  animateWave();
+  startTypingAnimation();
 
-    const fetchInitialQuestions = async () => {
-      try {
-        if (!user?.primaryEmailAddress?.emailAddress) {
-          setFallbackSuggestions();
-          return;
-        }
+  const fetchInitialQuestions = async () => {
+    try {
+      if (!user?.primaryEmailAddress?.emailAddress) {
+        setFallbackSuggestions();
+        return;
+      }
 
-        const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/chat/getHistory?email=' + user.primaryEmailAddress.emailAddress, {
+      const response = await fetch(
+        `https://436e-2409-40e1-30d9-8b3a-8f83-f1a5-cc76-e36.ngrok-free.app/api/chat/getHistory?email=${encodeURIComponent(user.primaryEmailAddress.emailAddress)}`,
+        {
           method: 'GET',
           headers: {
             "ngrok-skip-browser-warning": "true",
             'Accept': 'application/json',
             'Content-Type': 'application/json',
           }
-        });
-
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          const data = await response.json();
-          if (data.success && data.history && data.history.length > 0) {
-            const historyMessages = data.history.map((item) => {
-              const userMessage = {
-                role: 'user',
-                content: item.userres,
-                timestamp: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              };
-
-              let assistantContent = "Sorry, I couldn't process this message.";
-              let sections = null;
-
-              try {
-                const parsedLLM = JSON.parse(item.llmres);
-
-                if (parsedLLM.success) {
-                  sections = [];
-
-                  if (parsedLLM.answer) {
-                    sections.push({
-                      type: 'answer',
-                      content: parsedLLM.answer
-                    });
-                  }
-
-                  if (parsedLLM.explanation) {
-                    sections.push({
-                      type: 'explanation',
-                      content: parsedLLM.explanation,
-                      icon: 'lightbulb-outline'
-                    });
-                  }
-
-                  if (parsedLLM.feedback) {
-                    sections.push({
-                      type: 'feedback',
-                      content: parsedLLM.feedback,
-                      icon: 'message-alert-outline'
-                    });
-                  }
-
-                  if (parsedLLM.followUp) {
-                    sections.push({
-                      type: 'followUp',
-                      content: parsedLLM.followUp,
-                      icon: 'chat-question-outline'
-                    });
-                  }
-
-                  assistantContent = [
-                    parsedLLM.answer,
-                    parsedLLM.explanation,
-                    parsedLLM.feedback,
-                    parsedLLM.followUp
-                  ].filter(Boolean).join('\n\n');
-
-                  if (parsedLLM.followUp) {
-                    generateSuggestionsFromFollowUp(parsedLLM.followUp);
-                  }
-                }
-              } catch (error) {
-                console.error('Error parsing LLM response:', error);
-                assistantContent = "Error parsing response.";
-              }
-
-              const assistantMessage = {
-                role: 'assistant',
-                content: assistantContent,
-                sections: sections,
-                timestamp: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              };
-
-              return [userMessage, assistantMessage];
-            }).flat();
-
-            if (historyMessages.length === 0) {
-              setMessages([
-                {
-                  role: 'assistant',
-                  content: `Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your language learning assistant. Let's practice conversation! What would you like to talk about?`,
-                  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                  isInitial: true
-                }
-              ]);
-            } else {
-              setMessages(historyMessages);
-            }
-
-            if (data.history.length > 0) {
-              const lastItem = data.history[data.history.length - 1];
-              try {
-                const parsedLLM = JSON.parse(lastItem.llmres);
-                if (parsedLLM.followUp) {
-                  generateSuggestionsFromFollowUp(parsedLLM.followUp);
-                  return;
-                }
-              } catch (error) {
-                console.error('Error parsing last message for suggestions:', error);
-              }
-            }
-          } else {
-            setMessages([
-              {
-                role: 'assistant',
-                content: `Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your language learning assistant. Let's practice conversation! What would you like to talk about?`,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                isInitial: true
-              }
-            ]);
-          }
-          setFallbackSuggestions();
-        } else {
-          console.error('Invalid content type from API');
-          setFallbackSuggestions();
         }
-      } catch (error) {
-        console.error('Error fetching chat history:', error);
-        setFallbackSuggestions();
-
-        setMessages([
-          {
-            role: 'assistant',
-            content: `Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your language learning assistant. Let's practice conversation! What would you like to talk about?`,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isInitial: true
-          }
-        ]);
-      }
-    };
-
-    fetchInitialQuestions();
-
-    return () => {
-      Speech.stop();
-      if (recordingRef.current) {
-        recordingRef.current.stopAndUnloadAsync();
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (scrollViewRef.current && messages.length > 1) {
-      scrollViewRef.current.scrollToEnd({ animated: true });
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    if (isLoading) {
-      startTypingAnimation();
-    } else {
-      typingDot1.setValue(0);
-      typingDot2.setValue(0);
-      typingDot3.setValue(0);
-      typingAnimation.setValue(0);
-    }
-  }, [isLoading]);
-
-  useEffect(() => {
-    const latestMessage = messages[messages.length - 1];
-    if (latestMessage?.role === 'assistant' && !latestMessage.isInitial && messages.length > 1) {
-      const content = latestMessage.sections
-        ? latestMessage.sections.find((section) => section.type === 'answer')?.content
-        : latestMessage.content;
-      if (content) {
-        speakText(content, messages.length - 1);
-      }
-    }
-  }, [messages]);
-
-  const scrollToTop = () => {
-    if (scrollViewRef.current) {
-      try {
-        scrollViewRef.current.scrollTo({ y: 0, animated: true });
-      } catch (error) {
-        console.log('Error scrolling to top', error);
-      }
-    }
-  };
-
-  const scrollToBottom = () => {
-    if (scrollViewRef.current) {
-      try {
-        scrollViewRef.current.scrollToEnd({ animated: true });
-      } catch (error) {
-        console.log('Error scrolling to bottom', error);
-      }
-    }
-  };
-
-  const handleScroll = useCallback((event) => {
-    const scrollPosition = event.nativeEvent.contentOffset.y;
-    const scrollingUp = scrollPosition < lastScrollPosition;
-    setLastScrollPosition(scrollPosition);
-
-    // Update scrolling direction state
-    setIsScrollingUp(scrollingUp);
-
-    const nearTop = scrollPosition < 100;
-    if (nearTop !== isNearTop) {
-      setIsNearTop(nearTop);
-    }
-
-    tabBarScrollHandler(event);
-
-    // Only show scroll button when scroll position exceeds threshold
-    const shouldShowScrollButton = scrollPosition > 300;
-
-    if (shouldShowScrollButton) {
-      Animated.spring(scrollButtonAnim, {
-        toValue: 1,
-        friction: 8,
-        tension: 60,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      // Hide button when near the top
-      Animated.timing(scrollButtonAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
-
-    if (scrollingUp && scrollPosition > 200) {
-      animateFloatingAssistant(true);
-    } else {
-      animateFloatingAssistant(false);
-    }
-
-    // Manage scrolling state
-    setIsScrolling(true);
-
-    if (scrollEndTimer.current) {
-      clearTimeout(scrollEndTimer.current);
-    }
-    scrollEndTimer.current = setTimeout(() => {
-      setIsScrolling(false);
-    }, 150);
-  }, [lastScrollPosition, tabBarScrollHandler, isNearTop]);
-
-  const sendMessage = async (text) => {
-    const messageText = text !== undefined ? text : input;
-
-    if (!messageText || messageText.trim() === '') return;
-
-    setInput('');
-    setSuggestions([]);
-    setSelectedTopic(null);
-
-    // Close any open sections
-    setExpandedSections({});
-
-    // Add the user message to the state
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    setMessages(prev => [...prev, {
-      role: 'user',
-      content: messageText,
-      timestamp,
-      isInitial: false
-    }]);
-
-    // Update layout state
-    setIsLoading(true);
-
-    try {
-      // Prepare the context from previous messages to improve response quality
-      const recentMessages = messages.slice(-4).map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-
-      // Use the correct server URL
-      const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/conversation/ask', {
-        method: 'POST',
-        headers: {
-          "ngrok-skip-browser-warning": "true",
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: user?.primaryEmailAddress?.emailAddress,
-          message: messageText,
-          selectedTopic: selectedTopic,
-          context: recentMessages, // Add conversation context for better responses
-          requestHighQuality: true // Request the highest quality response
-        }),
-      });
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Invalid response format');
-      }
+      );
 
       const data = await response.json();
 
-      if (data.success) {
-        // Start typing animation
+      if (data.success && data.history && data.history.length > 0) {
+        const processedMessages = data.history.flatMap(item => {
+          const userMessage = {
+            role: 'user',
+            content: item.userres,
+            timestamp: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            id: item.id // Store the ID from the server
+          };
+
+          try {
+            const parsedLLM = JSON.parse(item.llmres);
+            const assistantMessage = {
+              role: 'assistant',
+              content: parsedLLM.answer || "Response from tutor",
+              sections: [
+                { type: 'answer', content: parsedLLM.answer },
+                { type: 'explanation', content: parsedLLM.explanation },
+                { type: 'feedback', content: parsedLLM.feedback },
+                { type: 'followUp', content: parsedLLM.followUp }
+              ].filter(section => section.content),
+              timestamp: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              id: item.id // Same ID for the response
+            };
+
+            return [userMessage, assistantMessage];
+          } catch (e) {
+            return [userMessage];
+          }
+        });
+
+        setMessages(processedMessages);
+      } else {
+        setMessages([{
+          role: 'assistant',
+          content: `Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your language learning assistant.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isInitial: true
+        }]);
+      }
+    } catch (error) {
+      console.error('Error fetching chat history:', error);
+      setMessages([{
+        role: 'assistant',
+        content: `Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your language learning assistant.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isInitial: true
+      }]);
+    }
+  };
+
+  fetchInitialQuestions();
+
+  return () => {
+    Speech.stop();
+    if (recordingRef.current) {
+      recordingRef.current.stopAndUnloadAsync();
+    }
+  };
+}, []);
+
+// Add this to your component for debugging
+const logMessageIdsDebug = () => {
+  let msgCount = 0;
+  let idCount = 0;
+
+  if (messages) {
+    msgCount = messages.length;
+  }
+
+  if (messageIds) {
+    idCount = Object.keys(messageIds).length;
+  }
+
+  console.log(`Messages: ${msgCount}, IDs: ${idCount}`);
+  console.log("Message IDs mapping:", JSON.stringify(messageIds, null, 2));
+
+  // Check if we're missing any IDs
+  if (messages) {
+    messages.forEach((msg, idx) => {
+      if (!messageIds[idx]) {
+        console.log(`Missing ID for message ${idx} (${msg.role}): ${msg.content.substring(0, 20)}...`);
+      }
+    });
+  }
+};
+    useEffect(() => {
+      if (scrollViewRef.current && messages.length > 1) {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }
+    }, [messages]);
+
+    useEffect(() => {
+      if (isLoading) {
         startTypingAnimation();
+      } else {
+        typingDot1.setValue(0);
+        typingDot2.setValue(0);
+        typingDot3.setValue(0);
+        typingAnimation.setValue(0);
+      }
+    }, [isLoading]);
 
-        const formattedResponse = formatResponseFromAPI(data);
-        const messageIndex = messages.length; // Get the index for the new message
+    useEffect(() => {
+      const latestMessage = messages[messages.length - 1];
+      if (latestMessage?.role === 'assistant' && !latestMessage.isInitial && messages.length > 1) {
+        const content = latestMessage.sections
+          ? latestMessage.sections.find((section) => section.type === 'answer')?.content
+          : latestMessage.content;
+        if (content) {
+          speakText(content, messages.length - 1);
+        }
+      }
+    }, [messages]);
 
-        // Delay to simulate typing
-        setTimeout(() => {
-          // Add the assistant message
+    const scrollToTop = () => {
+      if (scrollViewRef.current) {
+        try {
+          scrollViewRef.current.scrollTo({ y: 0, animated: true });
+        } catch (error) {
+          console.log('Error scrolling to top', error);
+        }
+      }
+    };
+
+    const scrollToBottom = () => {
+      if (scrollViewRef.current) {
+        try {
+          scrollViewRef.current.scrollToEnd({ animated: true });
+        } catch (error) {
+          console.log('Error scrolling to bottom', error);
+        }
+      }
+    };
+
+    const handleScroll = useCallback((event) => {
+      const scrollPosition = event.nativeEvent.contentOffset.y;
+      const scrollingUp = scrollPosition < lastScrollPosition;
+      setLastScrollPosition(scrollPosition);
+
+      // Update scrolling direction state
+      setIsScrollingUp(scrollingUp);
+
+      const nearTop = scrollPosition < 100;
+      if (nearTop !== isNearTop) {
+        setIsNearTop(nearTop);
+      }
+
+      tabBarScrollHandler(event);
+
+      // Only show scroll button when scroll position exceeds threshold
+      const shouldShowScrollButton = scrollPosition > 300;
+
+      if (shouldShowScrollButton) {
+        Animated.spring(scrollButtonAnim, {
+          toValue: 1,
+          friction: 8,
+          tension: 60,
+          useNativeDriver: true,
+        }).start();
+      } else {
+        // Hide button when near the top
+        Animated.timing(scrollButtonAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      }
+
+      if (scrollingUp && scrollPosition > 200) {
+        animateFloatingAssistant(true);
+      } else {
+        animateFloatingAssistant(false);
+      }
+
+      // Manage scrolling state
+      setIsScrolling(true);
+
+      if (scrollEndTimer.current) {
+        clearTimeout(scrollEndTimer.current);
+      }
+      scrollEndTimer.current = setTimeout(() => {
+        setIsScrolling(false);
+      }, 150);
+    }, [lastScrollPosition, tabBarScrollHandler, isNearTop]);
+
+    const sendMessage = async (text) => {
+      const messageText = text !== undefined ? text : input;
+      if (!messageText || messageText.trim() === '') return;
+
+      setInput('');
+      setSuggestions([]);
+      setSelectedTopic(null);
+      setExpandedSections({});
+
+      // Add the user message to the state with a temporary ID
+      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const userMessageIndex = messages.length;
+
+      setMessages(prev => [...prev, {
+        role: 'user',
+        content: messageText,
+        timestamp,
+        isInitial: false,
+        tempId: Date.now() // Temporary ID until we get the real one from server
+      }]);
+
+      setIsLoading(true);
+
+      try {
+        // Prepare the context from previous messages
+        const recentMessages = messages.slice(-4).map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+
+        const response = await fetch('https://ai-english-tutor-9ixt.onrender.com/api/conversation/ask', {
+          method: 'POST',
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: user?.primaryEmailAddress?.emailAddress,
+            message: messageText,
+            selectedTopic: selectedTopic,
+            context: recentMessages,
+            requestHighQuality: true
+          }),
+        });
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error('Invalid response format');
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+          // Update the message with the real ID from the server
+          setMessages(prev => {
+            const newMessages = [...prev];
+            // Find the user message we just added (it will be the last one before this update)
+            const userMessage = newMessages[newMessages.length - 1];
+            if (userMessage) {
+              // Replace the temporary ID with the real one
+              userMessage.id = data.questionId;
+            }
+            return newMessages;
+          });
+
+          // Add the assistant response with its ID
+          const formattedResponse = formatResponseFromAPI(data);
+          setTimeout(() => {
+            setMessages(prev => [...prev, {
+              role: 'assistant',
+              content: formattedResponse.content,
+              sections: formattedResponse.sections,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              isInitial: false,
+              id: data.assistantId || data.questionId // Use assistantId if available, fallback to questionId
+            }]);
+
+            if (data.followUp) {
+              generateSuggestionsFromFollowUp(data.followUp);
+            }
+            setIsLoading(false);
+          }, 1000);
+        } else {
+          // Error handling
           setMessages(prev => [...prev, {
             role: 'assistant',
-            content: formattedResponse.content,
-            sections: formattedResponse.sections,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            content: data.error || "I'm sorry, I couldn't process your message properly.",
+            timestamp,
             isInitial: false
           }]);
-
-          if (data.followUp) {
-            generateSuggestionsFromFollowUp(data.followUp);
-
-            // Auto-expand the suggestions section
-            setTimeout(() => {
-              const suggestionsSectionKey = `${messageIndex}-suggestions`;
-              setExpandedSections(prev => ({
-                ...prev,
-                [suggestionsSectionKey]: true
-              }));
-            }, 500);
-          }
-
-          // Hide loading indicator
           setIsLoading(false);
-        }, 1000); // Slightly longer delay for a more realistic typing effect
-      } else {
-        // More informative error message for server-side issues
+        }
+      } catch (error) {
+        console.error('Error sending message:', error);
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: data.error || "I'm sorry, I couldn't process your message properly. Could you try rephrasing your question?",
+          content: "Sorry, there was an error connecting to the service.",
           timestamp,
           isInitial: false
         }]);
         setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error:', error);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: "Sorry, there was an error connecting to the service. Please check your internet connection and try again.",
-        timestamp,
-        isInitial: false
-      }]);
-      setIsLoading(false);
-    }
-  };
-
-  const formatResponseFromAPI = (data) => {
-    const sections = [];
-
-    // Ensure the answer has proper content and formatting
-    if (data.answer) {
-      sections.push({
-        type: 'answer',
-        content: data.answer.trim()
-      });
-    }
-
-    // Ensure explanations are properly formatted
-    if (data.explanation && data.explanation.trim()) {
-      sections.push({
-        type: 'explanation',
-        content: data.explanation.trim(),
-        icon: 'school'
-      });
-    }
-
-    // Ensure feedback is properly formatted
-    if (data.feedback && data.feedback.trim()) {
-      sections.push({
-        type: 'feedback',
-        content: data.feedback.trim(),
-        icon: 'check-circle'
-      });
-    }
-
-    // Enhance follow-up questions section
-    if (data.followUp && data.followUp.trim() !== '') {
-      // Format the follow-up content for better readability
-      const formattedFollowUp = data.followUp
-        .split(/\d+\./)
-        .filter(item => item.trim())
-        .map(item => `• ${item.trim()}`)
-        .join('\n\n');
-
-      sections.push({
-        type: 'followUp',
-        content: formattedFollowUp || data.followUp.trim(),
-        icon: 'help-circle'
-      });
-
-      // Add suggestions section after followUp
-      sections.push({
-        type: 'suggestions',
-        content: 'Click to see suggestions based on these questions',
-        icon: 'lightbulb'
-      });
-    }
-
-    return {
-      content: data.answer?.trim() || "I'm here to help with your English learning!",
-      sections
     };
-  };
-
-  const generateSuggestionsFromFollowUp = (followUp) => {
-    const newSuggestions = [];
-
-    if (followUp.includes("aspect of travel")) {
-      setSelectedTopic("travel");
-      newSuggestions.push(
-        "I love exploring historical sites",
-        "I prefer relaxing beach vacations",
-        "I enjoy trying local cuisine when traveling",
-        "Adventure travel is my favorite"
-      );
-    } else if (followUp.includes("vocabulary")) {
-      setSelectedTopic("vocabulary");
-      newSuggestions.push(
-        "Help me with business vocabulary",
-        "I need everyday conversation phrases",
-        "Let's practice advanced idioms",
-        "Formal language for presentations"
-      );
-    } else if (followUp.includes("hobby")) {
-      setSelectedTopic("hobbies");
-      newSuggestions.push(
-        "I enjoy photography",
-        "I love cooking new recipes",
-        "Reading books is my favorite pastime",
-        "I play tennis regularly"
-      );
-    } else {
-      newSuggestions.push(
-        "Can you explain that more clearly?",
-        "Let's continue practicing",
-        "Give me a challenging exercise",
-        "How can I improve my grammar?"
-      );
-    }
-
-    setSuggestions(newSuggestions);
-  };
-
-  const handleSuggestionPress = (suggestion) => {
-    if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    sendMessage(suggestion);
-  };
-
-  const renderTopicBadge = (index) => {
-    if (!selectedTopic) return null;
-
-    const topicIcons = {
-      "travel": <FontAwesome5 name="plane" size={14} color="#FFF" />,
-      "vocabulary": <FontAwesome5 name="book" size={14} color="#FFF" />,
-      "hobbies": <FontAwesome5 name="palette" size={14} color="#FFF" />
-    };
-
-    const topicColors = {
-      "travel": ['#FF9800', '#FF5722'],
-      "vocabulary": ['#4CAF50', '#2E7D32'],
-      "hobbies": ['#9C27B0', '#7B1FA2']
-    };
-
+// Add a debugging button component to your UI for testing message IDs
+const DebugButton = () => {
+  if (__DEV__) { // Only show in development mode
     return (
-      <LinearGradient
-        colors={topicColors[selectedTopic] || ['#3B82F6', '#6366F1']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.topicBadge}
+      <TouchableOpacity
+        style={{
+          position: 'absolute',
+          top: 40,
+          right: 10,
+          backgroundColor: 'rgba(255,0,0,0.2)',
+          padding: 5,
+          borderRadius: 5,
+          zIndex: 9999,
+        }}
+        onPress={() => {
+          console.log("=== DEBUG INFO ===");
+          console.log("Messages:", messages.length);
+          console.log("MessageIds:", JSON.stringify(messageIds, null, 2));
+
+          // Check if each message has a corresponding ID
+          messages.forEach((msg, idx) => {
+            console.log(`Message ${idx} (${msg.role}): ${messageIds[idx] ? `ID ${messageIds[idx]}` : 'NO ID'}`);
+          });
+
+          Alert.alert(
+            "Debug Info",
+            `Messages: ${messages.length}\nIDs mapped: ${Object.keys(messageIds).length}`,
+            [{ text: "OK" }]
+          );
+        }}
       >
-        {topicIcons[selectedTopic]}
-      </LinearGradient>
+        <Text style={{ color: 'white' }}>Debug</Text>
+      </TouchableOpacity>
     );
-  };
+  }
+  return null;
+};
 
-  const renderWelcomeCard = () => {
-    return (
-      <Animated.View
-        style={[
-          styles.welcomeCard,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY }]
-          }
-        ]}
-      >
-        <LinearGradient
-          colors={['#0a402e', '#072622']}
-          style={styles.welcomeGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View style={styles.welcomeHeader}>
-            <View style={styles.welcomeAvatarContainer}>
-              <View style={styles.welcomeAvatarInner}>
-                <Animated.View
-                  style={{
-                    transform: [
-                      {
-                        rotate: waveAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: ['-15deg', '15deg']
-                        })
-                      }
-                    ]
-                  }}
-                >
-                  <MaterialCommunityIcons
-                    name="robot-happy"
-                    size={36}
-                    color="#23cc96"
-                  />
-                </Animated.View>
-              </View>
-            </View>
-            <View style={styles.welcomeTitleContainer}>
-              <Text style={styles.welcomeTitle}>Welcome to Language Partner</Text>
-              <View style={styles.welcomeSubtitleContainer}>
-                <View style={styles.onlineDot} />
-                <Text style={styles.welcomeSubtitle}>AI-Powered Learning</Text>
-              </View>
-            </View>
-          </View>
+// Return this component in your JSX
+// Add this inside your main view:
+// <DebugButton />
 
-          <Text style={styles.welcomeText}>
-            {`Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your AI language coach. Let's practice conversation to improve your skills!`}
-          </Text>
+    const formatResponseFromAPI = (data) => {
+      const sections = [];
 
-          <View style={styles.welcomeDivider} />
-
-          <View style={styles.welcomeTips}>
-            <View style={styles.tipItem}>
-              <View style={styles.tipIconContainer}>
-                <MaterialCommunityIcons name="message-text-outline" size={18} color="#FFD700" />
-              </View>
-              <Text style={styles.tipText}>Natural conversations with tailored feedback</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <View style={styles.tipIconContainer}>
-                <MaterialCommunityIcons name="lightbulb-on-outline" size={18} color="#76FF03" />
-              </View>
-              <Text style={styles.tipText}>Learn vocabulary, grammar, and cultural nuances</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <View style={styles.tipIconContainer}>
-                <MaterialCommunityIcons name="chart-line-variant" size={18} color="#FF9800" />
-              </View>
-              <Text style={styles.tipText}>Track your progress and build confidence</Text>
-            </View>
-          </View>
-        </LinearGradient>
-      </Animated.View>
-    );
-  };
-
-  const renderMessageSection = (section, sectionIndex, messageIndex) => {
-    const isExpanded = expandedSections[`${messageIndex}-${section.type}`];
-    const shouldRenderContent = section.type === 'answer' || isExpanded;
-
-    const sectionColors = {
-      answer: {
-        bg: 'rgba(35, 204, 150, 0.1)', // Light green for main answer
-        border: '#23cc96',
-        icon: '#23cc96'
-      },
-      explanation: {
-        bg: 'rgba(56, 189, 248, 0.1)', // Light blue
-        border: '#38BDF8',
-        icon: '#38BDF8'
-      },
-      feedback: {
-        bg: 'rgba(9, 184, 243, 0.1)', // Lighter purple (reduced opacity)
-        border: '#6366F1',
-        icon: '#6366F1'
-      },
-      followUp: {
-        bg: 'rgba(251, 191, 36, 0.1)', // Light yellow
-        border: '#FBB848',
-        icon: '#FBB848'
-      },
-      suggestions: {
-        bg: 'rgba(251, 191, 36, 0.1)', // Match the followUp style
-        border: '#15a387',
-        icon: '#15a387'
+      // Ensure the answer has proper content and formatting
+      if (data.answer) {
+        sections.push({
+          type: 'answer',
+          content: data.answer.trim()
+        });
       }
+
+      // Ensure explanations are properly formatted
+      if (data.explanation && data.explanation.trim()) {
+        sections.push({
+          type: 'explanation',
+          content: data.explanation.trim(),
+          icon: 'school'
+        });
+      }
+
+      // Ensure feedback is properly formatted
+      if (data.feedback && data.feedback.trim()) {
+        sections.push({
+          type: 'feedback',
+          content: data.feedback.trim(),
+          icon: 'check-circle'
+        });
+      }
+
+      // Enhance follow-up questions section
+      if (data.followUp && data.followUp.trim() !== '') {
+        // Format the follow-up content for better readability
+        const formattedFollowUp = data.followUp
+          .split(/\d+\./)
+          .filter(item => item.trim())
+          .map(item => `• ${item.trim()}`)
+          .join('\n\n');
+
+        sections.push({
+          type: 'followUp',
+          content: formattedFollowUp || data.followUp.trim(),
+          icon: 'help-circle'
+        });
+
+        // Add suggestions section after followUp
+        sections.push({
+          type: 'suggestions',
+          content: 'Click to see suggestions based on these questions',
+          icon: 'lightbulb'
+        });
+      }
+
+      return {
+        content: data.answer?.trim() || "I'm here to help with your English learning!",
+        sections,
+        questionId: data.questionId // Store the question ID
+      };
     };
 
-    const sectionColor = sectionColors[section.type] || {
-      bg: 'transparent',
-      border: 'transparent',
-      icon: '#FFF'
+    const generateSuggestionsFromFollowUp = (followUp) => {
+      const newSuggestions = [];
+
+      if (followUp.includes("aspect of travel")) {
+        setSelectedTopic("travel");
+        newSuggestions.push(
+          "I love exploring historical sites",
+          "I prefer relaxing beach vacations",
+          "I enjoy trying local cuisine when traveling",
+          "Adventure travel is my favorite"
+        );
+      } else if (followUp.includes("vocabulary")) {
+        setSelectedTopic("vocabulary");
+        newSuggestions.push(
+          "Help me with business vocabulary",
+          "I need everyday conversation phrases",
+          "Let's practice advanced idioms",
+          "Formal language for presentations"
+        );
+      } else if (followUp.includes("hobby")) {
+        setSelectedTopic("hobbies");
+        newSuggestions.push(
+          "I enjoy photography",
+          "I love cooking new recipes",
+          "Reading books is my favorite pastime",
+          "I play tennis regularly"
+        );
+      } else {
+        newSuggestions.push(
+          "Can you explain that more clearly?",
+          "Let's continue practicing",
+          "Give me a challenging exercise",
+          "How can I improve my grammar?"
+        );
+      }
+
+      setSuggestions(newSuggestions);
     };
 
-    const sectionTitles = {
-      answer: 'Response',
-      explanation: 'Tips & Explanation',
-      feedback: 'Feedback',
-      followUp: 'Follow-up Questions',
-      suggestions: 'Suggestions'
+    const handleSuggestionPress = (suggestion) => {
+      if (Platform.OS === 'ios') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      sendMessage(suggestion);
     };
 
-    const sectionIcons = {
-      answer: 'chat-outline',
-      explanation: 'lightbulb-outline',
-      feedback: 'message-alert-outline',
-      followUp: 'chat-question-outline',
-      suggestions: 'lightbulb-on'
+    const renderTopicBadge = (index) => {
+      if (!selectedTopic) return null;
+
+      const topicIcons = {
+        "travel": <FontAwesome5 name="plane" size={14} color="#FFF" />,
+        "vocabulary": <FontAwesome5 name="book" size={14} color="#FFF" />,
+        "hobbies": <FontAwesome5 name="palette" size={14} color="#FFF" />
+      };
+
+      const topicColors = {
+        "travel": ['#FF9800', '#FF5722'],
+        "vocabulary": ['#4CAF50', '#2E7D32'],
+        "hobbies": ['#9C27B0', '#7B1FA2']
+      };
+
+      return (
+        <LinearGradient
+          colors={topicColors[selectedTopic] || ['#3B82F6', '#6366F1']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.topicBadge}
+        >
+          {topicIcons[selectedTopic]}
+        </LinearGradient>
+      );
     };
 
-    return (
-      <View
-        key={sectionIndex}
-        style={[
-          styles.sectionBox,
-          {
-            backgroundColor: sectionColor.bg,
-            borderColor: sectionColor.border,
-            marginBottom: section.type === 'followUp' ? 4 : 8 // Reduce margin between followUp and suggestions
-          }
-        ]}
-      >
-        {section.type !== 'answer' && (
-          <TouchableOpacity
-            style={styles.sectionHeader}
-            onPress={() => toggleSection(messageIndex, section.type)}
-            activeOpacity={0.7}
+    const renderWelcomeCard = () => {
+      return (
+        <Animated.View
+          style={[
+            styles.welcomeCard,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY }]
+            }
+          ]}
+        >
+          <LinearGradient
+            colors={['#0a402e', '#072622']}
+            style={styles.welcomeGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            <View style={styles.sectionHeaderContent}>
-              <View style={[
-                styles.sectionIconContainer,
-                { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: sectionColor.border }
-              ]}>
-                <MaterialCommunityIcons
-                  name={sectionIcons[section.type]}
-                  size={16}
-                  color={sectionColor.icon}
-                />
+            <View style={styles.welcomeHeader}>
+              <View style={styles.welcomeAvatarContainer}>
+                <View style={styles.welcomeAvatarInner}>
+                  <Animated.View
+                    style={{
+                      transform: [
+                        {
+                          rotate: waveAnimation.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['-15deg', '15deg']
+                          })
+                        }
+                      ]
+                    }}
+                  >
+                    <MaterialCommunityIcons
+                      name="robot-happy"
+                      size={36}
+                      color="#23cc96"
+                    />
+                  </Animated.View>
+                </View>
               </View>
-              <Text style={[styles.sectionTitle, { color: sectionColor.icon }]}>
-                {sectionTitles[section.type]}
-              </Text>
+              <View style={styles.welcomeTitleContainer}>
+                <Text style={styles.welcomeTitle}>Welcome to Language Partner</Text>
+                <View style={styles.welcomeSubtitleContainer}>
+                  <View style={styles.onlineDot} />
+                  <Text style={styles.welcomeSubtitle}>AI-Powered Learning</Text>
+                </View>
+              </View>
             </View>
-            <MaterialIcons
-              name={isExpanded ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-              size={22}
-              color={sectionColor.icon}
-            />
-          </TouchableOpacity>
-        )}
 
-        {shouldRenderContent && section.type !== 'suggestions' && (
-          <View style={styles.sectionContent}>
-            {section.type === 'answer' && (
-              <View style={styles.answerHeader}>
+            <Text style={styles.welcomeText}>
+              {`Hi${user?.firstName ? ` ${user.firstName}` : ''}! I'm your AI language coach. Let's practice conversation to improve your skills!`}
+            </Text>
+
+            <View style={styles.welcomeDivider} />
+
+            <View style={styles.welcomeTips}>
+              <View style={styles.tipItem}>
+                <View style={styles.tipIconContainer}>
+                  <MaterialCommunityIcons name="message-text-outline" size={18} color="#FFD700" />
+                </View>
+                <Text style={styles.tipText}>Natural conversations with tailored feedback</Text>
+              </View>
+              <View style={styles.tipItem}>
+                <View style={styles.tipIconContainer}>
+                  <MaterialCommunityIcons name="lightbulb-on-outline" size={18} color="#76FF03" />
+                </View>
+                <Text style={styles.tipText}>Learn vocabulary, grammar, and cultural nuances</Text>
+              </View>
+              <View style={styles.tipItem}>
+                <View style={styles.tipIconContainer}>
+                  <MaterialCommunityIcons name="chart-line-variant" size={18} color="#FF9800" />
+                </View>
+                <Text style={styles.tipText}>Track your progress and build confidence</Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+      );
+    };
+
+    const renderMessageSection = (section, sectionIndex, messageIndex) => {
+      const isExpanded = expandedSections[`${messageIndex}-${section.type}`];
+      const shouldRenderContent = section.type === 'answer' || isExpanded;
+
+      const sectionColors = {
+        answer: {
+          bg: 'rgba(35, 204, 150, 0.1)', // Light green for main answer
+          border: '#23cc96',
+          icon: '#23cc96'
+        },
+        explanation: {
+          bg: 'rgba(56, 189, 248, 0.1)', // Light blue
+          border: '#38BDF8',
+          icon: '#38BDF8'
+        },
+        feedback: {
+          bg: 'rgba(9, 184, 243, 0.1)', // Lighter purple (reduced opacity)
+          border: '#6366F1',
+          icon: '#6366F1'
+        },
+        followUp: {
+          bg: 'rgba(251, 191, 36, 0.1)', // Light yellow
+          border: '#FBB848',
+          icon: '#FBB848'
+        },
+        suggestions: {
+          bg: 'rgba(251, 191, 36, 0.1)', // Match the followUp style
+          border: '#15a387',
+          icon: '#15a387'
+        }
+      };
+
+      const sectionColor = sectionColors[section.type] || {
+        bg: 'transparent',
+        border: 'transparent',
+        icon: '#FFF'
+      };
+
+      const sectionTitles = {
+        answer: 'Response',
+        explanation: 'Tips & Explanation',
+        feedback: 'Feedback',
+        followUp: 'Follow-up Questions',
+        suggestions: 'Suggestions'
+      };
+
+      const sectionIcons = {
+        answer: 'chat-outline',
+        explanation: 'lightbulb-outline',
+        feedback: 'message-alert-outline',
+        followUp: 'chat-question-outline',
+        suggestions: 'lightbulb-on'
+      };
+
+      return (
+        <View
+          key={sectionIndex}
+          style={[
+            styles.sectionBox,
+            {
+              backgroundColor: sectionColor.bg,
+              borderColor: sectionColor.border,
+              marginBottom: section.type === 'followUp' ? 4 : 8 // Reduce margin between followUp and suggestions
+            }
+          ]}
+        >
+          {section.type !== 'answer' && (
+            <TouchableOpacity
+              style={styles.sectionHeader}
+              onPress={() => toggleSection(messageIndex, section.type)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.sectionHeaderContent}>
                 <View style={[
                   styles.sectionIconContainer,
                   { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: sectionColor.border }
                 ]}>
                   <MaterialCommunityIcons
-                    name={sectionIcons.answer}
+                    name={sectionIcons[section.type]}
                     size={16}
                     color={sectionColor.icon}
                   />
                 </View>
                 <Text style={[styles.sectionTitle, { color: sectionColor.icon }]}>
-                  {sectionTitles.answer}
+                  {sectionTitles[section.type]}
                 </Text>
               </View>
-            )}
-            <Text style={styles.sectionText}>
-              {section.content}
-            </Text>
+              <MaterialIcons
+                name={isExpanded ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                size={22}
+                color={sectionColor.icon}
+              />
+            </TouchableOpacity>
+          )}
 
-            <View style={styles.messageActionButtons}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => replayText(section.content, messageIndex)}
-              >
-                <Ionicons
-                  name={speakingMessageIndex === messageIndex ? "volume-mute" : "volume-high"}
-                  size={16}
-                  color={speakingMessageIndex === messageIndex ? "#FF5722" : "#23cc96"}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => toggleTranslation(messageIndex, section.content, section.type)}
-              >
-                <MaterialIcons name="translate" size={16} color="#3B82F6" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+          {shouldRenderContent && section.type !== 'suggestions' && (
+            <View style={styles.sectionContent}>
+              {section.type === 'answer' && (
+                <View style={styles.answerHeader}>
+                  <View style={[
+                    styles.sectionIconContainer,
+                    { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: sectionColor.border }
+                  ]}>
+                    <MaterialCommunityIcons
+                      name={sectionIcons.answer}
+                      size={16}
+                      color={sectionColor.icon}
+                    />
+                  </View>
+                  <Text style={[styles.sectionTitle, { color: sectionColor.icon }]}>
+                    {sectionTitles.answer}
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.sectionText}>
+                {section.content}
+              </Text>
 
-        {/* Suggestions section content */}
-        {isExpanded && section.type === 'suggestions' && (
-          <View style={styles.suggestionsContent}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.suggestionsScrollContent}
-            >
-              {suggestions.map((suggestion, i) => (
+              <View style={styles.messageActionButtons}>
                 <TouchableOpacity
-                  key={i}
-                  style={styles.suggestionButton}
-                  onPress={() => handleSuggestionPress(suggestion)}
+                  style={styles.actionButton}
+                  onPress={() => replayText(section.content, messageIndex)}
                 >
-                  <Text style={styles.suggestionText}>{suggestion}</Text>
+                  <Ionicons
+                    name={speakingMessageIndex === messageIndex ? "volume-mute" : "volume-high"}
+                    size={16}
+                    color={speakingMessageIndex === messageIndex ? "#FF5722" : "#23cc96"}
+                  />
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => toggleTranslation(messageIndex, section.content, section.type)}
+                >
+                  <MaterialIcons name="translate" size={16} color="#3B82F6" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
-        {showTranslation[`${messageIndex}-${section.type}`] && (
-          <View style={styles.translationContainer}>
-            <Text style={styles.translationText}>
-              {translations[`${messageIndex}-${section.type}`] || 'Translating...'}
-            </Text>
-          </View>
-        )}
-      </View>
-    );
-  };
+          {/* Suggestions section content */}
+          {isExpanded && section.type === 'suggestions' && (
+            <View style={styles.suggestionsContent}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.suggestionsScrollContent}
+              >
+                {suggestions.map((suggestion, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={styles.suggestionButton}
+                    onPress={() => handleSuggestionPress(suggestion)}
+                  >
+                    <Text style={styles.suggestionText}>{suggestion}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
-  const renderMessageContent = (message, index) => {
-    if (message.isInitial) {
-      return renderWelcomeCard();
-    }
+          {showTranslation[`${messageIndex}-${section.type}`] && (
+            <View style={styles.translationContainer}>
+              <Text style={styles.translationText}>
+                {translations[`${messageIndex}-${section.type}`] || 'Translating...'}
+              </Text>
+            </View>
+          )}
+        </View>
+      );
+    };
 
-    if (message.role === 'user') {
-      // If we're editing this message, show the edit interface
-      if (editingMessageIndex === index) {
+    // Add this to finish the code content with all required functions
+    const renderMessageContent = (message, index) => {
+      if (message.isInitial) {
+        return renderWelcomeCard();
+      }
+
+      if (message.role === 'user') {
+        // If we're editing this message, show the edit interface
+        if (editingMessageIndex === index) {
+          return (
+            <View style={styles.editContainer}>
+              <TextInput
+                style={styles.editInput}
+                value={editingText}
+                onChangeText={setEditingText}
+                multiline
+              />
+              <View style={styles.editButtons}>
+                <TouchableOpacity
+                  style={[styles.editButton, styles.cancelButton]}
+                  onPress={cancelEditing}
+                >
+                  <Text style={styles.editButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.editButton, styles.saveButton]}
+                  onPress={saveEditedMessage}
+                >
+                  <Text style={styles.editButtonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        }
+
+        // Regular user message with action buttons - updated styling
         return (
-          <View style={styles.editContainer}>
-            <TextInput
-              style={styles.editInput}
-              value={editingText}
-              onChangeText={setEditingText}
-              multiline
-            />
-            <View style={styles.editButtons}>
-              <TouchableOpacity
-                style={[styles.editButton, styles.cancelButton]}
-                onPress={cancelEditing}
-              >
-                <Text style={styles.editButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.editButton, styles.saveButton]}
-                onPress={saveEditedMessage}
-              >
-                <Text style={styles.editButtonText}>Save</Text>
-              </TouchableOpacity>
+          <View style={styles.userMessageContainer}>
+            <Text style={[styles.messageText, styles.userMessageText]}>
+              {message.content}
+            </Text>
+            <View style={styles.userMessageActions}>
+              <View style={styles.userMessageButtons}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => startEditMessage(index)}
+                >
+                  <MaterialIcons name="edit" size={16} color="#23cc96" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => deleteMessage(index)}
+                >
+                  <MaterialIcons name="delete" size={16} color="#ef4444" />
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.timestamp, styles.userTimestamp]}>
+                {message.timestamp}
+              </Text>
             </View>
           </View>
         );
       }
 
-      // Regular user message with action buttons - updated styling
-      return (
-        <View style={styles.userMessageContainer}>
-          <Text style={[styles.messageText, styles.userMessageText]}>
-            {message.content}
-          </Text>
-          <View style={styles.userMessageActions}>
-            <View style={styles.userMessageButtons}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => startEditMessage(index)}
-              >
-                <MaterialIcons name="edit" size={16} color="#23cc96" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => deleteMessage(index)}
-              >
-                <MaterialIcons name="delete" size={16} color="#ef4444" />
-              </TouchableOpacity>
+      // Assistant message with sections
+      if (message.sections) {
+        return (
+          <View style={styles.assistantContainer}>
+            <View style={styles.assistantMessageContainer}>
+              {message.sections.map((section, sectionIndex) =>
+                renderMessageSection(section, sectionIndex, index)
+              )}
             </View>
-            <Text style={[styles.timestamp, styles.userTimestamp]}>
+            <Text style={[styles.timestamp, styles.assistantTimestamp]}>
               {message.timestamp}
             </Text>
           </View>
-        </View>
-      );
-    }
+        );
+      }
 
-    // Assistant message with sections
-    if (message.sections) {
+      // Standard assistant message without sections
       return (
-        <View style={styles.assistantContainer}>
-          <View style={styles.assistantMessageContainer}>
-            {message.sections.map((section, sectionIndex) =>
-              renderMessageSection(section, sectionIndex, index)
+        <View>
+          <View style={[styles.assistantMessageContainer, styles.standardAssistantMessage]}>
+            <Text style={[styles.messageText, styles.assistantMessageText]}>
+              {message.content}
+            </Text>
+            <View style={styles.messageActionButtons}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => replayText(message.content, index)}
+              >
+                <Ionicons
+                  name={speakingMessageIndex === index ? "volume-mute" : "volume-high"}
+                  size={18}
+                  color={speakingMessageIndex === index ? "#FF5722" : "#23cc96"}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => toggleTranslation(index, message.content, message.sections ? message.sections[0].type : 'answer')}
+              >
+                <MaterialIcons name="translate" size={18} color="#3B82F6" />
+              </TouchableOpacity>
+            </View>
+
+            {showTranslation[`${index}-${message.sections ? message.sections[0].type : 'answer'}`] && (
+              <View style={styles.translationContainer}>
+                <Text style={styles.translationText}>
+                  {translations[`${index}-${message.sections ? message.sections[0].type : 'answer'}`] || 'Translating...'}
+                </Text>
+              </View>
             )}
           </View>
+
           <Text style={[styles.timestamp, styles.assistantTimestamp]}>
             {message.timestamp}
           </Text>
         </View>
       );
-    }
+    };
 
-    // Standard assistant message without sections
     return (
-      <View>
-        <View style={[styles.assistantMessageContainer, styles.standardAssistantMessage]}>
-          <Text style={[styles.messageText, styles.assistantMessageText]}>
-            {message.content}
-          </Text>
-          <View style={styles.messageActionButtons}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => replayText(message.content, index)}
-            >
-              <Ionicons
-                name={speakingMessageIndex === index ? "volume-mute" : "volume-high"}
-                size={18}
-                color={speakingMessageIndex === index ? "#FF5722" : "#23cc96"}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => toggleTranslation(index, message.content, message.sections ? message.sections[0].type : 'answer')}
-            >
-              <MaterialIcons name="translate" size={18} color="#3B82F6" />
-            </TouchableOpacity>
+      <View style={styles.container}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <StatusBar barStyle="light-content" />
+          <View style={[styles.header, { paddingTop: insets.top }]}>
+            {/* Completely empty header */}
           </View>
 
-          {showTranslation[`${index}-${message.sections ? message.sections[0].type : 'answer'}`] && (
-            <View style={styles.translationContainer}>
-              <Text style={styles.translationText}>
-                {translations[`${index}-${message.sections ? message.sections[0].type : 'answer'}`] || 'Translating...'}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <Text style={[styles.timestamp, styles.assistantTimestamp]}>
-          {message.timestamp}
-        </Text>
-      </View>
-    );
-  };
-
-  // Add language menu button
-  return (
-    <View style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <StatusBar barStyle="light-content" />
-        <View style={[styles.header, { paddingTop: insets.top }]}>
-          {/* Completely empty header */}
-        </View>
-
-        {/* Translation toggle button */}
-        <TouchableOpacity
-          style={styles.translationButton}
-          onPress={() => setShowLanguageModal(true)}
-        >
-          <MaterialIcons name="translate" size={20} color="#FFF" />
-        </TouchableOpacity>
-
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.messagesContainer}
-          contentContainerStyle={[
-            styles.messagesContent,
-            { paddingBottom: 120 } // Increased padding to make room for lower input
-          ]}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-        >
-          {messages.map((message, index) => (
-            <View
-              key={index}
-              style={[
-                styles.messageContainer,
-                message.role === 'user' ? styles.userContainer : styles.assistantContainer
-              ]}
-            >
-              {renderMessageContent(message, index)}
-            </View>
-          ))}
-
-          {isLoading && (
-            <View style={styles.loadingContainer}>
-              <BlurView intensity={80} style={styles.loadingBlur} tint="dark">
-                <View style={styles.typingIndicator}>
-                  <Animated.View
-                    style={[
-                      styles.typingDot,
-                      {
-                        opacity: typingDot1
-                      }
-                    ]}
-                  />
-                  <Animated.View
-                    style={[
-                      styles.typingDot,
-                      {
-                        opacity: typingDot2
-                      }
-                    ]}
-                  />
-                  <Animated.View
-                    style={[
-                      styles.typingDot,
-                      {
-                        opacity: typingDot3
-                      }
-                    ]}
-                  />
-                </View>
-              </BlurView>
-            </View>
-          )}
-        </ScrollView>
-
-        <Animated.View
-          style={[
-            styles.scrollButton,
-            {
-              opacity: scrollButtonAnim,
-              transform: [
-                {
-                  scale: scrollButtonAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.5, 1]
-                  })
-                }
-              ],
-              pointerEvents: scrollButtonAnim._value === 0 ? 'none' : 'auto'
-            }
-          ]}
-        >
+          {/* Translation toggle button */}
           <TouchableOpacity
-            onPress={isScrollingUp ? scrollToTop : scrollToBottom}
-            style={styles.scrollButtonInner}
-            activeOpacity={0.8}
+            style={styles.translationButton}
+            onPress={() => setShowLanguageModal(true)}
           >
-            <BlurView intensity={90} style={styles.scrollButtonBlur} tint="dark">
-              <LinearGradient
-                colors={isScrollingUp ? ['#3b82f6', '#1d4ed8'] : ['#1c855c', '#16a34a']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.scrollButtonGradient}
-              />
-              <MaterialCommunityIcons
-                name={isScrollingUp ? "arrow-up" : "arrow-down"}
-                size={28}
-                color="#FFF"
-                style={styles.scrollButtonIcon}
-              />
-            </BlurView>
+            <MaterialIcons name="translate" size={20} color="#FFF" />
           </TouchableOpacity>
-        </Animated.View>
 
-        <View style={[
-          styles.inputContainer,
-          {
-            paddingBottom: Math.max(insets.bottom, 20), // Add extra bottom padding based on safe area
-            bottom: -10 // Push further down
-          }
-        ]}>
-          <TextInput
-            style={styles.input}
-            placeholder="Type a message..."
-            placeholderTextColor="rgba(255,255,255,0.5)"
-            value={input}
-            onChangeText={setInput}
-            multiline
-            maxHeight={100}
-          />
-          <View style={styles.buttonContainer}>
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.messagesContainer}
+            contentContainerStyle={[
+              styles.messagesContent,
+              { paddingBottom: 120 } // Increased padding to make room for lower input
+            ]}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+          >
+            {messages.map((message, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.messageContainer,
+                  message.role === 'user' ? styles.userContainer : styles.assistantContainer
+                ]}
+              >
+                {renderMessageContent(message, index)}
+              </View>
+            ))}
+
+            {isLoading && (
+              <View style={styles.loadingContainer}>
+                <BlurView intensity={80} style={styles.loadingBlur} tint="dark">
+                  <View style={styles.typingIndicator}>
+                    <Animated.View
+                      style={[
+                        styles.typingDot,
+                        {
+                          opacity: typingDot1
+                        }
+                      ]}
+                    />
+                    <Animated.View
+                      style={[
+                        styles.typingDot,
+                        {
+                          opacity: typingDot2
+                        }
+                      ]}
+                    />
+                    <Animated.View
+                      style={[
+                        styles.typingDot,
+                        {
+                          opacity: typingDot3
+                        }
+                      ]}
+                    />
+                  </View>
+                </BlurView>
+              </View>
+            )}
+          </ScrollView>
+
+          <Animated.View
+            style={[
+              styles.scrollButton,
+              {
+                opacity: scrollButtonAnim,
+                transform: [
+                  {
+                    scale: scrollButtonAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.5, 1]
+                    })
+                  }
+                ],
+                pointerEvents: scrollButtonAnim._value === 0 ? 'none' : 'auto'
+              }
+            ]}
+          >
             <TouchableOpacity
-              style={[
-                styles.recordButton,
-                isRecording ? styles.recordingButton : styles.startRecordingButton
-              ]}
-              onPress={isRecording ? stopRecording : startRecording}
+              onPress={isScrollingUp ? scrollToTop : scrollToBottom}
+              style={styles.scrollButtonInner}
+              activeOpacity={0.8}
             >
-              {isRecording ? (
-                <Animated.View
-                  style={{
-                    transform: [
-                      {
-                        scale: recordingAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [1, 1.2]
-                        })
-                      }
-                    ]
-                  }}
-                >
-                  <FontAwesome5 name="stop" size={18} color="#FFF" />
-                </Animated.View>
-              ) : (
-                <FontAwesome5 name="microphone" size={18} color="#000" />
-              )}
+              <BlurView intensity={90} style={styles.scrollButtonBlur} tint="dark">
+                <LinearGradient
+                  colors={isScrollingUp ? ['#3b82f6', '#1d4ed8'] : ['#1c855c', '#16a34a']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.scrollButtonGradient}
+                />
+                <MaterialCommunityIcons
+                  name={isScrollingUp ? "arrow-up" : "arrow-down"}
+                  size={28}
+                  color="#FFF"
+                  style={styles.scrollButtonIcon}
+                />
+              </BlurView>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                input.trim().length === 0 ? styles.sendButtonDisabled : {}
+          </Animated.View>
+
+          <View style={[
+            styles.inputContainer,
+            {
+              paddingBottom: Math.max(insets.bottom, 20), // Add extra bottom padding based on safe area
+              bottom: -10 // Push further down
+            }
+          ]}>
+            <TextInput
+              style={styles.input}
+              placeholder="Type a message..."
+              placeholderTextColor="rgba(255,255,255,0.5)"
+              value={input}
+              onChangeText={setInput}
+              multiline
+              maxHeight={100}
+            />
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.recordButton,
+                  isRecording ? styles.recordingButton : styles.startRecordingButton
+                ]}
+                onPress={isRecording ? stopRecording : startRecording}
+              >
+                {isRecording ? (
+                  <Animated.View
+                    style={{
+                      transform: [
+                        {
+                          scale: recordingAnimation.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.2]
+                          })
+                        }
+                      ]
+                    }}
+                  >
+                    <FontAwesome5 name="stop" size={18} color="#FFF" />
+                  </Animated.View>
+                ) : (
+                  <FontAwesome5 name="microphone" size={18} color="#000" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  input.trim().length === 0 ? styles.sendButtonDisabled : {}
               ]}
               onPress={() => sendMessage()}
               disabled={input.trim().length === 0}
@@ -2184,7 +2338,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   // User message actions
-
+  userMessageContainer: {
+    backgroundColor: '#05382b',
+    padding: 0,
+    borderRadius: 20,
+    borderBottomRightRadius: 4,
+    borderWidth: 1,
+    borderColor: '#4752C4',
+    overflow: 'hidden',
+  },
   userMessageActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2416,4 +2578,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
+  topicBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center'
+  }
 });
