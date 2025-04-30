@@ -1963,13 +1963,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#05382b', // Updated to match theme from first stylesheet
     color: '#FFF',
     borderBottomRightRadius: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#4752C4', // Updated to match theme
+    shadowColor: "#FFF",
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4.65,
+
+    elevation: 6,
+    // borderColor: '#4752C4', // Updated to match theme
   },
   assistantMessageText: {
     backgroundColor: '#2d405e', // Updated to match theme from first stylesheet
@@ -1998,6 +2001,7 @@ const styles = StyleSheet.create({
   assistantTimestamp: {
     textAlign: 'left',
     marginLeft: 8,
+    marginTop: 3,
     marginRight: 0,
   },
   inputContainer: {
@@ -2340,12 +2344,13 @@ const styles = StyleSheet.create({
   // User message actions
   userMessageContainer: {
     backgroundColor: '#05382b',
-    padding: 0,
+    padding: 4,
     borderRadius: 20,
     borderBottomRightRadius: 4,
-    borderWidth: 1,
-    borderColor: '#4752C4',
+    // borderWidth: 2,
+    // borderColor: '#4752C4',
     overflow: 'hidden',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.9)',
   },
   userMessageActions: {
     flexDirection: 'row',
@@ -2518,6 +2523,7 @@ const styles = StyleSheet.create({
     borderColor: '#1f2a30',
     padding: 2,
     marginBottom: 4,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.9)',
   },
   standardAssistantMessage: {
     padding: 0,
