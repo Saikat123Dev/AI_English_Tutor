@@ -5,7 +5,7 @@
     "version": "1.0.2",
 
     "orientation": "portrait",
-    "icon": "./assets/images/logo.jpeg",
+    "icon": "./assets/images/sela.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -16,7 +16,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/logo.jpeg",
+        "foregroundImage": "./assets/images/sela.png",
         "backgroundColor": "#033330"
       },
       "package": "com.saikat7679dev.expoclerksociallogin"
@@ -40,14 +40,14 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/logo.jpeg",
+          "image": "./assets/images/sela.png",
           "imageWidth": 600,
           "backgroundColor": "#033330"
         }
       ]
     ],
     "splash": {
-      "image": "./assets/images/logo.jpeg",
+      "image": "./assets/images/sela.png",
       "resizeMode": "contain",
       "backgroundColor": "#033330"
     },
