@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RecentActivity from '../../components/RecentActivity';
+import UpdateChecker from '../../components/Update'; // Import the UpdateChecker component
+
 const { width, height } = Dimensions.get('window');
 const nodeCount = 10;
 
@@ -152,13 +154,10 @@ export default function HomeScreen() {
       <View style={styles.backgroundContainer}>
         <LinearGradient
           colors = {['#041b1a', '#06403a', '#041b1a']}
-
           style={styles.backgroundGradient}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
         />
-
-
 
         {/* Render nodes */}
         {nodePositions.map((node, index) => (
@@ -183,8 +182,6 @@ export default function HomeScreen() {
             }}
           />
         ))}
-
-
       </View>
 
       <ScrollView
@@ -213,68 +210,63 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <Text style={[styles.welcomeText, { color: theme.text }]}>Welcome back {user?.firstName ? user.firstName : ''}!</Text>
+          <Text style={[styles.welcomeText, { color: theme.text }]}>Welcome back {user?.firstName ? user.firstName : ''}</Text>
           <Text style={[styles.subtitle, { color: theme.secondaryText }]}>What would you like to learn today?</Text>
         </View>
 
-        {/* Daily Goal Progress */}
-
-
+        {/* Update Checker Component */}
+        <UpdateChecker theme={theme} />
 
         {/* Features Grid */}
-
         <View style={styles.featuresGrid}>
-  {features.map((feature) => (
-    <Pressable
-      key={feature.id}
-      style={({ pressed }) => [
-        styles.featureCard,
-        {
-          transform: [{ scale: pressed ? 0.95 : 1 }],
-          borderWidth: 2,
-          borderColor: theme.cardBorder,
-          overflow: 'hidden' // Add this to contain the gradient
-        }
-      ]}
-      onPress={() => handleFeaturePress(feature.route)}
-    >
-      <LinearGradient
-        colors={['#06403a', '#032420', '#06403a']}
-        style={styles.gradientCard}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.featureContent}>
-          <View style={[styles.featureIconContainer, { backgroundColor: feature.color + '20' }]}>
-            <MaterialCommunityIcons name={feature.icon} size={24} color={feature.color} />
-          </View>
-          <Text style={[styles.featureTitle, { color: theme.text }]}>{feature.title}</Text>
-          <Text style={[styles.featureDescription, { color: theme.secondaryText }]}>{feature.description}</Text>
-
-          <View style={styles.progressMiniContainer}>
-            <View style={[styles.progressMiniBar, { backgroundColor: theme.progressBackground }]}>
+          {features.map((feature) => (
+            <Pressable
+              key={feature.id}
+              style={({ pressed }) => [
+                styles.featureCard,
+                {
+                  transform: [{ scale: pressed ? 0.95 : 1 }],
+                  borderWidth: 2,
+                  borderColor: theme.cardBorder,
+                  overflow: 'hidden' // Add this to contain the gradient
+                }
+              ]}
+              onPress={() => handleFeaturePress(feature.route)}
+            >
               <LinearGradient
-                colors={feature.gradientColors}
+                colors={['#06403a', '#032420', '#06403a']}
+                style={styles.gradientCard}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[styles.progressMini, { width: '40%' }]}
-              />
-            </View>
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.featureContent}>
+                  <View style={[styles.featureIconContainer, { backgroundColor: feature.color + '20' }]}>
+                    <MaterialCommunityIcons name={feature.icon} size={24} color={feature.color} />
+                  </View>
+                  <Text style={[styles.featureTitle, { color: theme.text }]}>{feature.title}</Text>
+                  <Text style={[styles.featureDescription, { color: theme.secondaryText }]}>{feature.description}</Text>
 
-          </View>
+                  <View style={styles.progressMiniContainer}>
+                    <View style={[styles.progressMiniBar, { backgroundColor: theme.progressBackground }]}>
+                      <LinearGradient
+                        colors={feature.gradientColors}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={[styles.progressMini, { width: '40%' }]}
+                      />
+                    </View>
+                  </View>
+                </View>
+              </LinearGradient>
+            </Pressable>
+          ))}
         </View>
-      </LinearGradient>
-    </Pressable>
-  ))}
-</View>
 
         {/* Recent Activity */}
-     <RecentActivity theme={theme} router={router} />
+        <RecentActivity theme={theme} router={router} />
 
-
-
-{/* Bottom Spacer */}
-<View style={{ height: 20 }} />
+        {/* Bottom Spacer */}
+        <View style={{ height: 20 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -339,101 +331,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  goalContainer: {
-    paddingHorizontal: 14,
-    marginTop: 16,
-  },
-  goalCard: {
-    borderRadius: 20,
-  },
-  blurOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-
-  },
-  goalContent: {
-    padding: 12,
-  },
-  goalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  goalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  viewAll: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  progressBar: {
-    height: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    overflow: 'hidden',
-    flex: 1,
-    marginRight: 10,
-  },
-  progress: {
-    height: '100%',
-    borderRadius: 8,
-  },
-  progressText: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  goalDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  goalFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  goalText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  badge: {
-    backgroundColor: 'rgba(255,215,0,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  continueButton: {
-    marginTop: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gradientCard: {
-    justifyContent: 'space-between',
-    borderRadius: 18,
-  },
-
   featuresGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -489,13 +386,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 16,
   },
-
   recentActivityContainer: {
     paddingHorizontal: 14,
     marginTop: 32,
@@ -553,13 +448,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     opacity: 0.4,
   },
-
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: 16,
     marginTop: 20,
-    backgroundColor:'#072624', // or a darker color if preferred
+    backgroundColor:'#072624',
   },
   footerButton: {
     alignItems: 'center',
@@ -568,9 +462,6 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     marginTop: 4,
-    fontFamily: 'Inter_500Medium',
+    fontWeight: '500',
   },
-
-
-
 });

@@ -1,20 +1,22 @@
 {
   "expo": {
-    "name": "SELL",
+    "name": "SELA",
     "slug": "expo-clerk-social-login",
-    "version": "1.0.0",
+    "version": "1.0.2",
+
     "orientation": "portrait",
-    "icon": "./assets/images/newicon.jpeg",
+    "icon": "./assets/images/logo.jpeg",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.saikat7679dev.expo-clerk-social-login"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/newicon.jpeg",
+        "foregroundImage": "./assets/images/logo.jpeg",
         "backgroundColor": "#033330"
       },
       "package": "com.saikat7679dev.expoclerksociallogin"
@@ -38,15 +40,14 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/newicon.jpeg",
-          "imageWidth": 300,
-          "resizeMode": "contain",
+          "image": "./assets/images/logo.jpeg",
+          "imageWidth": 600,
           "backgroundColor": "#033330"
         }
       ]
     ],
     "splash": {
-      "image": "./assets/images/newicon.jpeg",
+      "image": "./assets/images/logo.jpeg",
       "resizeMode": "contain",
       "backgroundColor": "#033330"
     },
@@ -60,6 +61,12 @@
       "eas": {
         "projectId": "9556b92b-94f8-4029-8678-0e376b180101"
       }
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9556b92b-94f8-4029-8678-0e376b180101"
     }
   }
 }
