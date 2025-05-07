@@ -1,12 +1,11 @@
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
 const COLORS = {
   primary: '#09b3a6',       // Deeper, richer green
   primaryDark: '#033330',   // Very dark green, almost black
@@ -106,105 +105,7 @@ function SkillProgressCard({ title, progress, total, icon }) {
   );
 }
 
-// Progress Section Component with 7-day cycle
-function ProgressSection({ userStats, lastResetTime, onTimerToggle, showTimer }) {
-  const [timeRemaining, setTimeRemaining] = useState({
-    days: 0,
-    hours: 0,
-    minutes: 0,
-    seconds: 0,
-  });
 
-  // Calculate time remaining until next reset
-  useEffect(() => {
-    const calculateTimeRemaining = () => {
-      // Get the current date and time
-      const now = new Date();
-      
-      // Find when the next reset should happen (7 days from the last reset)
-      const lastReset = new Date(lastResetTime || now);
-      const nextResetTime = new Date(lastReset);
-      nextResetTime.setDate(nextResetTime.getDate() + 7);
-      
-      // Calculate the difference
-      const diffTime = nextResetTime - now;
-      
-      // If time is up, trigger reset
-      if (diffTime <= 0) {
-        setTimeRemaining({ days: 7, hours: 0, minutes: 0, seconds: 0 });
-        return;
-      }
-      
-      // Calculate days, hours, minutes, seconds
-      const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diffTime % (1000 * 60)) / 1000);
-      
-      setTimeRemaining({ days, hours, minutes, seconds });
-    };
-
-    // Calculate immediately
-    calculateTimeRemaining();
-    
-    // Then update every second
-    const interval = setInterval(calculateTimeRemaining, 1000);
-    
-    // Clean up
-    return () => clearInterval(interval);
-  }, [lastResetTime]);
-
-  return (
-    <View style={styles.sectionContainer}>
-      <View style={styles.progressSectionHeader}>
-        <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>MY PROGRESS</Text>
-        
-        <TouchableOpacity 
-          style={styles.timerButton}
-          onPress={onTimerToggle}
-        >
-          <MaterialCommunityIcons 
-            name="timer-outline" 
-            size={22} 
-            color={COLORS.primary} 
-          />
-          <Text style={styles.timerButtonText}>
-            {showTimer ? "Hide Timer" : "Show Timer"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-      
-      {showTimer && (
-        <View style={styles.timerContainer}>
-          <Text style={styles.timerText}>
-            Next reset in: {timeRemaining.days}d {timeRemaining.hours}h {timeRemaining.minutes}m {timeRemaining.seconds}s
-          </Text>
-        </View>
-      )}
-
-      <SkillProgressCard
-        title="Pronunciation Accuracy"
-        progress={userStats.pronunciationAccuracy}
-        total={100}
-        icon={<MaterialCommunityIcons name="microphone" size={20} color={COLORS.primary} />}
-      />
-
-      <SkillProgressCard
-        title="Vocabulary Building"
-        progress={userStats.vocabulary}
-        total={100}
-        icon={<MaterialCommunityIcons name="book-open-variant" size={20} color={COLORS.primary} />}
-      />
-
-      <SkillProgressCard
-        title="Learning Progress"
-        progress={userStats.learningProgress}
-        total={100}
-        icon={<MaterialCommunityIcons name="school" size={20} color={COLORS.primary} />}
-      />
-    </View>
-  );
-}
 
 export default function ProfileScreen() {
   const { user, isLoaded: isUserLoaded } = useUser();
@@ -219,12 +120,12 @@ export default function ProfileScreen() {
     text: "Learning another language is not only learning different words for the same things, but learning another way to think about things.",
     author: "Flora Lewis"
   });
-  
+
   // Progress cycle state
   const [lastResetTime, setLastResetTime] = useState(new Date().toISOString());
   const [showTimer, setShowTimer] = useState(false);
   const [previousAchievements, setPreviousAchievements] = useState([]);
-  
+
   const PROGRESS_STORAGE_KEY = '@language_app_progress_data';
 
   // Load progress data
@@ -235,7 +136,7 @@ export default function ProfileScreen() {
         const parsedData = JSON.parse(storedData);
         setLastResetTime(parsedData.lastResetTime);
         setPreviousAchievements(parsedData.previousAchievements || []);
-        
+
         // Check if reset is needed
         checkAndResetProgress(parsedData);
       }
@@ -243,13 +144,13 @@ export default function ProfileScreen() {
       console.error('Error loading progress data:', error);
     }
   };
-  
+
   // Check if progress needs to be reset (7-day cycle)
   const checkAndResetProgress = async (data) => {
     const now = new Date();
     const lastReset = new Date(data.lastResetTime);
     const diffDays = Math.floor((now - lastReset) / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays >= 7) {
       // Store achievements before reset
       const achievements = [
@@ -262,7 +163,7 @@ export default function ProfileScreen() {
           learningCompleted: userData?.stats?.learningProgress >= 100,
         }
       ];
-      
+
       // Reset progress stats in userData
       if (userData && userData.stats) {
         const resetUserData = {
@@ -276,16 +177,16 @@ export default function ProfileScreen() {
         };
         setUserData(resetUserData);
       }
-      
+
       // Update storage
       const updatedData = {
         lastResetTime: now.toISOString(),
         previousAchievements: achievements
       };
-      
+
       setLastResetTime(now.toISOString());
       setPreviousAchievements(achievements);
-      
+
       await AsyncStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(updatedData));
     }
   };
@@ -334,7 +235,7 @@ export default function ProfileScreen() {
 
       // Set the received data directly to userData state
       setUserData(data);
-      
+
       // Initialize progress data if it doesn't exist yet
       const progressData = await AsyncStorage.getItem(PROGRESS_STORAGE_KEY);
       if (!progressData) {
@@ -507,12 +408,12 @@ export default function ProfileScreen() {
         </View>
 
         {/* Progress Section with 7-day cycle */}
-        <ProgressSection 
-          userStats={userStats}
-          lastResetTime={lastResetTime}
-          onTimerToggle={() => setShowTimer(!showTimer)}
-          showTimer={showTimer}
-        />
+        {/* <ProgressSection
+  userStats={userStats}
+  onTimerToggle={() => setShowTimer(!showTimer)}
+  showTimer={showTimer}
+  userEmail={userData?.email || user?.primaryEmailAddress?.emailAddress}
+/> */}
 
         {/* Challenge Areas Section */}
         {userData?.challengeAreas && userData.challengeAreas.length > 0 && (
@@ -552,10 +453,10 @@ export default function ProfileScreen() {
         {previousAchievements.length > 0 && (
           <View style={styles.sectionContainer}>
             <Text style={[styles.sectionTitle, { color: COLORS.textSecondary }]}>PREVIOUS ACHIEVEMENTS</Text>
-            
+
             <View style={[styles.infoCard, { backgroundColor: COLORS.card }]}>
               {previousAchievements.slice(-3).map((achievement, index) => (
-                <View key={index} style={[styles.achievementRow, 
+                <View key={index} style={[styles.achievementRow,
                   index !== previousAchievements.slice(-3).length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border }
                 ]}>
                   <Text style={[styles.achievementTitle, { color: COLORS.text }]}>
@@ -681,7 +582,7 @@ export default function ProfileScreen() {
         )}
 
         {/* App Version */}
-        <Text style={[styles.version, { color: COLORS.textSecondary }]}>Version 1.0.0 (beta)</Text>
+        <Text style={[styles.version, { color: COLORS.textSecondary }]}>Version 1.0.1</Text>
       </ScrollView>
     </SafeAreaView>
   );

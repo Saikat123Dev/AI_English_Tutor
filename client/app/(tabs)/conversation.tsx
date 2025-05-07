@@ -1562,7 +1562,6 @@ const DebugButton = () => {
           );
         }
 
-        // Regular user message with action buttons - updated styling
         return (
           <View style={styles.userMessageContainer}>
             <Text style={[styles.messageText, styles.userMessageText]}>
@@ -1877,6 +1876,51 @@ const DebugButton = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  editContainer: {
+    backgroundColor: '#03302c',
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(35, 204, 150, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+    minWidth: 150, // Add minimum width to prevent buttons from squeezing
+  },
+  editInput: {
+    color: '#FFF',
+    fontSize: 16,
+    padding: 14,
+    lineHeight: 22,
+    minHeight: 60, // Ensure input has minimum height
+  },
+  editButtons: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(51, 65, 85, 0.5)',
+    minHeight: 44, // Ensure buttons have minimum height
+  },
+  editButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    minWidth: 80, // Ensure each button has minimum width
+  },
+  cancelButton: {
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(51, 65, 85, 0.5)',
+  },
+  saveButton: {
+    backgroundColor: 'rgba(35, 204, 150, 0.15)',
+  },
+  editButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 15,
   },
   scrollButton: {
     position: 'absolute',
@@ -2300,47 +2344,7 @@ const styles = StyleSheet.create({
     color: '#DCDDDE', // From first stylesheet
   },
   // Edit message styles
-  editContainer: {
-    backgroundColor: '#03302c', // Updated to match theme
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(35, 204, 150, 0.2)', // Using theme accent color
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  editInput: {
-    color: '#FFF',
-    fontSize: 16,
-    padding: 14,
-    lineHeight: 22,
-  },
-  editButtons: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(51, 65, 85, 0.5)',
-  },
-  editButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    borderRightWidth: 1,
-    borderRightColor: 'rgba(51, 65, 85, 0.5)',
-  },
-  saveButton: {
-    backgroundColor: 'rgba(35, 204, 150, 0.15)', // Using theme accent color
-  },
-  editButtonText: {
-    color: '#FFF',
-    fontWeight: '600',
-    fontSize: 15,
-  },
+
   // User message actions
   userMessageContainer: {
     backgroundColor: '#05382b',

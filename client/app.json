@@ -1,23 +1,25 @@
 {
   "expo": {
-    "name": "Ella",
+    "name": "SELA",
     "slug": "expo-clerk-social-login",
-    "version": "1.0.0",
+    "version": "1.0.2",
+
     "orientation": "portrait",
-    "icon": "./assets/images/icon.jpeg",
+    "icon": "./assets/images/logo.jpeg",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bipulpoudeldev.expo-clerk-social-login"
+      "bundleIdentifier": "com.saikat7679dev.expo-clerk-social-login"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.jpeg",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/logo.jpeg",
+        "backgroundColor": "#033330"
       },
-      "package": "com.saikat123.expoclerksociallogin"
+      "package": "com.saikat7679dev.expoclerksociallogin"
     },
     "web": {
       "bundler": "metro",
@@ -38,13 +40,17 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/icon.jpeg",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "image": "./assets/images/logo.jpeg",
+          "imageWidth": 600,
+          "backgroundColor": "#033330"
         }
       ]
     ],
+    "splash": {
+      "image": "./assets/images/logo.jpeg",
+      "resizeMode": "contain",
+      "backgroundColor": "#033330"
+    },
     "experiments": {
       "typedRoutes": true
     },
@@ -53,8 +59,14 @@
         "origin": false
       },
       "eas": {
-        "projectId": "ce9dcdd4-d1bc-487f-ae15-87998c2f6dd0"
+        "projectId": "9556b92b-94f8-4029-8678-0e376b180101"
       }
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9556b92b-94f8-4029-8678-0e376b180101"
     }
   }
 }
