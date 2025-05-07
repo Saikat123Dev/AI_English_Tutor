@@ -221,7 +221,7 @@ export default function RootLayout() {
 
               {/* Logo */}
               <Animated.Image
-                source={require("../assets/images/newicon.jpeg")}
+                source={require("../assets/images/sela.png")}
                 style={[
                   styles.logo,
                   {
