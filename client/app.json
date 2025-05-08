@@ -3,13 +3,11 @@
     "name": "SELA",
     "slug": "expo-clerk-social-login",
     "version": "1.0.2",
-
     "orientation": "portrait",
     "icon": "./assets/images/sela.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.saikat7679dev.expo-clerk-social-login"
@@ -17,6 +15,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/sela.png",
+        "resizeMode": "contain",
         "backgroundColor": "#033330"
       },
       "package": "com.saikat7679dev.expoclerksociallogin"
@@ -41,7 +40,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/sela.png",
-          "imageWidth": 600,
+          "resizeMode": "contain",
           "backgroundColor": "#033330"
         }
       ]
@@ -49,6 +48,7 @@
     "splash": {
       "image": "./assets/images/sela.png",
       "resizeMode": "contain",
+      "imageWidth": 300,
       "backgroundColor": "#033330"
     },
     "experiments": {
@@ -59,14 +59,14 @@
         "origin": false
       },
       "eas": {
-        "projectId": "9556b92b-94f8-4029-8678-0e376b180101"
+        "projectId": "d4415449-4ad3-4183-a965-135d2b89fc20"
       }
     },
     "runtimeVersion": {
       "policy": "sdkVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/9556b92b-94f8-4029-8678-0e376b180101"
+      "url": "https://u.expo.dev/d4415449-4ad3-4183-a965-135d2b89fc20"
     }
   }
 }
