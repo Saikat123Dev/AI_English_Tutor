@@ -1416,67 +1416,72 @@ export default function PronunciationPracticeScreen() {
           </View>
         </View>
 
-        {/* Accent preference selector */}
-        <View style={styles.accentPreferenceContainer}>
-          <View style={styles.accentSelectorHeader}>
-            <FontAwesome5 name="globe-americas" size={18} color="#10b981" />
-            <Text style={styles.accentSelectorTitle}>Accent Preference</Text>
-          </View>
+        {/* Accent preference selector - Improved with gradients and better spacing */}
+{/* Enhanced Accent preference selector with improved visual styling */}
+<View style={styles.accentPreferenceContainer}>
+  <View style={styles.accentSelectorHeader}>
+    <FontAwesome5 name="globe-americas" size={22} color="#10b981" />
+    <Text style={styles.accentSelectorTitle}>Accent Preference</Text>
+  </View>
 
-          <View style={styles.accentSelector}>
-            <Text style={styles.accentSelectorLabel}>Choose your target accent:</Text>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: preferBritishAccent ? 'transparent' : 'rgba(16, 185, 129, 0.2)',
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: preferBritishAccent ? 'transparent' : '#10b981',
-                }}
-                onPress={() => {
-                  setPreferBritishAccent(false);
-                  setUserAccent('American');
-                  Haptics.selectionAsync();
-                }}
-              >
-                <Text style={{
-                  color: preferBritishAccent ? 'rgba(255,255,255,0.6)' : '#10b981',
-                  fontWeight: preferBritishAccent ? 'normal' : 'bold'
-                }}>
-                  American
-                </Text>
-              </TouchableOpacity>
+  <View style={styles.accentSelector}>
+    <Text style={styles.accentSelectorLabel}>Choose your target accent:</Text>
+    <View style={styles.accentOptionsContainer}>
+      <TouchableOpacity
+        style={[
+          styles.accentOption,
+          preferBritishAccent ? styles.accentOptionInactive : styles.accentOptionActive
+        ]}
+        onPress={() => {
+          setPreferBritishAccent(false);
+          setUserAccent('American');
+          Haptics.selectionAsync();
+        }}
+      >
+        <FontAwesome5 
+          name="flag-usa" 
+          size={18} 
+          color={preferBritishAccent ? 'rgba(255,255,255,0.55)' : '#10b981'} 
+          style={styles.accentOptionIcon}
+        />
+        <Text style={[
+          styles.accentOptionText,
+          preferBritishAccent ? styles.accentOptionTextInactive : styles.accentOptionTextActive
+        ]}>
+          American
+        </Text>
+      </TouchableOpacity>
 
-              <TouchableOpacity
-                style={{
-                  backgroundColor: preferBritishAccent ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: preferBritishAccent ? '#10b981' : 'transparent',
-                }}
-                onPress={() => {
-                  setPreferBritishAccent(true);
-                  setUserAccent('British');
-                  Haptics.selectionAsync();
-                }}
-              >
-                <Text style={{
-                  color: preferBritishAccent ? '#10b981' : 'rgba(255,255,255,0.6)',
-                  fontWeight: preferBritishAccent ? 'bold' : 'normal'
-                }}>
-                  British
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          <Text style={styles.accentHelperText}>
-            Your accent preference affects pronunciation examples and feedback
-          </Text>
-        </View>
+      <TouchableOpacity
+        style={[
+          styles.accentOption,
+          preferBritishAccent ? styles.accentOptionActive : styles.accentOptionInactive
+        ]}
+        onPress={() => {
+          setPreferBritishAccent(true);
+          setUserAccent('British');
+          Haptics.selectionAsync();
+        }}
+      >
+        <FontAwesome5 
+          name="flag-checkered" 
+          size={18} 
+          color={preferBritishAccent ? '#10b981' : 'rgba(255,255,255,0.55)'} 
+          style={styles.accentOptionIcon}
+        />
+        <Text style={[
+          styles.accentOptionText,
+          preferBritishAccent ? styles.accentOptionTextActive : styles.accentOptionTextInactive
+        ]}>
+          British
+        </Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+  <Text style={styles.accentHelperText}>
+    Your accent preference affects pronunciation examples and feedback
+  </Text>
+</View>
 
         <Animated.View style={[styles.searchContainer, { opacity: fadeAnim }]}>
           <View style={styles.searchInputContainer}>
@@ -1873,41 +1878,99 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     marginRight: 16,
   },
-  // Accent selector styles
   accentPreferenceContainer: {
-    backgroundColor: '#06403a',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
+    backgroundColor: 'rgba(16, 185, 129, 0.02)',
+    borderRadius: 8,
+    padding: 20,
+    marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#0a7e6e',
+    borderColor: 'rgba(16, 185, 129, 0.5)',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   accentSelectorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    gap: 8,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(16, 185, 129, 0.2)',
   },
   accentSelectorTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#10b981',
+    marginLeft: 12,
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(16, 185, 129, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   accentSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 16,
   },
   accentSelectorLabel: {
-    fontSize: 15,
-    color: '#FFFFFF',
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginBottom: 16,
     fontWeight: '500',
+    letterSpacing: 0.2,
+  },
+  accentOption: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 120,
+    justifyContent: 'center',
+  },
+  accentOptionActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.18)',
+    borderColor: '#10b981',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+  },
+  accentOptionInactive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  accentOptionIcon: {
+    marginRight: 10,
+  },
+  accentOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  accentOptionTextActive: {
+    color: '#10b981',
+  },
+  accentOptionTextInactive: {
+    color: 'rgba(255, 255, 255, 0.65)',
+  },
+  accentOptionsContainer: {
+    flexDirection: 'row',
+    gap: 18,
   },
   accentHelperText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.65)',
     fontStyle: 'italic',
+    marginTop: 10,
+    textAlign: 'center',
+    paddingHorizontal: 10,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    letterSpacing: 0.2,
+    lineHeight: 20,
   },
   // Search container styles
   searchContainer: {

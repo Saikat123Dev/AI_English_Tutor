@@ -1703,7 +1703,7 @@ export default function VocabularyScreen() {
                 disabled={loading}
               >
 
-<MaterialIcons name="refresh" size={24} color="#4A90E2" />
+<MaterialIcons name="refresh" size={35} color="#7ff562" />
               </TouchableOpacity>
             </View>
           </View>
