@@ -3,7 +3,11 @@ import { createClient } from 'redis';
 
 // Initialize Redis client
 const client = createClient({
-  url: 'rediss://default:AVlxAAIjcDE1MDFiNDMxMzQ0Yjc0Mzk2Yjc4YjdjYjQzODEwNzRhZnAxMA@talented-lemur-22897.upstash.io:6379'
+  url: 'rediss://default:AVlxAAIjcDE1MDFiNDMxMzQ0Yjc0Mzk2Yjc4YjdjYjQzODEwNzRhZnAxMA@talented-lemur-22897.upstash.io:6379',
+   socket: {
+    tls: true,
+    rejectUnauthorized: false, // sometimes needed if certs fail
+  }
 });
 
 // Handle Redis errors
